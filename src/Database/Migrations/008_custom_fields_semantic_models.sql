@@ -1,0 +1,2 @@
+-- Deferred: see docs/architecture/spec-issues.md (2026-08-06).
+-- The entity model must explicitly authorize these platform tables before creation.
