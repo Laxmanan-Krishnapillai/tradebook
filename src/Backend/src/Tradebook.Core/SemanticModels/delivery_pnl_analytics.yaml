@@ -1,0 +1,57 @@
+version: "1.0"
+semantic_model:
+  name: delivery_pnl_analytics
+  description: Core delivery revenue, cost, VAT and P&L analytics.
+  target_entity: physical_delivery
+  entities:
+    - name: physical_delivery
+      table: physical_deliveries
+      primary_key: id
+      columns: [id, contract_id, contract_instance_id, book_type, status, supply_month, volume_mwh, revenue_eur, tax_eur, vat_eur, invoice_amount_eur, custom_fields]
+      description: Monthly delivery records.
+    - name: contract
+      table: contracts
+      primary_key: id
+      columns: [id, contract_name, product_type, counterparty_id]
+      description: Master contracts.
+    - name: counterparty
+      table: counterparties
+      primary_key: id
+      columns: [id, segment]
+      description: External trading partners.
+  joins:
+    - name: delivery_contract
+      left_entity: physical_delivery
+      right_entity: contract
+      join_type: inner
+      relationship: many_to_one
+      left_column: contract_id
+      right_column: id
+    - name: contract_counterparty
+      left_entity: contract
+      right_entity: counterparty
+      join_type: left
+      relationship: many_to_one
+      left_column: counterparty_id
+      right_column: id
+  dimensions:
+    - { name: delivery_id, entity: physical_delivery, type: string, sql: id }
+    - { name: contract_instance_id, entity: physical_delivery, type: string, sql: contract_instance_id }
+    - { name: supply_month, entity: physical_delivery, type: date, sql: supply_month, granularity: [day, week, month, quarter, year] }
+    - { name: book_type, entity: physical_delivery, type: string, sql: book_type }
+    - { name: status, entity: physical_delivery, type: string, sql: status }
+    - { name: contract_name, entity: contract, type: string, sql: contract_name }
+    - { name: product_type, entity: contract, type: string, sql: product_type }
+    - { name: counterparty_segment, entity: counterparty, type: string, sql: segment }
+    - { name: custom_quality, entity: physical_delivery, type: string, sql: custom_fields, jsonb_key: quality }
+  measures:
+    - { name: delivery_count, entity: physical_delivery, type: count, sql: id }
+    - { name: volume_mwh, entity: physical_delivery, type: sum, sql: volume_mwh, format: decimal }
+    - { name: revenue_eur, entity: physical_delivery, type: sum, sql: revenue_eur, format: currency }
+    - { name: tax_eur, entity: physical_delivery, type: sum, sql: tax_eur, format: currency }
+    - { name: vat_eur, entity: physical_delivery, type: sum, sql: vat_eur, format: currency }
+    - { name: invoice_amount_eur, entity: physical_delivery, type: sum, sql: invoice_amount_eur, format: currency }
+  metrics:
+    - { name: avg_price_eur_mwh, description: Blended achieved price per MWh., expression: "revenue_eur / NULLIF(volume_mwh, 0)", format: currency }
+    - { name: avg_invoice_eur_mwh, description: Average invoiced amount per MWh., expression: "invoice_amount_eur / NULLIF(volume_mwh, 0)", format: currency }
+    - { name: vat_ratio, description: VAT as a ratio of invoiced amount., expression: "vat_eur / NULLIF(invoice_amount_eur, 0)", format: percentage }

@@ -63,6 +63,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         await base.DisposeAsync();
     }
 
+    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
+
     private static string RepositoryRoot()
     {
         for (var current = new DirectoryInfo(AppContext.BaseDirectory); current is not null; current = current.Parent)
