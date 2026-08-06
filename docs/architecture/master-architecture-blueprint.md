@@ -30,7 +30,7 @@ $$\text{CRS} = 100 \times \left( 1 - \frac{\text{Score}_{\text{Iteration 3}}}{\t
 | Dimension | Iteration 1 Polyglot Stack | Iteration 3 Pragmatic Stack | Complexity Reduction Rationale |
 | :--- | :---: | :---: | :--- |
 | **Stateful Databases** | **38 pts** (5 DBs: Postgres, SurrealDB, ScyllaDB, ClickHouse, Redis) | **10 pts** (1 Primary Postgres 17 + TimescaleDB + Outbox) | Eliminates 4 external stateful database clusters, CDC sync pipelines, and cross-store data drift. |
-| **Event Messaging & CDC** | **20 pts** (Kafka/Redpanda + Debezium + ZooKeeper/KRaft) | **4.5 pts** (NATS JetStream static Go binary, <50MB RAM) | Replaces complex JVM/C++ Kafka brokers with zero-dependency static NATS binary. |
+| **Event Messaging & CDC** | **20 pts** (Kafka/Redpanda + Debezium + ZooKeeper/KRaft) | **4.5 pts** (scored with NATS at the time; broker since removed entirely per D2 — now zero external brokers) | Replaces complex JVM/C++ Kafka brokers with zero-dependency static NATS binary. |
 | **Backend API & Compute** | **18 pts** (Polyglot Rust 1.80+ & .NET 9 microservices, gRPC) | **6.5 pts** (.NET 9 Modular Monolith + FastEndpoints + Native AOT) | Consolidates service boundaries into a single C# codebase with sub-5ms cold starts and <30MB RAM. |
 | **Deployment Footprint** | **14 pts** (Multi-region Kubernetes, Istio service mesh, 12 pods) | **5 pts** (2-node Container / Systemd PaaS, Caddy reverse proxy) | Replaces k8s cluster orchestration with simple container deployments managed via Terraform. |
 | **CI/CD & Developer DX** | **8 pts** (Dual-toolchain Cargo + MSBuild + Proto generation) | **3.11 pts** (Single .NET SDK + Vite frontend build toolchain) | Accelerates build pipelines from ~18 min to <2.5 min; unified local `docker-compose up`. |
@@ -86,13 +86,13 @@ $$\text{CRS} = 100 \times \left( 1 - \frac{\text{Score}_{\text{Iteration 3}}}{\t
 |   |  +-------------------------------------------------------------------------------------+  |   |
 |   +-------------------------------------------------------------------------------------------+   |
 |                                     |                                 |                           |
-|                      Npgsql / Dapper SQL Writes                NATS JetStream Pub/Sub             |
-|                    (Single Atomic Postgres Tx)                 (KV Cache & Inter-Service)         |
+|                      Npgsql / Dapper SQL Writes                In-Proc Outbox Fan-Out             |
+|                    (Single Atomic Postgres Tx)                 (LISTEN/NOTIFY + SignalR)          |
 |                                     v                                 v                           |
 |   +---------------------------------------------------+   +-----------------------------------+   |
-|   |        PostgreSQL 17 Consolidated Primary DB      |   |     NATS JetStream Binary Broker  |   |
+|   |        PostgreSQL 17 Consolidated Primary DB      |   |  In-Proc Outbox Dispatcher (D2)   |   |
 |   |  - Relational Core Domain Entities (`contracts`)   |   |  - Real-Time Event Bus            |   |
-|   |  - TimescaleDB Hypertables (`market_prices`)      |   |  - KV Cache & Stream Persistence  |   |
+|   |  - Plain `market_prices` EOD Table (D3)           |   |  - pg_notify wake + 1s poll       |   |
 |   |  - Bi-Temporal Audit Log (`TSTZRANGE` Exclusion)  |   +-----------------------------------+   |
 |   |  - Transactional Outbox Table (`outbox_events`)   |                                           |
 |   |  - Dynamic Semantic Models (`semantic_models`)    |                                           |
@@ -126,7 +126,7 @@ sequenceDiagram
     participant SignalR as SignalR MessagePack Hub
     participant S3 as Versioned S3 Backup Bucket
 
-    Note over Client, Dexie: 1. User performs action (e.g. Edit Trade Quantity)
+    Note over Client: 1. User performs action (e.g. Edit Delivery Volume)
     Client->>Client: Mutate TanStack Query cache (0ms optimistic UI update)
     Client->>Client: Capture rollback snapshot (TanStack Query mutation context)
     
@@ -142,11 +142,11 @@ sequenceDiagram
     
     Note over API, Cache: 4. Invalidate Cache & Notify Workers
     API->>Cache: Invalidate L1 memory key & pub/sub L2 channel
-    API->>Dexie: Acknowledge transaction success -> Mark mutation 'SYNCED'
+    API-->>Client: 200 OK with new entity version -> TanStack Query confirms optimistic state
     
     Note over DB, Broker: 5. Background Outbox Worker Processing
     API->>DB: Poll/Listen outbox_events WHERE processed_at IS NULL
-    API->>Broker: Publish Event to NATS JetStream (stream: `trade.events`)
+    API->>Broker: NOTIFY outbox_new_event (dispatcher claims batch in tx, D2)
     API->>DB: UPDATE outbox_events SET processed_at = clock_timestamp()
     
     Note over Broker, SignalR: 6. Real-Time WebSocket Push to Subscribers
@@ -162,7 +162,7 @@ sequenceDiagram
 
 ## 3. Production PostgreSQL 17 DDL Schema
 
-Below is the complete, execution-ready PostgreSQL 17 master DDL schema aligned to the Excel-verified domain model in `architecture/entity-model.md` (v2.0). It supports bi-temporal audit logs with `TSTZRANGE` and `btree_gist` exclusion constraints, TimescaleDB hypertables and continuous aggregates for market/FX index data, transactional outbox events, custom field definitions, dynamic semantic models, and point-in-time state recovery functions.
+Below is the complete, execution-ready PostgreSQL 17 master DDL schema aligned to the Excel-verified domain model in `architecture/entity-model.md` (v2.0). It supports bi-temporal audit logs with `TSTZRANGE` and `btree_gist` exclusion constraints, a plain `market_prices` daily EOD table (TimescaleDB removed per D3), transactional outbox events, custom field definitions, dynamic semantic models, and point-in-time state recovery functions.
 
 ```sql
 -- ============================================================================
@@ -171,9 +171,9 @@ Below is the complete, execution-ready PostgreSQL 17 master DDL schema aligned t
 -- ============================================================================
 
 -- Enable required PostgreSQL extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- uuid-ossp not needed: gen_random_uuid() is built into PG 13+ (D3 cleanup)
 CREATE EXTENSION IF NOT EXISTS "btree_gist";
-CREATE EXTENSION IF NOT EXISTS "timescaledb";
+-- timescaledb removed per D3: all tables are plain PostgreSQL
 
 -- ============================================================================
 -- 0. Enum Types (mirrors architecture/entity-model.md §4)
@@ -589,11 +589,11 @@ CREATE TABLE hedges (
 CREATE INDEX idx_hedges_contract ON hedges(contract_id, month);
 
 -- ============================================================================
--- 4. TimescaleDB Time-Series (Market & FX Indexes)
+-- 4. Market & FX Index Time-Series (plain tables, D3)
 -- ============================================================================
 
 CREATE TABLE market_prices (
-    price_date DATE NOT NULL,
+    price_date DATE PRIMARY KEY,
     ttf_eur_mwh NUMERIC(12,6),
     egsi_etf_eur_mwh NUMERIC(12,6),
     the_eur_mwh NUMERIC(12,6),
@@ -609,16 +609,13 @@ CREATE TABLE market_prices (
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
--- Convert to TimescaleDB hypertable partitioned by day (30-day chunks)
-SELECT create_hypertable('market_prices', 'price_date', chunk_time_interval => INTERVAL '30 days');
+-- Plain table, ~1 row/day (TimescaleDB removed per D3 — future tick path is
+-- native declarative partitioning, see architecture/decision-log.md)
 
-CREATE INDEX idx_market_prices_date ON market_prices (price_date DESC);
-
--- Monthly index average continuous aggregate
-CREATE MATERIALIZED VIEW market_prices_monthly
-WITH (timescaledb.continuous) AS
+-- Monthly index averages as a plain SQL view (no continuous aggregate needed)
+CREATE VIEW market_prices_monthly AS
 SELECT
-    time_bucket('1 month', price_date) AS month,
+    date_trunc('month', price_date)::date AS month,
     AVG(ttf_eur_mwh) AS avg_ttf_eur_mwh,
     AVG(egsi_etf_eur_mwh) AS avg_egsi_etf_eur_mwh,
     AVG(the_eur_mwh) AS avg_the_eur_mwh,
@@ -626,12 +623,7 @@ SELECT
     AVG(eur_chf) AS avg_eur_chf,
     AVG(eur_dkk) AS avg_eur_dkk
 FROM market_prices
-GROUP BY month;
-
-SELECT add_continuous_aggregate_policy('market_prices_monthly',
-    start_offset => INTERVAL '3 months',
-    end_offset => INTERVAL '1 month',
-    schedule_interval => INTERVAL '1 day');
+GROUP BY 1;
 
 CREATE TABLE capacity_price_indexes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -850,7 +842,7 @@ $$ LANGUAGE plpgsql STABLE;
 
 ### 4.1 Native AOT & FastEndpoints REPR Pattern
 
-The Tradebook backend is engineered as a high-throughput .NET 9 Modular Monolith using ASP.NET Core Web API compiled with **Native AOT** (`<PublishAot>true</PublishAot>`). The API layer discards heavy MVC controllers and MediatR indirection in favor of **FastEndpoints** (REPR Pattern: Request-Endpoint-Response).
+The Tradebook backend is engineered as a high-throughput .NET 9 Modular Monolith using ASP.NET Core Web API built as a standard JIT Release publish (Native AOT deferred per D7). The API layer discards heavy MVC controllers and MediatR indirection in favor of **FastEndpoints** (REPR Pattern: Request-Endpoint-Response).
 
 #### C# FastEndpoint Example: `CreatePhysicalDeliveryEndpoint.cs`
 

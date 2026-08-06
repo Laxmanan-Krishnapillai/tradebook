@@ -498,11 +498,11 @@ Certificate transactions from DENA or AIB registries. Maps 1:1 to Salesforce `Ce
 
 ### 2.12 `market_prices` — Historical Market Price Time Series
 
-Time-indexed market price data (`Tradebook_Physical.xlsm` → `Prices`, `Tradebook_Certificates_v2.xlsx` → `Prices`). TimescaleDB hypertable (30-day chunks).
+Time-indexed market price data (`Tradebook_Physical.xlsm` → `Prices`, `Tradebook_Certificates_v2.xlsx` → `Prices`). Plain PostgreSQL table, one row per price date (TimescaleDB removed per decision-log D3).
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `price_date` | DATE NOT NULL | Hypertable partition key |
+| `price_date` | DATE PRIMARY KEY | One row per price date |
 | `ttf_eur_mwh` | NUMERIC(12,6) | TTF Day-Ahead |
 | `egsi_etf_eur_mwh` | NUMERIC(12,6) | EGSI ETF index |
 | `the_eur_mwh` | NUMERIC(12,6) | German hub |
@@ -787,8 +787,8 @@ Instance:       {ContractName}-{DeliveryMonthNo}-{Year}                         
 2. **Contract Instance**: `contract_instance_id` is unique per contract per delivery month; derived as `{contract_name}-{month}-{year}`.
 3. **Bi-Temporal Audit**: All core entities require bi-temporal tracking (`valid_time TSTZRANGE`, `system_time TSTZRANGE`) via `btree_gist` exclusion constraints.
 4. **Volume Hierarchy**: `volume_mwh` = final settled (takes precedence over corrections `volume_corr1_mwh`, `volume_corr2_mwh`).
-5. **Salesforce Sync**: `sf_transaction_id`, `sf_contract_name`, `sf_invoice_ref` sync via NATS JetStream outbox events. `Fact_Transactions` links SF `Certificate_Transaction__c` to Tradebook contracts via `Sales_TB_Contract` / `Purchase_TB_Contract` and detects `Sales_Month_Mismatch` / `Purchase_Month_Mismatch`.
-6. **TimescaleDB**: `market_prices` is a hypertable (30-day chunks). Continuous aggregates for monthly OHLCV / index averages.
+5. **Salesforce Sync**: `sf_transaction_id`, `sf_contract_name`, `sf_invoice_ref` sync via transactional outbox events (D2; the Salesforce integration itself is future scope). `Fact_Transactions` links SF `Certificate_Transaction__c` to Tradebook contracts via `Sales_TB_Contract` / `Purchase_TB_Contract` and detects `Sales_Month_Mismatch` / `Purchase_Month_Mismatch`.
+6. **Time-series**: `market_prices` is a plain table (~1 row/day); monthly index averages via a plain SQL view (TimescaleDB removed per decision-log D3).
 7. **Currency Normalization**: Monetary amounts stored in EUR. Local currency stored alongside for invoicing (`tax_tariffs.currency`).
 8. **Balance Integrity**: Sum of sourcing volumes + transfer volumes = sales volumes per month per balancing group (`Balance` / `Balance Dashboard` sheets).
 9. **Subsidy Consistency**: Contract suffix subsidy flag (`S`/`U`) must equal `subsidy_status` (`SUB`/`UNS`).

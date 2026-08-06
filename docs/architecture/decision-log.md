@@ -74,7 +74,7 @@ One container host (API + static frontend behind Caddy) + managed PostgreSQL. Ti
 ## D10 — Verification honesty
 
 - No absolute performance gates. Removed: >35,000 req/sec, <50ms p99, <5ms cold start, <30/50MB RAM, 5,000 msg/sec, 60fps assertions, <10ms query asserts.
-- Gates are: functional tests green + **recorded measured baselines** (NBomber/Playwright runs record numbers on a documented reference machine; a later run failing >20% below its recorded baseline fails).
+- Gates are: functional tests green + **recorded measured baselines** (k6/Playwright runs record numbers on a documented reference machine; a later run failing >20% below its recorded baseline fails).
 - Every "Verified" status in any document is stripped until code exists and the verification actually ran.
 
 ## D11 — Security baseline
@@ -118,7 +118,7 @@ Single repository: `src/Backend`, `src/Frontend`, `src/Database`, `infra/`, `tes
 | 06 | Major | ChartAdapter contract is the deliverable; ECharts + Lightweight Charts; delete WebGL pool + memory governor; adopt Task 04's AST/endpoint |
 | 07 | **Rewrite** | Tier 1 only; plain `postgres:17`; no NATS/Redis/ScyllaDB; versioned backup bucket instead of WORM |
 | 08 | Minor | Remove AOT references; formally own ArchUnitNET |
-| 09 | Moderate | Baseline-regression gates replace absolute numbers; drop offline-replay scenarios; resolve NBomber commercial license |
+| 09 | Moderate | Baseline-regression gates replace absolute numbers; drop offline-replay scenarios; NBomber replaced by k6 (commercial-license issue) |
 | 10 | Moderate | Drop Merkle/WORM, NATS, and batch-endpoint verification; remove `|| true` from verify scripts |
 
 ---

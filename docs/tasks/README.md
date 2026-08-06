@@ -106,7 +106,7 @@ The traceability matrix below establishes explicit mapping between every require
 | :--- | :--- | :--- | :--- | :--- |
 | **Iter 1 - R1** | Bi-Temporal Audit Trails & Full Revertability | **Task 01** | `TSTZRANGE` valid/system time, PL/pgSQL triggers, `audit_log` | SQL automated trigger mutation test & range exclusion check |
 | **Iter 1 - R2** | Semantic Data Modeling & Heterogeneous Data Pipelines | **Task 04** | Single C# AST→SQL semantic compiler with identifier whitelist (dbt & Timescale aggregates removed, D3/D4) | Dynamic SQL generation unit tests incl. injection suite |
-| **Iter 1 - R3** | High-Performance Snappy CRUD UI/UX & Local Sync | **Task 05** | React 19, TanStack Query v5, IndexedDB (Dexie) mutation queue, TanStack Table v8, Kbar cmdk | Playwright optimistic UI mutation test (<16ms frame target) |
+| **Iter 1 - R3** | High-Performance Snappy CRUD UI/UX & Local Sync | **Task 05** | React 19, TanStack Query v5 optimistic mutations + version OCC (D5), TanStack Table v8, cmdk palette | Playwright optimistic UI mutation test (<16ms frame target) |
 | **Iter 1 - R4** | Plug-and-Play Custom Visualizations Framework | **Task 06** | Apache ECharts canvas/WebGL, Tremor UI, React Grid Layout, metric query binding | Live tick WebGL frame rate benchmark (>60fps) |
 | **Iter 2 - R1** | Adversarial Tech Stack Review & 90/10 Simplification | **Task 01, Task 02, Task 03** | Single PostgreSQL 17 primary storage, .NET 9 JIT monolith (D7), in-proc outbox dispatcher (D2) | Build verification & measured startup/memory baseline (no absolute gate, D10) |
 | **Iter 2 - R2** | Real-World Industry Case Studies & Engineering Post-Mortems | **Task 03, Task 05** | Linear-style local sync queue, PostHog outbox worker resilience, Retool widget registry | Network latency disconnect/reconnect sync test |
@@ -139,7 +139,7 @@ To maximize execution velocity while avoiding merge conflicts and state corrupti
 |   └── Subagent Zeta:  Task 08 (AGENTS.md Rules, Automated TypeGen, ArchUnitNET, Stryker Setup)                          |
 +-------------------------------------------------------------------------------------------------------------------------+
 | WAVE 4 (Frontend UI & Visualizations):                                                                                  |
-|   ├── Subagent Eta:   Task 05 (React 19 SPA, TanStack Local Sync, Dexie Queue, Command Palette)                        |
+|   ├── Subagent Eta:   Task 05 (React 19 SPA, TanStack Query Optimistic OCC, Command Palette   )                        |
 |   └── Subagent Theta: Task 06 (ECharts / Tremor Widget Registry, Dynamic Metric Builder)                                 |
 +-------------------------------------------------------------------------------------------------------------------------+
 | WAVE 5 (QA & Performance Engineering):                                                                                  |
@@ -160,7 +160,7 @@ To maximize execution velocity while avoiding merge conflicts and state corrupti
 
 ## 5. Standard Structure for Task Specification Files
 
-All 10 detailed task specification markdown files (`tasks/task-01-database-and-timescaledb-setup.md` through `tasks/task-10-platform-integration-and-verification.md`) follow a strict, standardized 6-part structure:
+All 10 detailed task specification markdown files (`tasks/task-01-database-and-timescaledb-setup.md` through `tasks/task-10-platform-integration-master-blueprint.md`) follow a strict, standardized 6-part structure:
 
 ```markdown
 # Task [XX]: [Task Title]
