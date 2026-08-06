@@ -3,5 +3,6 @@
 **/node_modules/
 TestResults/
 StrykerOutput/
-!bin/
-!bin/agent-commit.sh
+!/bin/
+!/bin/agent-commit.sh
+stryker-run*.log

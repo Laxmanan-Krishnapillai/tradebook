@@ -7,7 +7,7 @@
     "mutation-level": "Standard",
     "concurrency": 4,
     "reporters": ["html", "progress", "cleartext", "json"],
-    "thresholds": { "high": 85, "low": 80, "break": 80 },
-    "mutate": ["src/Backend/src/Tradebook.Api/Features/**/*.cs", "!src/Backend/src/Tradebook.Api/Features/**/Models/*.cs", "!src/Backend/src/Tradebook.Api/Features/**/Dto/*.cs"]
+    "thresholds": { "high": 85, "low": 75, "break": 80 },
+    "mutate": ["Features/**/*.cs", "!Features/**/Models/*.cs", "!Features/**/Dto/*.cs"]
   }
 }
