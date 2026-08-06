@@ -22,7 +22,7 @@ Removed technology you must NOT introduce even if a stray mention survives somew
 
 ## Task order
 
-01 → 02 → 03 and 08 (parallel) → 04 and 05 (parallel) → 06 and 07 (parallel) → 09 → 10. Implement only your assigned task. Its prerequisite tasks must already be merged; verify that before starting, and stop if they are not.
+01 → 02 → {03, 04, 07, 08 in parallel} → 05 → {06, 09 in parallel} → 10. When tasks in the same wave run as parallel agents, each works on its own branch; merge within a wave in the order 08 → 03 → 04 → 07 (08 touches solution/CI plumbing, 03 and 04 both register into Program.cs, 07 is mostly isolated under infra/), rebasing each branch on the previous merge. Implement only your assigned task. Its prerequisite tasks must already be merged; verify that before starting, and stop if they are not.
 
 Your assigned task: **<TASK NN>**
 
