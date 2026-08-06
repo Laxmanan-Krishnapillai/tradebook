@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Tradebook.IntegrationTests'">
+    <PackageReference Include="Respawn" Version="6.2.1" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,23 @@
+name: Verify TypeScript Contract Drift
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  check-contract-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - run: dotnet tool restore
+      - run: dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug
+      - run: dotnet typegen generate --project-folder .
+      - run: git diff --exit-code -- src/Frontend/src/api/generated

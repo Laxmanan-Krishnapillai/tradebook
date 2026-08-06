@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "dotnet-typegen": {
+      "version": "5.0.0",
+      "commands": ["dotnet-typegen"]
+    },
+    "dotnet-stryker": {
+      "version": "4.16.0",
+      "commands": ["dotnet-stryker"]
+    }
+  }
+}

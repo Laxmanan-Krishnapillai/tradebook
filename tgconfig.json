@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jburzynski/TypeGen/master/schema/tgconfig.json",
+  "outputPath": "./src/Frontend/src/api/generated",
+  "clearOutputDirectory": true,
+  "generateObsoleteAttribute": true,
+  "typeUnionsForEnums": true,
+  "enumStringInitializers": true,
+  "propertyNameConverters": ["TypeGen.Core.Converters.PascalCaseToCamelCaseConverter"],
+  "customTypeMappings": {
+    "System.Guid": "string",
+    "System.DateOnly": "string",
+    "System.DateTime": "string",
+    "System.DateTimeOffset": "string",
+    "decimal": "number"
+  },
+  "csNullableTranslation": "Null",
+  "assemblies": ["./src/Backend/src/Tradebook.Core/bin/Debug/net9.0/Tradebook.Core.dll"]
+}

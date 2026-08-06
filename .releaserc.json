@@ -1,0 +1,11 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    ["@semantic-release/commit-analyzer", {"preset": "conventionalcommits", "releaseRules": [{"type": "docs", "release": "patch"}, {"type": "refactor", "release": "patch"}, {"type": "style", "release": false}, {"type": "perf", "release": "minor"}, {"type": "feat", "release": "minor"}, {"type": "fix", "release": "patch"}]}],
+    ["@semantic-release/release-notes-generator", {"preset": "conventionalcommits"}],
+    ["@semantic-release/changelog", {"changelogFile": "CHANGELOG.md"}],
+    ["@semantic-release/exec", {"prepareCmd": "dotnet build src/Backend/Tradebook.sln -c Release /p:Version=${nextRelease.version}"}],
+    ["@semantic-release/git", {"assets": ["CHANGELOG.md", "Directory.Build.props"], "message": "chore(release): ${nextRelease.version} [skip ci]\\n\\n${nextRelease.notes}"}],
+    "@semantic-release/github"
+  ]
+}
