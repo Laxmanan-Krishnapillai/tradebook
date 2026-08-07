@@ -1,0 +1,41 @@
+# tradebook — recommended Codex CLI config.
+# Copy to  ~/.codex/config.toml  (merge into your existing one; do NOT commit your
+# personal ~/.codex/config.toml into the repo). Keep this .example in the repo as the
+# team reference. Verify keys against `codex --help` / your installed version.
+
+model = "gpt-5.6-sol"                 # flagship coding model (bare "gpt-5.6" also aliases to Sol)
+model_reasoning_effort = "high"       # default working level for tasks 09–24
+plan_mode_reasoning_effort = "high"   # planning quality compounds downstream
+
+approval_policy = "on-request"        # supervised interactive default; the overnight
+                                      # driver passes --ask-for-approval never itself.
+sandbox_mode = "workspace-write"      # never danger-full-access for this work
+
+log_user_prompt = false               # prompts can contain source/paths — keep them out of logs
+
+[sandbox_workspace_write]
+network_access = true                 # dotnet restore / npm ci / Testcontainers image pulls
+
+# --- profiles: select with `codex --profile <name>` or in the driver -------------
+# Very-High tasks (Entra auth = 12, TypeSpec contract = 16) and the hardest refactors.
+[profiles.deep]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "xhigh"
+
+# Cheap triage / trivial edits.
+[profiles.quick]
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+
+# Spark (Cerebras fast-inference). VERY fast but LIMITED context — use only for
+# small, well-scoped, single-file mechanical edits and fast interactive iteration.
+# Do NOT use it for overnight multi-file/architectural tasks; its context can't hold
+# the spec + AGENTS.md + the files a real task touches.
+[profiles.spark]
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "medium"
+
+# --- optional: schema-aware Postgres introspection during data-layer tasks (15,20) -
+# [mcp_servers.postgres]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost:5432/tradebook"]
