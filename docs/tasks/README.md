@@ -2,16 +2,18 @@
 
 **Author**: Worker 3 (Master Task Breakdown Index Author)  
 **Date**: August 5, 2026  
-**Target File**: `c:\Users\LaxmananKrishnapilla\tradebook\tasks\README.md`  
+**Target File**: `docs/tasks/README.md`
 **Status**: Authoritative Master Implementation Roadmap & Subagent Execution Specification  
 
 ---
 
 > **DESCOPE NOTICE (2026-08-06)** — [`architecture/decision-log.md`](../architecture/decision-log.md) is now authoritative over this index. Removed from the stack: NATS JetStream, TimescaleDB, DuckDB WASM, Dexie offline queue + `/api/v1/mutations/batch`, S3 WORM/Merkle, Native AOT, WebGL pool/memory governor, infra tiers 2–3, and all absolute perf gates. Each task file carries its own notice; tasks 03 and 07 require full rewrites. The audit table is named `audit_log` (not `bi_temporal_audit_log`).
 
+> **GREENFIELD MODERNIZATION NOTICE (2026-08-07)** — The project is confirmed **greenfield**; only React (frontend) and .NET (backend) are fixed. **Tasks 13–24** (see §7) form a full-adoption modernization program from a two-round tooling review plus a UI-craft review: .NET 10 LTS + Central Package Management (13); backend analyzers/formatting (14); Vogen domain primitives (15); a TypeSpec → OpenAPI → Zod contract pipeline (16, supersedes Task 08 TypeGen); Wolverine durable outbox (17, supersedes Task 03's hand-rolled outbox); frontend platform (18); UI primitives + forms (19); DbUp/sqlc/Squawk migrations (20); .NET Aspire (21); xUnit v3/CsCheck (22); the OKLCH design system + motion foundation (23); and Agent UI guardrails + visual QA (24). These are committed, repo-wide adoptions. **Task 12 (Microsoft Entra ID) is a separate post-roadmap identity task** implementing D15, not part of the modernization program.
+
 ## Executive Overview
 
-This master index defines the complete, end-to-end implementation roadmap for the **Tradebook** platform. It consolidates all technical, architectural, agent-readiness, and infrastructure requirements synthesized across **Iterations 1–3** into **10 granular, independently verifiable implementation tasks**. 
+This master index defines the complete, end-to-end implementation roadmap for the **Tradebook** platform. It contains the **10 original implementation tasks** preserved by [`architecture/decision-log.md`](../architecture/decision-log.md) D1 plus **Task 11**, a post-roadmap frontend routing and state-boundary remediation task added after implementation review on 2026-08-07. A **Microsoft Entra ID identity migration** was subsequently added as **Task 12** (implementing decision-log D15), and a **Greenfield Modernization Program** as **Tasks 13–24** (see §7); within their scope these are authoritative over earlier stack choices.
 
 Every task is designed to be executed by specialized parallel subagents or engineering leads without ambiguity, adhering strictly to the **Pragmatic .NET 9 + PostgreSQL 17 + React 19** tech stack (2026-08-06 de-scope — TimescaleDB and NATS JetStream removed, see `architecture/decision-log.md`) defined in `architecture/master-architecture-blueprint.md` and `research/agent-readiness-framework.md`.
 
@@ -21,7 +23,7 @@ The **authoritative domain source of truth** is `architecture/entity-model.md` (
 
 ## 1. Master Implementation Task Breakdown Index Table
 
-The table below summarizes all 10 implementation tasks, detailing their primary domain, target specification document, entity/data-model scope, logical prerequisites, complexity, and current specification status. Entity references are bound to `architecture/entity-model.md` (v2.0).
+The table below summarizes all 24 task specifications (the 11 original/remediation tasks, the Task 12 Entra ID identity migration, and the Greenfield Modernization Program Tasks 13–24 — see §7), detailing their primary domain, target specification document, entity/data-model scope, logical prerequisites, complexity, and current specification status. Entity references are bound to `architecture/entity-model.md` (v2.0).
 
 | Task ID | Task Title | Primary Domain | Target Specification File | Entities / Data Model | Logical Prerequisites | Complexity | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -33,8 +35,22 @@ The table below summarizes all 10 implementation tasks, detailing their primary 
 | **Task 06** | Plug-and-Play Custom Visualizations & Dynamic Dashboard Framework | Visualizations & Analytics | [`tasks/task-06-custom-visualizations-framework.md`](task-06-custom-visualizations-framework.md) | `market_prices`, `capacity_price_indexes`, `physical_deliveries` (dashboard series) | Task 04, Task 05 | Medium | Implemented |
 | **Task 07** | Infrastructure as Code (IaC) Terraform Modules & Docker Setup | Infrastructure & DevOps | [`tasks/task-07-infrastructure-terraform-docker.md`](task-07-infrastructure-terraform-docker.md) | Full schema (plain Postgres 17; Azure Tier 1 — rewritten 2026-08-06, D9/D14) | Task 01, Task 02 | Medium | Implemented |
 | **Task 08** | Agent-Readiness Framework, Automated TypeGen & Tooling | Agent Governance | [`tasks/task-08-agent-readiness-framework.md`](task-08-agent-readiness-framework.md) | All entities (TypeGen DTO generation + DB-first codegen) | Task 02 | Medium | Implemented |
-| **Task 09** | Automated End-to-End (E2E) Testing Harness & Load Baselines (k6) | QA & Performance | [`tasks/task-09-e2e-testing-and-nbomber-harness.md`](task-09-e2e-testing-and-nbomber-harness.md) | `contracts`, `physical_deliveries`, `market_prices` (mutation + load fixtures) | Task 03, Task 05, Task 07 | Medium | Specified |
-| **Task 10** | Platform Integration, Master Documentation & Production Readiness Verification | Master Integration | [`tasks/task-10-platform-integration-master-blueprint.md`](task-10-platform-integration-master-blueprint.md) | All entities (integration + reconciliation audit) | Tasks 01–09 | Medium | Specified |
+| **Task 09** | Automated End-to-End (E2E) Testing Harness & Load Baselines (k6) | QA & Performance | [`tasks/task-09-e2e-testing-and-nbomber-harness.md`](task-09-e2e-testing-and-nbomber-harness.md) | `contracts`, `physical_deliveries`, `market_prices` (mutation + load fixtures) | Task 03, Task 05, Task 07, Task 11 | Medium | Specified |
+| **Task 10** | Platform Integration, Master Documentation & Production Readiness Verification | Master Integration | [`tasks/task-10-platform-integration-master-blueprint.md`](task-10-platform-integration-master-blueprint.md) | All entities (integration + reconciliation audit) | Tasks 01–09, Task 11 | Medium | Specified |
+| **Task 11** | Frontend Routing, Server-State & Session Boundary Hardening | Frontend Platform | [`tasks/task-11-frontend-routing-state-hardening.md`](task-11-frontend-routing-state-hardening.md) | No schema changes; frontend routes, authenticated Query caches, realtime entity views | Task 03, Task 05, Task 06 | High | Specified |
+| **Task 12** | Microsoft Entra ID Authentication & Authorization Migration | Identity & Access | [`tasks/task-12-microsoft-entra-id-authentication.md`](task-12-microsoft-entra-id-authentication.md) | No schema change; JWT/SignalR auth, MSAL, session boundaries, Entra Terraform (D15) | Task 02, Task 03, Task 07, Task 11 | Very High | Specified |
+| **Task 13** | Platform Currency & Central Package Management (.NET 10 LTS + CPM) | Foundation / Platform | [`tasks/task-13-platform-currency-and-central-package-management.md`](task-13-platform-currency-and-central-package-management.md) | No schema change; all `.csproj`, `Directory.Packages.props`, `global.json` | None | Medium | Specified |
+| **Task 14** | Backend Compile-Time Safety, Analyzers & Formatting | Backend Quality | [`tasks/task-14-backend-compile-time-safety-and-analyzers.md`](task-14-backend-compile-time-safety-and-analyzers.md) | No schema change; analyzers, `[OptionsValidator]`, Mapperly, record DTOs | Task 13 | High | Specified |
+| **Task 15** | Strongly-Typed Domain Primitives (Vogen) | Domain Type-Safety | [`tasks/task-15-strongly-typed-domain-primitives-vogen.md`](task-15-strongly-typed-domain-primitives-vogen.md) | All entity IDs + `Price`/`Quantity` value objects | Task 13 (coord. 16) | High | Specified |
+| **Task 16** | Contract-First API — TypeSpec, OpenAPI & Generated TS Client (supersedes Task 08 TypeGen) | API Contract & Type Safety | [`tasks/task-16-contract-first-api-typespec-openapi.md`](task-16-contract-first-api-typespec-openapi.md) | All DTOs/endpoints; money-as-string; SignalR payload validation | Task 13 (supersedes 08; rel. 15, 17) | Very High | Specified |
+| **Task 17** | Wolverine Messaging & Durable Transactional Outbox (supersedes Task 03 outbox) | Real-Time Messaging | [`tasks/task-17-wolverine-messaging-and-durable-outbox.md`](task-17-wolverine-messaging-and-durable-outbox.md) | `contracts`, `physical_deliveries`, `market_prices` events | Task 13 (supersedes 03) | High | Specified |
+| **Task 18** | Frontend Platform — React Compiler, Vite 8, Tailwind v4 & ESLint 10 Type-Aware | Frontend Platform | [`tasks/task-18-frontend-platform-react-compiler-vite8-eslint10.md`](task-18-frontend-platform-react-compiler-vite8-eslint10.md) | No schema change; frontend build, lint, compiler | Task 13 | High | Specified |
+| **Task 19** | UI Primitives on Base UI, Tremor Removal & Schema-Validated Forms | Frontend UI & Forms | [`tasks/task-19-ui-primitives-base-ui-and-forms-validation.md`](task-19-ui-primitives-base-ui-and-forms-validation.md) | No schema change; UI components, forms, boundary validation | Task 16, Task 18 (rel. 11) | High | Specified |
+| **Task 20** | Migration Runner (DbUp), Compile-Time SQL (sqlc) & Postgres Safety Gates | Storage & Data Access | [`tasks/task-20-data-migrations-dbup-and-sql-safety.md`](task-20-data-migrations-dbup-and-sql-safety.md) | All migrations `001–013_*.sql`; typed query layer | Task 13 (coord. 15) | High | Specified |
+| **Task 21** | .NET Aspire Local Orchestration, Observability & Deployment | Infrastructure & DevOps | [`tasks/task-21-dotnet-aspire-orchestration-and-observability.md`](task-21-dotnet-aspire-orchestration-and-observability.md) | No schema change; AppHost, OpenTelemetry, ACA deploy | Task 13, Task 17 (rel. 07) | High | Specified |
+| **Task 22** | Test Platform Modernization — xUnit v3 / MTP & Property-Based Testing | QA & Verification | [`tasks/task-22-test-platform-modernization-xunit-v3-cscheck.md`](task-22-test-platform-modernization-xunit-v3-cscheck.md) | Test suites; SemanticQueryCompiler + value-object properties | Task 13 (coord. 04, 15, 21) | Medium | Specified |
+| **Task 23** | Design System & Motion Foundation | Frontend Design System | [`tasks/task-23-design-system-and-motion-foundation.md`](task-23-design-system-and-motion-foundation.md) | No schema change; OKLCH tokens, typography-for-data, motion vocabulary | Task 18, Task 19 (rel. 05, 06) | High | Specified |
+| **Task 24** | Agent UI Guardrails & Visual QA | Agent Governance / Frontend | [`tasks/task-24-agent-ui-guardrails-and-visual-qa.md`](task-24-agent-ui-guardrails-and-visual-qa.md) | No schema change; token-lock lint, component registry + MCP, `DESIGN.md`, visual-regression + a11y gates | Task 08, Task 18, Task 19, Task 23 (rel. 09) | High | Specified |
 
 ---
 
@@ -81,6 +97,12 @@ The execution order of tasks is governed by explicit architectural dependencies.
 |   +-----------------------------------+                                                                                     |
 |            │                                                                                                            |
 |            ▼                                                                                                            |
+|   PHASE 4B: FRONTEND ARCHITECTURE HARDENING                                                                             |
+|   +-------------------------------------------------------------------+                                                 |
+|   | Task 11: TanStack Router + Query/Session/Zustand Boundaries       |                                                 |
+|   +-------------------------------------------------------------------+                                                 |
+|                                    │                                                                                    |
+|                                    ▼                                                                                    |
 |   PHASE 5: QA, PERFORMANCE & INTEGRATION VERIFICATION                                                                   |
 |   +-------------------------------------------------------------------+                                                 |
 |   | Task 09: Automated E2E Playwright Harness & k6 Load Baselines     |                                                 |
@@ -106,15 +128,18 @@ The traceability matrix below establishes explicit mapping between every require
 | :--- | :--- | :--- | :--- | :--- |
 | **Iter 1 - R1** | Bi-Temporal Audit Trails & Full Revertability | **Task 01** | `TSTZRANGE` valid/system time, PL/pgSQL triggers, `audit_log` | SQL automated trigger mutation test & range exclusion check |
 | **Iter 1 - R2** | Semantic Data Modeling & Heterogeneous Data Pipelines | **Task 04** | Single C# AST→SQL semantic compiler with identifier whitelist (dbt & Timescale aggregates removed, D3/D4) | Dynamic SQL generation unit tests incl. injection suite |
-| **Iter 1 - R3** | High-Performance Snappy CRUD UI/UX & Local Sync | **Task 05** | React 19, TanStack Query v5 optimistic mutations + version OCC (D5), TanStack Table v8, cmdk palette | Playwright optimistic UI mutation test (<16ms frame target) |
+| **Iter 1 - R3** | High-Performance Snappy CRUD UI/UX & Local Sync | **Task 05, Task 11** | React 19, TanStack Router, session-isolated TanStack Query v5 optimistic mutations + version OCC (D5), TanStack Table v8, Zustand UI/auth boundaries, cmdk palette | Unit tests plus Playwright optimistic mutation, routing, and session-isolation flows |
 | **Iter 1 - R4** | Plug-and-Play Custom Visualizations Framework | **Task 06** | Apache ECharts canvas/WebGL, Tremor UI, React Grid Layout, metric query binding | Live tick WebGL frame rate benchmark (>60fps) |
 | **Iter 2 - R1** | Adversarial Tech Stack Review & 90/10 Simplification | **Task 01, Task 02, Task 03** | Single PostgreSQL 17 primary storage, .NET 9 JIT monolith (D7), in-proc outbox dispatcher (D2) | Build verification & measured startup/memory baseline (no absolute gate, D10) |
 | **Iter 2 - R2** | Real-World Industry Case Studies & Engineering Post-Mortems | **Task 03, Task 05** | Linear-style local sync queue, PostHog outbox worker resilience, Retool widget registry | Network latency disconnect/reconnect sync test |
 | **Iter 2 - R3** | Infrastructure IaC Terraform Modules & Monthly Cost Scaling | **Task 07** | Terraform modules for Tier 1 (Lean), Tier 2 (Growth), Tier 3 (Scale); docker-compose dev setup | `tflint` validation & `docker compose up` multi-container health check |
 | **Iter 3 - R1** | Master Architecture Blueprint Consolidation | **Task 10** | Single authoritative architecture document (`architecture/master-architecture-blueprint.md`) | Document completeness audit & cross-link validation |
 | **Iter 3 - R2** | Agent-Readiness & Governance Framework | **Task 08** | Root `AGENTS.md`, `TypeGen` DTO generator, `ArchUnitNET` slice tests, Stryker mutation testing | ArchUnitNET boundary failure assertion & Stryker score ≥80% |
-| **Iter 3 - R3** | Master Implementation Task Breakdown & Specifications | **Task 01 to Task 10** | Master task breakdown (`tasks/README.md`) and 10 detailed task specifications | Audit of all 10 task specification files in `tasks/` |
+| **Iter 3 - R3** | Master Implementation Task Breakdown & Specifications | **Task 01 to Task 11** | Master task breakdown (`tasks/README.md`): 10 original specifications plus the post-roadmap Task 11 remediation specification | Audit of all 11 task specification files in `tasks/` |
 | **Iter 3 - R3.5** | Domain & Entity Model Alignment (Excel-Verified) | **Task 01** | Authoritative `architecture/entity-model.md` (v2.0), entity-aligned PostgreSQL 17 DDL in blueprint §3, contract naming convention (`BFEX45.BT.2301.CO2E-9-2023`) | DDL cross-check vs `entity-model.md` and source Excel workbooks (5 files) |
+| **Post-roadmap - R1** | Frontend routing and state-boundary remediation | **Task 11** | Typed TanStack route tree; Query cache isolation/retry/realtime/conflict contracts; typed Zustand shared-UI bridge | Vitest router, two-user cache-isolation, mutation-policy, realtime mapping, and UI-store tests |
+| **Post-roadmap - R2** | Microsoft Entra ID identity migration (D15) | **Task 12** | MSAL SPA auth, Entra JWT validation, SignalR bearer transport, session isolation, Entra Terraform | Auth integration tests + fail-closed authorization checks |
+| **Modernization - R1** | Greenfield full-adoption stack modernization + UI craft | **Tasks 13–24** | .NET 10 + CPM; analyzers/CSharpier/Vogen; TypeSpec+OpenAPI+Zod; Wolverine outbox; React Compiler/Vite 8/Base UI; DbUp+sqlc+Squawk; .NET Aspire; xUnit v3/CsCheck; OKLCH design system + motion; agent UI guardrails + visual QA | Per-task §5 acceptance workflows; supersedes Task 08 TypeGen and Task 03 outbox |
 
 ---
 
@@ -142,11 +167,14 @@ To maximize execution velocity while avoiding merge conflicts and state corrupti
 |   ├── Subagent Eta:   Task 05 (React 19 SPA, TanStack Query Optimistic OCC, Command Palette   )                        |
 |   └── Subagent Theta: Task 06 (ECharts / Tremor Widget Registry, Dynamic Metric Builder)                                 |
 +-------------------------------------------------------------------------------------------------------------------------+
-| WAVE 5 (QA & Performance Engineering):                                                                                  |
+| WAVE 5 (Frontend Architecture Hardening):                                                                               |
+|   └── Subagent Lambda: Task 11 (TanStack Router, Query/session isolation, Zustand shared UI)                           |
++-------------------------------------------------------------------------------------------------------------------------+
+| WAVE 6 (QA & Performance Engineering):                                                                                  |
 |   └── Subagent Iota:  Task 09 (Playwright E2E Test Suite, k6 Baseline Harness, CI/CD Pipeline)                         |
 +-------------------------------------------------------------------------------------------------------------------------+
-| WAVE 6 (Master Platform Integration & Audit):                                                                           |
-|   └── Subagent Kappa: Task 10 (End-to-End Integration, Master Documentation, Final Verification)                         |
+| WAVE 7 (Master Platform Integration & Audit):                                                                           |
+|   └── Subagent Kappa: Task 10 (End-to-End Integration, Master Documentation, Final Verification)                      |
 +-------------------------------------------------------------------------------------------------------------------------+
 ```
 
@@ -160,7 +188,7 @@ To maximize execution velocity while avoiding merge conflicts and state corrupti
 
 ## 5. Standard Structure for Task Specification Files
 
-All 10 detailed task specification markdown files (`tasks/task-01-database-and-timescaledb-setup.md` through `tasks/task-10-platform-integration-master-blueprint.md`) follow a strict, standardized 6-part structure:
+All 11 detailed task specification markdown files (the original Task 01–10 files plus `tasks/task-11-frontend-routing-state-hardening.md`) follow a strict, standardized 6-part structure:
 
 ```markdown
 # Task [XX]: [Task Title]
@@ -253,10 +281,41 @@ terraform -chdir=infra/terraform validate
 dotnet test tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj
 dotnet stryker --config-file stryker-config.json
 
-# 8. E2E Playwright & k6 Load Baseline (Task 09)
+# 8. Frontend Routing & State Hardening (Task 11)
+npm --prefix src/Frontend run lint
+npm --prefix src/Frontend test -- --run
+npm --prefix src/Frontend run build
+
+# 9. E2E Playwright & k6 Load Baseline (Task 09)
 npx playwright test --config tests/e2e/playwright.config.ts
 k6 run tests/performance/load-baseline.js --out json=tests/performance/baseline-run.json
 ```
 
+## 7. Greenfield Modernization Program (Tasks 13–24)
+
+> Added 2026-08-07. Derived from a two-round modern-tooling research review plus a UI-craft review, accepted in full. Because the project is greenfield, these are **committed, repo-wide adoptions applied everywhere**, not trials, and each is authoritative over earlier stack choices within its scope. (Task 12, the Microsoft Entra ID migration, is a separate post-roadmap identity task implementing D15 and is not part of this program.) Full rationale, current (Aug 2026) versions, and sources are in the research reports delivered 2026-08-07.
+
+### 7.1 Program Index
+
+| Task | Adopts (repo-wide) | Supersedes |
+| :--- | :--- | :--- |
+| **13** | .NET 10 LTS; NuGet Central Package Management + transitive pinning | .NET 9 target; per-project versions |
+| **14** | Meziantou / SonarAnalyzer / BannedApi / Threading analyzers, `.editorconfig`, `TreatWarningsAsErrors`, CSharpier, `[OptionsValidator]`, Mapperly, `record`/`required` DTOs | reflection-based options validation; ad-hoc mapping (and commercial AutoMapper/MediatR/MassTransit) |
+| **15** | Vogen strongly-typed IDs + `Price`/`Quantity` value objects across every aggregate | raw `Guid`/`string` IDs; bare `decimal` money |
+| **16** | TypeSpec → OpenAPI 3.1 → Hey API (TS types + Zod v4 validators + TanStack Query hooks); money-as-string; SignalR validation; CI zero-drift gate | **Task 08 TypeGen** (types-only) |
+| **17** | Wolverine durable PostgreSQL outbox/inbox (on Dapper, no EF Core) + transactional mediator; SignalR fed by handlers | **Task 03** hand-rolled `LISTEN/NOTIFY` outbox |
+| **18** | React Compiler, Vite 8 (Rolldown), Tailwind v4, ESLint 10 flat config + typescript-eslint type-checked, Knip | ESLint 8 legacy `.eslintrc`; manual memoization |
+| **19** | Base UI primitives (via shadcn/ui); React Hook Form + Zod forms; Zod boundary validation | Radix-as-primary; **@tremor/react** (removed) |
+| **20** | DbUp migration runner; sqlc-gen-csharp schema-verified typed SQL; Squawk + sqlfluff gates | hand-rolled embedded-resource migration runner |
+| **21** | .NET Aspire AppHost + OpenTelemetry + `Aspire.Hosting.Testing`; devcontainer; ACA deploy path | docker-compose as the local orchestrator |
+| **22** | xUnit v3 on Microsoft.Testing.Platform; CsCheck property-based tests (semantic compiler + value objects) | xUnit v2 |
+| **23** | OKLCH design-token system (Tailwind v4 `@theme`), typography-for-data (`tabular-nums`), six-state components, motion vocabulary (Motion via `LazyMotion`, NumberFlow, View Transitions, `tw-animate-css`) | undefined "bootstrap" styling; ad-hoc visual decisions |
+| **24** | Token-lock lint, curated shadcn component registry + MCP, `DESIGN.md`, Storybook + Argos visual-regression + `axe` CI gates, design-review agent | ungoverned agent-authored UI drift |
+
+### 7.2 Sequencing
+
+**Task 13 is foundational and unblocks Tasks 14–24** (it establishes the `net10.0` target and a populated `Directory.Packages.props`). After it, three tracks proceed in parallel: the **backend** track (14 → 15 → 16 and 17), the **frontend** track (18 → 19 → 23 → 24), and the **data/DX** track (20, 21, 22). Cross-task coordination: Task 16 (contract) and Task 15 (value-object → primitive mapping) align on wire shapes; Task 17 messages carry Task 15 value objects; Task 21 orchestrates the Task 17 workers and the Vite frontend; Task 22 property-tests the Task 04 semantic compiler and Task 15 value objects; Task 23 builds the design system on the Task 18/19 platform; and Task 24's visual-regression gate rides on the Task 09 Playwright harness. These tasks do not change `architecture/entity-model.md` (v2.0) — the domain model remains the source of truth.
+
+---
 ---
 *End of Master Task Breakdown Index & Roadmap Specification.*
