@@ -10,29 +10,19 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/compose/postgres-init:/docker-entrypoint-initdb.d:ro
+      - ./infra/database-ops:/opt/tradebook/database-ops:ro
+      - ./src/Database/Migrations:/opt/tradebook/migrations:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tradebook -d tradebook"]
+      test:
+        - CMD-SHELL
+        - >-
+          test "$$(cat /proc/1/comm)" = postgres &&
+          test "$$(psql --username tradebook --dbname tradebook --tuples-only --no-align
+          --command 'SELECT count(*) FROM schema_migrations' 2>/dev/null)" -eq
+          "$$(find /opt/tradebook/migrations -maxdepth 1 -type f -name '*.sql' | wc -l)"
       interval: 5s
       timeout: 3s
       retries: 10
-
-  api:
-    build: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      Database__ConnectionString: Host=postgres;Database=tradebook;Username=tradebook;Password=${POSTGRES_PASSWORD}
-      Jwt__Issuer: Tradebook
-      Jwt__Audience: Tradebook
-      Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in .env}
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8080/health/live"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
 
 volumes:
   pgdata:

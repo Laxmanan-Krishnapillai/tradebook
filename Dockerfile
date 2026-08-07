@@ -13,6 +13,27 @@ COPY tests/ ./tests/
 RUN dotnet restore src/Backend/Tradebook.sln
 RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj -c Release -o /app/publish --no-restore
 
+FROM postgres:17-bookworm AS database-ops
+ARG AZCOPY_VERSION=10.32.4
+ARG AZCOPY_SHA256=8f859a0dbbc117660c249fb3569694fc8a0f33b68701f5b2b92ccc001ee50784
+USER root
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates curl \
+    && curl --fail --location --show-error \
+       "https://github.com/Azure/azure-storage-azcopy/releases/download/v${AZCOPY_VERSION}/azcopy_linux_amd64_${AZCOPY_VERSION}.tar.gz" \
+       --output /tmp/azcopy.tar.gz \
+    && echo "${AZCOPY_SHA256}  /tmp/azcopy.tar.gz" | sha256sum --check --strict \
+    && mkdir /tmp/azcopy \
+    && tar --extract --gzip --file /tmp/azcopy.tar.gz --directory /tmp/azcopy --strip-components=1 \
+    && install --mode 0555 /tmp/azcopy/azcopy /usr/local/bin/azcopy \
+    && rm -rf /tmp/azcopy /tmp/azcopy.tar.gz /var/lib/apt/lists/*
+COPY src/Database/Migrations/ /opt/tradebook/migrations/
+COPY infra/database-ops/ /opt/tradebook/database-ops/
+RUN chmod 0555 /opt/tradebook/database-ops/*.sh
+USER postgres
+ENTRYPOINT ["/bin/bash"]
+CMD ["/opt/tradebook/database-ops/run-migrations.sh"]
+
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-bookworm-slim AS runtime
 WORKDIR /app
 RUN apt-get update \
@@ -26,4 +47,6 @@ RUN chown -R tradebook:tradebook /app
 USER tradebook
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
+    CMD curl --fail --silent --show-error http://localhost:8080/health/live || exit 1
 ENTRYPOINT ["dotnet", "Tradebook.Api.dll"]
