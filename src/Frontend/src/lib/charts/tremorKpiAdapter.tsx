@@ -1,4 +1,6 @@
-import { Card, Metric, Text } from '@tremor/react';
+import Card from '@tremor/react/dist/components/layout-elements/Card/Card.js';
+import Metric from '@tremor/react/dist/components/text-elements/Metric/Metric.js';
+import Text from '@tremor/react/dist/components/text-elements/Text/Text.js';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ChartAdapter, ChartSpec, SeriesData, ThemeTokens } from '../../types/visualizations';
 export class TremorKpiAdapter implements ChartAdapter {

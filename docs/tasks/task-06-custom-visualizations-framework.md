@@ -98,7 +98,7 @@ src/Frontend/tests/                     # test root shared with Task 05
     └── lttbDownsample.test.ts
 ```
 
-**Dependencies** (pinned major versions): `echarts@^5.5.0`, `lightweight-charts@^5.0.0` (**pinned v5**), `@tremor/react@^3.18.0`, `react-grid-layout@^1.4.0`; from Task 05: `@tanstack/react-query@^5.0.0`, `@tanstack/react-table@^8.0.0` (TABLE widgets reuse the virtualized table).
+**Dependencies** (pinned major versions): `echarts@^6.1.0` (the maintained v6 line; the adapter was revalidated against its migration contract), `lightweight-charts@^5.0.0` (**pinned v5**), `@tremor/react@^3.18.0`, `react-grid-layout@^1.4.0`; from Task 05: `@tanstack/react-query@^5.0.0`, `@tanstack/react-table@^8.0.0` (TABLE widgets reuse the virtualized table).
 
 ---
 

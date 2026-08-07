@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "metric": "chartRenderMs",
+  "referenceRunner": {
+    "recordedAtUtc": "2026-08-07T16:21:53.528Z",
+    "platform": "win32",
+    "release": "10.0.26100",
+    "architecture": "x64",
+    "cpuModel": "AMD Ryzen 5 7530U with Radeon Graphics         ",
+    "cpuCount": 12,
+    "memoryBytes": 15919865856,
+    "nodeVersion": "v24.18.1",
+    "browserUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.7339.16 Safari/537.36",
+    "viewport": {
+      "width": 1280,
+      "height": 720,
+      "deviceScaleFactor": 1
+    },
+    "warmupRuns": 2,
+    "measuredRuns": 7
+  },
+  "samplesMs": [
+    52.79999999701977,
+    51.599999994039536,
+    42.20000000298023,
+    51.099999994039536,
+    63.099999994039536,
+    59.8999999910593,
+    89.20000000298023
+  ],
+  "medianMs": 52.79999999701977
+}

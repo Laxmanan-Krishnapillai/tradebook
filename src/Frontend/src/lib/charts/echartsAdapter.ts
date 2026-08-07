@@ -1,5 +1,5 @@
 import * as echarts from 'echarts';
-import { toEChartsOption } from '../../components/visualizations/VisualEncodingMapper';
+import { toEChartsOption } from './visualEncodingMapper';
 import type { ChartAdapter, ChartSpec, SeriesData, ThemeTokens } from '../../types/visualizations';
 export class EChartsAdapter implements ChartAdapter {
   private chart: echarts.ECharts | null = null; private spec: ChartSpec | null = null; private tokens: ThemeTokens | null = null; private lastData: SeriesData | null = null;
