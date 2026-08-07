@@ -1,0 +1,37 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}/tradebook-api:${{ github.sha }}
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Update Container App
+        run: az containerapp update --name tradebook-api --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --image "ghcr.io/${{ github.repository }}/tradebook-api:${{ github.sha }}"
+      - name: Smoke check readiness
+        run: curl --fail --retry 12 --retry-delay 5 "https://${{ vars.TRADEBOOK_API_FQDN }}/health/ready"

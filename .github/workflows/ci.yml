@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'src/Backend/**'
+              - 'src/Database/**'
+              - 'tests/**'
+              - 'Directory.Build.*'
+            frontend:
+              - 'src/Frontend/**'
+            infra:
+              - 'infra/**'
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 9.0.x }
+      - run: dotnet build src/Backend/Tradebook.sln -c Debug -warnaserror
+      - run: dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj
+      - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.x, cache: npm, cache-dependency-path: src/Frontend/package-lock.json }
+      - run: npm ci
+        working-directory: src/Frontend
+      - run: npm run build
+        working-directory: src/Frontend
+      - run: npm test -- --run
+        working-directory: src/Frontend
+
+  infra:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform init -backend=false
+      - run: terraform -chdir=infra/terraform validate
+      - run: terraform -chdir=infra/terraform fmt -check

@@ -1,6 +1,7 @@
 **/bin/
 **/obj/
 **/node_modules/
+**/.terraform/
 TestResults/
 StrykerOutput/
 !/bin/
