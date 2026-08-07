@@ -70,3 +70,14 @@ also configures only 365 days of soft-delete retention, so removing the immutabi
 resource would leave the intended seven-year backup retention contract undefined.
 Proposed resolution: remove the immutability resource and specify a non-WORM,
 versioning-based seven-year lifecycle/retention mechanism before production deployment.
+
+## 2026-08-07 - Task 10 Caddy rollout step has no Azure deployment contract
+
+Task 10 requires Caddy TLS and WebSocket proxy orchestration, but D14 and the implemented
+Task 07 infrastructure deploy the API directly behind Azure Container Apps ingress. The
+repository contains no Caddyfile, Caddy container, custom-domain variables, or certificate
+ownership contract. Adding those here would invent infrastructure outside Task 07's
+reviewed Azure topology. Proposed resolution: either declare Container Apps ingress the
+production TLS/WebSocket edge and remove Caddy from Task 10, or revise Task 07 with an
+explicit Caddy deployment and certificate contract. Until resolved, the production
+runbook must not claim that Caddy is deployed.
