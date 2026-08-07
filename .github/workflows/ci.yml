@@ -171,3 +171,18 @@ jobs:
         run: |
           export POSTGRES_PASSWORD='ci-local-postgres-only'
           bash infra/validation/verify-backup-restore.sh
+
+  ci-required:
+    needs: [governance, contracts, backend, frontend, infra]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all gates to pass (skipped is OK, failure/cancelled is not)
+        shell: bash
+        run: |
+          results='${{ join(needs.*.result, ",") }}'
+          echo "gate results: $results"
+          case "$results" in
+            *failure*|*cancelled*) echo "a required gate did not pass"; exit 1 ;;
+            *) echo "all required gates passed or were skipped" ;;
+          esac

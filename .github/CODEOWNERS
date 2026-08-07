@@ -1,0 +1,15 @@
+# tradebook code owners — protect the verification stack and tests.
+# Requires branch protection with "require_code_owner_reviews": true.
+
+/tests/                              @Laxmanan-Krishnapillai
+**/*Tests*/                          @Laxmanan-Krishnapillai
+/src/Frontend/**/*.test.ts           @Laxmanan-Krishnapillai
+/src/Frontend/**/*.test.tsx          @Laxmanan-Krishnapillai
+/src/Frontend/**/*.spec.ts           @Laxmanan-Krishnapillai
+/src/Frontend/**/*.spec.tsx          @Laxmanan-Krishnapillai
+/stryker-config.json                 @Laxmanan-Krishnapillai
+/bin/verify.sh                       @Laxmanan-Krishnapillai
+/bin/check-test-integrity.sh         @Laxmanan-Krishnapillai
+/.github/                            @Laxmanan-Krishnapillai
+/AGENTS.md                           @Laxmanan-Krishnapillai
+/src/Backend/AGENTS.md               @Laxmanan-Krishnapillai
