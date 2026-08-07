@@ -6,4 +6,5 @@
 export interface LoginResponse {
     accessToken: string;
     expiresAtUtc: string;
+    actorId: string;
 }

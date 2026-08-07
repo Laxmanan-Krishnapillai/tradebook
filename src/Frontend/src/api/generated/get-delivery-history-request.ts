@@ -4,12 +4,12 @@
  */
 
 export interface GetDeliveryHistoryRequest {
-    contractId: string;
-    contractInstanceId: string;
-    bookType: string;
-    status: string;
-    fromMonth: string;
-    toMonth: string;
+    contractId?: string | null;
+    contractInstanceId?: string | null;
+    bookType?: string | null;
+    status?: string | null;
+    fromMonth?: string | null;
+    toMonth?: string | null;
     page: number;
     pageSize: number;
 }

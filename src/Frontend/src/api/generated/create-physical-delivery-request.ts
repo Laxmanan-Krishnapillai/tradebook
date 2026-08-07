@@ -5,13 +5,13 @@
 
 export interface CreatePhysicalDeliveryRequest {
     contractId: string;
-    contractInstanceId: string;
+    contractInstanceId?: string | null;
     bookType: string;
     supplyMonth: string;
-    capacityMw: number;
-    volumeNominatedMwh: number;
-    volumeRealisedMwh: number;
-    priceMechanism: string;
-    startDay: string;
-    endDay: string;
+    capacityMw?: number | null;
+    volumeNominatedMwh?: number | null;
+    volumeRealisedMwh?: number | null;
+    priceMechanism?: string | null;
+    startDay?: string | null;
+    endDay?: string | null;
 }

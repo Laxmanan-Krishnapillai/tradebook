@@ -9,5 +9,5 @@ namespace Tradebook.Core.Interfaces;
 public interface IOutboxEventFanout
 {
     Task PublishEntityChangedAsync(Guid eventId, long sequenceId, string aggregateType,
-        Guid aggregateId, string eventType, string payloadJson, CancellationToken cancellationToken);
+        string aggregateId, string eventType, string payloadJson, CancellationToken cancellationToken);
 }

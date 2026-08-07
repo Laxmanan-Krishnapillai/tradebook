@@ -27,7 +27,10 @@ public sealed class AnalyticsQueryEndpoint(SemanticQueryCompiler compiler, INpgs
         }
 
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
-        var result = await connection.QueryAsync(query.SqlText, query.Parameters);
+        var result = await connection.QueryAsync(new CommandDefinition(
+            query.SqlText,
+            query.Parameters,
+            cancellationToken: cancellationToken));
         var rows = result.Select(row =>
         {
             var values = (IDictionary<string, object?>)row;

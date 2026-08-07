@@ -7,5 +7,5 @@ export interface ProblemDetailsResponse {
     type: string;
     title: string;
     status: number;
-    detail: string;
+    detail: string | null;
 }

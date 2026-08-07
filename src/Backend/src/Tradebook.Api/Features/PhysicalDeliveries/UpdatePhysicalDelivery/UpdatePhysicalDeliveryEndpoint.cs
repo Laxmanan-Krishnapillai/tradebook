@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Api.Security;
 
 namespace Tradebook.Api.Features.PhysicalDeliveries.UpdatePhysicalDelivery;
 

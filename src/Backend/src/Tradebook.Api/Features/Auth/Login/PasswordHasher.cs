@@ -23,7 +23,10 @@ public static class PasswordHasher
     public static bool Verify(string password, string encodedHash)
     {
         var parts = encodedHash.Split('.');
-        if (parts.Length != 4 || parts[0] != Prefix || !int.TryParse(parts[1], out var iterations))
+        if (parts.Length != 4
+            || parts[0] != Prefix
+            || !int.TryParse(parts[1], out var iterations)
+            || iterations < Iterations)
         {
             return false;
         }
@@ -36,6 +39,11 @@ public static class PasswordHasher
             expected = Convert.FromBase64String(parts[3]);
         }
         catch (FormatException)
+        {
+            return false;
+        }
+
+        if (salt.Length != SaltSize || expected.Length != HashSize)
         {
             return false;
         }

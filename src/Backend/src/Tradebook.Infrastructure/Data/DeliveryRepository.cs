@@ -1,6 +1,6 @@
 using System.Data;
-using System.Text.Json;
 using Dapper;
+using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
 
@@ -60,10 +60,11 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
         var deliveryId = Guid.NewGuid();
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-        await SetActorAsync(connection, transaction, actorId, cancellationToken);
+        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, cancellationToken);
         const string insert = """INSERT INTO physical_deliveries (id, contract_id, contract_instance_id, book_type, supply_month, capacity_mw, volume_nominated_mwh, volume_realised_mwh, volume_mwh, price_mechanism, start_day, end_day) VALUES (@DeliveryId, @ContractId, @ContractInstanceId, @BookType::book_type_enum, @SupplyMonth, @CapacityMw, @VolumeNominatedMwh, @VolumeRealisedMwh, @VolumeRealisedMwh, @PriceMechanism::gas_price_mech_enum, @StartDay, @EndDay) RETURNING """ + DetailsProjection;
         var details = ToDto(await connection.QuerySingleAsync<DeliveryRow>(new CommandDefinition(insert, new { DeliveryId = deliveryId, request.ContractId, request.ContractInstanceId, request.BookType, request.SupplyMonth, request.CapacityMw, request.VolumeNominatedMwh, request.VolumeRealisedMwh, request.PriceMechanism, request.StartDay, request.EndDay }, transaction, cancellationToken: cancellationToken)));
-        await WriteOutboxAsync(connection, transaction, deliveryId, "Created", details, cancellationToken);
+        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.PhysicalDelivery,
+            deliveryId.ToString(), "Created", details.Version, null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return details;
     }
@@ -72,12 +73,13 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
     {
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-        await SetActorAsync(connection, transaction, actorId, cancellationToken);
+        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, cancellationToken);
         var sql = """UPDATE physical_deliveries SET volume_realised_mwh = COALESCE(@VolumeRealisedMwh, volume_realised_mwh), volume_mwh = COALESCE(@VolumeRealisedMwh, volume_mwh), status = COALESCE(@Status::report_status_enum, status), updated_at = clock_timestamp(), version = version + 1 WHERE id = @DeliveryId AND version = @Version RETURNING """ + DetailsProjection;
         var row = await connection.QuerySingleOrDefaultAsync<DeliveryRow>(new CommandDefinition(sql, request, transaction, cancellationToken: cancellationToken));
         if (row is null) { await transaction.RollbackAsync(cancellationToken); return null; }
         var details = ToDto(row);
-        await WriteOutboxAsync(connection, transaction, request.DeliveryId, "Updated", details, cancellationToken);
+        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.PhysicalDelivery,
+            request.DeliveryId.ToString(), "Updated", details.Version, null, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return details;
     }
@@ -86,15 +88,19 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
     {
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
-        await SetActorAsync(connection, transaction, actorId, cancellationToken);
+        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, cancellationToken);
         var row = await connection.QuerySingleOrDefaultAsync<DeliveryRow>(new CommandDefinition("UPDATE physical_deliveries SET status = 'Cancelled', updated_at = clock_timestamp(), version = version + 1 WHERE id = @DeliveryId AND version = @ExpectedVersion RETURNING " + DetailsProjection, new { DeliveryId = deliveryId, ExpectedVersion = expectedVersion }, transaction, cancellationToken: cancellationToken));
-        if (row is not null) { await WriteOutboxAsync(connection, transaction, deliveryId, "Cancelled", new { Delivery = ToDto(row), Reason = reason }, cancellationToken); await transaction.CommitAsync(cancellationToken); return null; }
+        if (row is not null)
+        {
+            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.PhysicalDelivery,
+                deliveryId.ToString(), "Cancelled", row.Version, reason, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return null;
+        }
         await transaction.RollbackAsync(cancellationToken);
         var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition("SELECT EXISTS(SELECT 1 FROM physical_deliveries WHERE id = @DeliveryId)", new { DeliveryId = deliveryId }, cancellationToken: cancellationToken));
         return exists ? MutationOutcome.VersionConflict : MutationOutcome.NotFound;
     }
 
-    private static Task SetActorAsync(System.Data.IDbConnection connection, IDbTransaction transaction, Guid actorId, CancellationToken ct) => connection.ExecuteAsync(new CommandDefinition("SELECT set_config('app.actor_id', @ActorId, true)", new { ActorId = actorId.ToString() }, transaction, cancellationToken: ct));
-    private static Task WriteOutboxAsync(System.Data.IDbConnection connection, IDbTransaction transaction, Guid deliveryId, string eventType, object payload, CancellationToken ct) => connection.ExecuteAsync(new CommandDefinition("INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload) VALUES ('PhysicalDelivery', @AggregateId, @EventType, @Payload::jsonb)", new { AggregateId = deliveryId.ToString(), EventType = eventType, Payload = JsonSerializer.Serialize(payload) }, transaction, cancellationToken: ct));
     private static PhysicalDeliveryDetailsDto ToDto(DeliveryRow row) => new(row.DeliveryId, row.ContractId, row.ContractInstanceId, row.BookType, DateOnly.FromDateTime(row.SupplyMonth), row.CapacityMw, row.VolumeNominatedMwh, row.VolumeRealisedMwh, row.VolumeMwh, row.PriceMechanism, row.RevenueEur, row.SubtotalEur, row.VatEur, row.InvoiceAmountEur, row.Status, row.Version, new DateTimeOffset(row.CreatedAt), new DateTimeOffset(row.UpdatedAt));
 }

@@ -6,7 +6,7 @@
 export interface CreatePhysicalDeliveryResponse {
     deliveryId: string;
     contractInstanceId: string;
-    invoiceAmountEur: number;
+    invoiceAmountEur?: number | null;
     status: string;
     version: number;
     createdAt: string;

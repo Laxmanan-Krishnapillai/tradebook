@@ -6,4 +6,4 @@ namespace Tradebook.Core.DTOs;
 public sealed record LoginRequest(string Username, string Password);
 
 [ExportTsInterface]
-public sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);
+public sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAtUtc, Guid ActorId);

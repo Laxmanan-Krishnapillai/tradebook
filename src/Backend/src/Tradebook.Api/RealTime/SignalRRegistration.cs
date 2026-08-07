@@ -10,7 +10,11 @@ public static class SignalRRegistration
     public static IServiceCollection AddDashboardPush(this IServiceCollection services)
     {
         services.AddSignalR().AddMessagePackProtocol();
-        services.AddOptions<OutboxOptions>().BindConfiguration("Outbox");
+        services.AddOptions<OutboxOptions>()
+            .BindConfiguration("Outbox")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<IOutboxEventReader, PostgresOutboxEventReader>();
         services.AddSingleton<IOutboxEventFanout, DashboardPushFanout>();
         services.AddHostedService<OutboxDispatcher>();
         return services;

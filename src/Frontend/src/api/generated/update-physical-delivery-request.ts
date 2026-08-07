@@ -5,7 +5,7 @@
 
 export interface UpdatePhysicalDeliveryRequest {
     deliveryId: string;
-    volumeRealisedMwh: number;
-    status: string;
+    volumeRealisedMwh?: number | null;
+    status?: string | null;
     version: number;
 }
