@@ -1,14 +1,21 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
+using Tradebook.Infrastructure.Data;
+using Tradebook.Infrastructure.Migrations;
+using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests.Fixtures;
 
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string JwtSigningKey = "integration-test-signing-key-32-bytes-6bf93fd240704c44";
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:17")
         .WithDatabase("tradebook_hermetic_test")
@@ -27,20 +34,15 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         _connection = new NpgsqlConnection(ConnectionString);
         await _connection.OpenAsync();
 
-        var migrationsDirectory = Path.Combine(RepositoryRoot(), "src", "Database", "Migrations");
-        foreach (var migration in Directory.GetFiles(migrationsDirectory, "*.sql").OrderBy(Path.GetFileName))
-        {
-            await using var command = new NpgsqlCommand(await File.ReadAllTextAsync(migration), _connection)
-            {
-                CommandTimeout = 300
-            };
-            await command.ExecuteNonQueryAsync();
-        }
+        await using var connections = new NpgsqlConnectionFactory(Options.Create(
+            new DatabaseOptions { ConnectionString = ConnectionString }));
+        await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance).MigrateAsync();
 
         _respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"]
+            SchemasToInclude = ["public"],
+            TablesToIgnore = ["schema_migrations"]
         });
     }
 
@@ -52,7 +54,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Database:ConnectionString"] = ConnectionString
+                ["Database:ConnectionString"] = ConnectionString,
+                ["Jwt:Issuer"] = "Tradebook",
+                ["Jwt:Audience"] = "Tradebook",
+                ["Jwt:SigningKey"] = JwtSigningKey
             }));
     }
 
@@ -65,13 +70,4 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
 
-    private static string RepositoryRoot()
-    {
-        for (var current = new DirectoryInfo(AppContext.BaseDirectory); current is not null; current = current.Parent)
-        {
-            if (Directory.Exists(Path.Combine(current.FullName, ".git"))) return current.FullName;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate repository root from the test output directory.");
-    }
 }

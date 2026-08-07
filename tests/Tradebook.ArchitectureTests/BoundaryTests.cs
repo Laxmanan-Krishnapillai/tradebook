@@ -8,6 +8,15 @@ namespace Tradebook.ArchitectureTests;
 
 public sealed class BoundaryTests
 {
+    private const string FeatureNamespacePrefix = "Tradebook.Api.Features.";
+    private static readonly string[] FeatureSlices = typeof(Program).Assembly.GetTypes()
+        .Select(type => type.Namespace)
+        .Where(@namespace => @namespace?.StartsWith(FeatureNamespacePrefix, StringComparison.Ordinal) == true)
+        .Select(@namespace => @namespace![FeatureNamespacePrefix.Length..].Split('.')[0])
+        .Distinct(StringComparer.Ordinal)
+        .Order(StringComparer.Ordinal)
+        .ToArray();
+
     private static readonly Architecture Architecture = new ArchLoader()
         .LoadAssemblies(
             typeof(Program).Assembly,
@@ -28,9 +37,16 @@ public sealed class BoundaryTests
             .Should().NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
             .Check(Architecture);
 
-    [Fact]
-    public void Physical_delivery_slice_does_not_reference_market_price_slice() =>
-        Types().That().ResideInNamespace("Tradebook.Api.Features.PhysicalDeliveries", true)
-            .Should().NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api.Features.MarketPrices", true))
+    public static IEnumerable<object[]> SiblingFeaturePairs() =>
+        from source in FeatureSlices
+        from target in FeatureSlices
+        where !string.Equals(source, target, StringComparison.Ordinal)
+        select new object[] { source, target };
+
+    [Theory]
+    [MemberData(nameof(SiblingFeaturePairs))]
+    public void Feature_slices_do_not_reference_siblings(string source, string target) =>
+        Types().That().ResideInNamespace($"Tradebook.Api.Features.{source}", true)
+            .Should().NotDependOnAny(Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true))
             .Check(Architecture);
 }

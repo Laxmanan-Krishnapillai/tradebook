@@ -3,7 +3,7 @@ using Npgsql;
 
 namespace Tradebook.IntegrationTests;
 
-public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFixture postgres) : IClassFixture<PostgresTestFixture>
+public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFixture postgres) : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
     public async Task Dashboard_writes_are_audited_outboxed_and_versioned()
@@ -20,7 +20,7 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
         var stale = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"stale\",\"widgets\":[]}", created.Value);
         Assert.Null(stale);
 
-        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         var audit = (await connection.QueryAsync<(string Operation, Guid ActorId)>("""
             SELECT operation AS Operation, actor_id AS ActorId
             FROM audit_log
@@ -42,7 +42,7 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
 
     private async Task<long?> SaveAsync(Guid dashboardId, Guid actorId, string layout, long expectedVersion)
     {
-        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         await connection.ExecuteAsync(new CommandDefinition("SELECT set_config('app.actor_id', @ActorId, true)",
