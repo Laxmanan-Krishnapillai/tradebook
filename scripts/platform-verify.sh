@@ -53,7 +53,7 @@ run_stryker() {
     bash -lc 'dotnet tool restore && dotnet stryker --config-file stryker-config.json'
 }
 
-for command_name in curl docker dotnet git npm npx psql terraform; do
+for command_name in curl docker dotnet git node npm npx psql terraform; do
   require_command "$command_name"
 done
 
@@ -125,7 +125,8 @@ npm --prefix src/Frontend test -- --run
 npm --prefix src/Frontend run lint
 echo " -> Frontend verification PASSED."
 
-echo "[7/8] Verifying Terraform and the Tier-1 compose topology..."
+echo "[7/8] Verifying documentation, Terraform, and the Tier-1 compose topology..."
+node scripts/verify-doc-links.mjs
 terraform -chdir=infra/terraform init -backend=false -input=false
 terraform -chdir=infra/terraform fmt -check -recursive
 terraform -chdir=infra/terraform validate
@@ -136,7 +137,7 @@ mapfile -t compose_services < <(docker compose config --services)
 [[ " ${compose_services[*]} " == *" api "* ]] || fail "compose api service is missing"
 compose_images="$(docker compose config --images)"
 [[ "$compose_images" == *"postgres:17"* ]] || fail "compose does not use postgres:17"
-echo " -> Terraform and compose topology PASSED."
+echo " -> Documentation, Terraform, and compose topology PASSED."
 
 echo "[8/8] Verifying commit policy and mutation-test threshold..."
 git log -1 --pretty=%B | npx commitlint
