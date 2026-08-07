@@ -2,13 +2,19 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Dapper;
 using FastEndpoints;
-using Tradebook.Api.Features.PhysicalDeliveries;
+using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.Options;
+using Tradebook.Api.Security;
+using Tradebook.Core.Analytics;
 using Tradebook.Core.DTOs;
 using Tradebook.Infrastructure.Data;
 
 namespace Tradebook.Api.Features.Dashboards;
 
-public sealed class SaveDashboardEndpoint(INpgsqlConnectionFactory connections) : Endpoint<SaveDashboardRequest, SaveDashboardResponse>
+public sealed class SaveDashboardEndpoint(
+    INpgsqlConnectionFactory connections,
+    SemanticQueryCompiler semanticQueries,
+    IOptions<JsonOptions> jsonOptions) : Endpoint<SaveDashboardRequest, SaveDashboardResponse>
 {
     private sealed record DashboardRow(string Layout, long Version);
 
@@ -16,7 +22,13 @@ public sealed class SaveDashboardEndpoint(INpgsqlConnectionFactory connections) 
 
     public override async Task HandleAsync(SaveDashboardRequest request, CancellationToken cancellationToken)
     {
-        if (!DashboardLayoutValidator.TryValidate(request.DashboardId, request.Version, request.Layout, out var error))
+        if (!DashboardLayoutValidator.TryValidate(
+                request.DashboardId,
+                request.Version,
+                request.Layout,
+                semanticQueries,
+                jsonOptions.Value.SerializerOptions,
+                out var error))
         {
             AddError(error); await SendErrorsAsync(400, cancellationToken); return;
         }
@@ -52,8 +64,9 @@ public sealed class SaveDashboardEndpoint(INpgsqlConnectionFactory connections) 
 
         await connection.ExecuteAsync(new CommandDefinition("""
             INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-            VALUES ('WorkspaceDashboard', @Id::text, @EventType, jsonb_build_object('dashboardId', @Id::text, 'version', @Version));
-            """, new { Id = request.DashboardId, EventType = eventType, saved.Version }, transaction, cancellationToken: cancellationToken));
+            VALUES ('WorkspaceDashboard', @Id::text, @EventType,
+                    jsonb_build_object('dashboardId', @Id::text, 'actorId', @ActorId::text, 'version', @Version));
+            """, new { Id = request.DashboardId, ActorId = actorId, EventType = eventType, saved.Version }, transaction, cancellationToken: cancellationToken));
         await transaction.CommitAsync(cancellationToken);
         await SendAsync(ToResponse(request.DashboardId, saved), cancellation: cancellationToken);
     }

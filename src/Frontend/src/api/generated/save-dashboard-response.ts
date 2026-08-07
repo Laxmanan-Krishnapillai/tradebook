@@ -3,10 +3,10 @@
  * Any changes made to this file can be lost when this file is regenerated.
  */
 
-import { JsonElement } from "./json-element";
+import { DashboardSpecification } from "../../types/visualizations";
 
 export interface SaveDashboardResponse {
     dashboardId: string;
     version: number;
-    layout: JsonElement;
+    layout: DashboardSpecification;
 }
