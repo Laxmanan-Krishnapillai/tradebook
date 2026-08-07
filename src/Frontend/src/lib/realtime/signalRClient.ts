@@ -11,5 +11,5 @@ export class DashboardStreamClient {
   async start(): Promise<void> { await this.connection.start(); for (const group of ['entity:PhysicalDelivery', 'entity:Contract', 'entity:MarketPrice']) await this.connection.invoke('Subscribe', group); await this.catchUp(); }
   stop(): Promise<void> { return this.connection.stop(); }
   private handle(event: EntityChangedEvent): void { if (this.seen.has(event.eventId)) return; this.seen.add(event.eventId); this.lastSequenceId = Math.max(this.lastSequenceId, event.sequenceId); this.onEvent(event); }
-  private async catchUp(): Promise<void> { let page: EntityChangedEvent[]; do { const result = await apiFetch<CatchUpResponse>(`/api/v1/events?afterSequence=${this.lastSequenceId}&limit=500`); page = result.events; page.forEach((event) => this.handle(event)); } while (page.length === 500); }
+  public async catchUp(): Promise<void> { let page: EntityChangedEvent[]; do { const result = await apiFetch<CatchUpResponse>(`/api/v1/events?afterSequence=${this.lastSequenceId}&limit=500`); page = result.events; page.forEach((event) => this.handle(event)); } while (page.length === 500); }
 }
