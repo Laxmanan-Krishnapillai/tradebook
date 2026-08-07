@@ -7,10 +7,11 @@ using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Tradebook.Api.Features.Auth.Login;
 using Tradebook.Core.DTOs;
+using Tradebook.IntegrationTests.Fixtures;
 
 namespace Tradebook.IntegrationTests;
 
-public sealed class LoginEndpointTests(PostgresTestFixture postgres) : IClassFixture<PostgresTestFixture>
+public sealed class LoginEndpointTests(PostgresTestFixture postgres) : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
     public async Task Valid_credentials_return_token_that_opens_protected_endpoints()
@@ -64,12 +65,15 @@ public sealed class LoginEndpointTests(PostgresTestFixture postgres) : IClassFix
             builder.ConfigureAppConfiguration((_, config) =>
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Database:ConnectionString"] = postgres.ConnectionString,
+                    ["Database:ConnectionString"] = Postgres.ConnectionString,
+                    ["Jwt:Issuer"] = "Tradebook",
+                    ["Jwt:Audience"] = "Tradebook",
+                    ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
                 })));
 
     private async Task InsertUserAsync(string username, string password, bool isActive, string[] roles)
     {
-        await using var connection = new NpgsqlConnection(postgres.ConnectionString);
+        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.ExecuteAsync(
             """
             INSERT INTO users (username, password_hash, roles, is_active)

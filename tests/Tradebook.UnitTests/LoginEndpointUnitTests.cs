@@ -1,9 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using FastEndpoints;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Tradebook.Api.Features.Auth.Login;
+using Tradebook.Api.Security;
 using Tradebook.Core.Domain.Entities;
 using Tradebook.Core.DTOs;
 
@@ -13,21 +14,19 @@ public sealed class LoginEndpointUnitTests
 {
     private const string SigningKey = "unit-test-signing-key-with-enough-entropy-123456";
 
-    private static IConfiguration Configuration() => new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Jwt:SigningKey"] = SigningKey,
-            ["Jwt:Issuer"] = "TestIssuer",
-            ["Jwt:Audience"] = "TestAudience",
-        })
-        .Build();
+    private static IOptions<JwtOptions> Options() => Microsoft.Extensions.Options.Options.Create(new JwtOptions
+    {
+        SigningKey = SigningKey,
+        Issuer = "TestIssuer",
+        Audience = "TestAudience"
+    });
 
     private static (LoginEndpoint Endpoint, FakeUserRepository Users) CreateEndpoint()
     {
         var users = new FakeUserRepository();
         var endpoint = Factory.Create<LoginEndpoint>(
             ctx => ctx.AddTestServices(services => services.AddHttpContextAccessor()),
-            users, Configuration());
+            users, Options());
         return (endpoint, users);
     }
 
@@ -97,5 +96,15 @@ public sealed class LoginEndpointUnitTests
             await freshEndpoint.HandleAsync(request, default);
             Assert.Equal(401, freshEndpoint.HttpContext.Response.StatusCode);
         }
+    }
+
+    [Fact]
+    public void Password_hasher_rejects_a_valid_payload_with_an_unrecognized_scheme()
+    {
+        const string password = "S3cure!passphrase";
+        var encodedHash = PasswordHasher.Hash(password);
+        var wrongSchemeHash = $"argon2id.{encodedHash[(encodedHash.IndexOf('.') + 1)..]}";
+
+        Assert.False(PasswordHasher.Verify(password, wrongSchemeHash));
     }
 }

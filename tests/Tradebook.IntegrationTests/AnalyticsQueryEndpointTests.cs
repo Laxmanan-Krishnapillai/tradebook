@@ -44,7 +44,7 @@ public sealed class AnalyticsQueryEndpointTests(CustomWebApplicationFactory fact
     private void Authenticate() => Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken());
     private static string CreateToken()
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("development-only-signing-key-must-be-replaced"));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey));
         var descriptor = new SecurityTokenDescriptor { Subject = new System.Security.Claims.ClaimsIdentity([new("sub", Guid.NewGuid().ToString()), new("role", "Trader")]), Issuer = "Tradebook", Audience = "Tradebook", Expires = DateTime.UtcNow.AddMinutes(5), SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256) };
         return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
     }

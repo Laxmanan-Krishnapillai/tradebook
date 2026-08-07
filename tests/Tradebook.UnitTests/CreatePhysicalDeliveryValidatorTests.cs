@@ -27,11 +27,13 @@ public sealed class CreatePhysicalDeliveryValidatorTests
     public void Empty_contract_id_fails() =>
         new CreatePhysicalDeliveryValidator().Validate(ValidCreate(contractId: Guid.Empty)).IsValid.Should().BeFalse();
 
-    [Theory]
-    [InlineData("")]
-    [InlineData(null)]
-    public void Missing_instance_id_fails(string? instanceId) =>
-        new CreatePhysicalDeliveryValidator().Validate(ValidCreate(instanceId: instanceId!)).IsValid.Should().BeFalse();
+    [Fact]
+    public void Omitted_instance_id_is_generated_by_the_database() =>
+        new CreatePhysicalDeliveryValidator().Validate(ValidCreate(instanceId: null!)).IsValid.Should().BeTrue();
+
+    [Fact]
+    public void Empty_instance_id_fails() =>
+        new CreatePhysicalDeliveryValidator().Validate(ValidCreate(instanceId: string.Empty)).IsValid.Should().BeFalse();
 
     [Fact]
     public void Instance_id_longer_than_120_chars_fails() =>

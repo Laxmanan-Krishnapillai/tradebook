@@ -2,15 +2,16 @@ using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Tradebook.IntegrationTests.Fixtures;
 
 namespace Tradebook.IntegrationTests;
 
-public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres) : IClassFixture<PostgresTestFixture>
+public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres) : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
     public async Task Api_routes_require_a_bearer_token_while_health_probes_are_anonymous()
     {
-        await using var factory = CreateFactory(postgres.ConnectionString);
+        await using var factory = CreateFactory(Postgres.ConnectionString);
         using var client = factory.CreateClient();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/deliveries")).StatusCode);
@@ -35,6 +36,9 @@ public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres)
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Database:ConnectionString"] = connectionString
+                    ["Database:ConnectionString"] = connectionString,
+                    ["Jwt:Issuer"] = "Tradebook",
+                    ["Jwt:Audience"] = "Tradebook",
+                    ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
                 })));
 }
