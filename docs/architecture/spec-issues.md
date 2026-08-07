@@ -50,3 +50,23 @@ under `properties` while setting `additionalProperties: false`. A strict Draft-0
 validator therefore rejects every widget. The persisted-dashboard API uses the
 complete `DashboardSpecification` shape in `visualizations.ts` as the strict
 validation contract until the JSON schema declares its remaining fields.
+
+## 2026-08-07 - Task 10 health authentication conflicts with binding repository rules
+
+The Task 10 body and decision-log D11 say the health probes require JWT authentication,
+while the binding repository instructions explicitly exempt `/health/live` and
+`/health/ready` (and make `POST /api/v1/auth/login` the sole anonymous API route). The
+existing integration contract also expects both health probes to be anonymous.
+Proposed resolution: keep the two exact health routes anonymous, keep all business and
+realtime endpoints authenticated, and make readiness perform a real PostgreSQL check.
+
+## 2026-08-07 - Task 07 Azure backup policy reintroduces removed WORM behavior
+
+`infra/terraform/storage.tf` provisions
+`azurerm_storage_container_immutability_policy.backups` for 2,555 days. Azure immutable
+blob retention is WORM behavior, which conflicts with decision-log D6's explicit removal
+of WORM/object lock until compliance provides a written requirement. The storage account
+also configures only 365 days of soft-delete retention, so removing the immutability
+resource would leave the intended seven-year backup retention contract undefined.
+Proposed resolution: remove the immutability resource and specify a non-WORM,
+versioning-based seven-year lifecycle/retention mechanism before production deployment.
