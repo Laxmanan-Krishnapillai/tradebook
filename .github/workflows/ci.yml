@@ -5,6 +5,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -21,14 +28,89 @@ jobs:
             backend:
               - 'src/Backend/**'
               - 'src/Database/**'
-              - 'tests/**'
+              - 'tests/Tradebook.UnitTests/**'
+              - 'tests/Tradebook.IntegrationTests/**'
+              - 'tests/Tradebook.ArchitectureTests/**'
               - 'Directory.Build.*'
+              - '.config/dotnet-tools.json'
+              - 'tgconfig.json'
+              - 'stryker-config.json'
+              - '.github/workflows/ci.yml'
             frontend:
               - 'src/Frontend/**'
+              - '.github/workflows/ci.yml'
             infra:
               - 'infra/**'
+              - 'src/Database/Migrations/**'
               - 'Dockerfile'
               - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy.yml'
+
+  governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - name: Lint pull-request title
+        if: github.event_name == 'pull_request'
+        env:
+          COMMIT_MESSAGE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$COMMIT_MESSAGE" | npx --no-install commitlint
+      - name: Lint pushed commit
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$BEFORE_SHA" == '0000000000000000000000000000000000000000' ]]; then
+            commits="$(git rev-list --reverse "$HEAD_SHA")"
+          else
+            commits="$(git rev-list --reverse "$BEFORE_SHA..$HEAD_SHA")"
+          fi
+          while IFS= read -r commit; do
+            [[ -z "$commit" ]] && continue
+            git show --quiet --format=%B "$commit" | npx --no-install commitlint
+          done <<< "$commits"
+      - name: Lint every pull-request commit
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          commits="$(git rev-list --reverse "$BASE_SHA..$HEAD_SHA")"
+          while IFS= read -r commit; do
+            [[ -z "$commit" ]] && continue
+            git show --quiet --format=%B "$commit" | npx --no-install commitlint
+          done <<< "$commits"
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet tool restore
+      - run: dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug
+      - run: dotnet typegen generate --project-folder .
+      - name: Fail on tracked or untracked contract drift
+        shell: bash
+        run: |
+          contract_drift="$(git status --porcelain -- src/Frontend/src/api/generated)"
+          if [[ -n "$contract_drift" ]]; then
+            printf '%s\n' "$contract_drift"
+            git diff -- src/Frontend/src/api/generated
+            exit 1
+          fi
 
   backend:
     needs: changes
@@ -37,10 +119,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: 9.0.x }
-      - run: dotnet build src/Backend/Tradebook.sln -c Debug -warnaserror
-      - run: dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj
-      - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet tool restore
+      - run: dotnet restore src/Backend/Tradebook.sln
+      - run: dotnet restore tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj
+      - run: dotnet build src/Backend/Tradebook.sln -c Debug --no-restore -warnaserror
+      - run: dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj --no-restore
+      - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --no-restore
+      - run: dotnet test tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj --no-restore
+      - run: dotnet stryker --config-file stryker-config.json
 
   frontend:
     needs: changes
@@ -49,8 +137,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22.x, cache: npm, cache-dependency-path: src/Frontend/package-lock.json }
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: src/Frontend/package-lock.json
       - run: npm ci
+        working-directory: src/Frontend
+      - run: npm run lint
         working-directory: src/Frontend
       - run: npm run build
         working-directory: src/Frontend
@@ -64,6 +157,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir=infra/terraform init -backend=false
+        with:
+          terraform_version: 1.11.4
+      - run: terraform fmt -check -recursive infra/terraform
+      - run: terraform -chdir=infra/terraform init -backend=false -input=false
       - run: terraform -chdir=infra/terraform validate
-      - run: terraform -chdir=infra/terraform fmt -check
+      - run: pwsh -File infra/validation/verify-tier1.ps1
+      - run: bash -n infra/database-ops/*.sh infra/compose/postgres-init/*.sh infra/validation/*.sh
+      - run: docker build --target database-ops --tag tradebook-database-ops:ci .
+      - run: docker build --target runtime --tag tradebook-api:ci .
+      - name: Exercise Compose migrations and backup restore
+        shell: bash
+        run: |
+          export POSTGRES_PASSWORD='ci-local-postgres-only'
+          bash infra/validation/verify-backup-restore.sh

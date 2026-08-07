@@ -20,4 +20,12 @@ jobs:
       - run: dotnet tool restore
       - run: dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug
       - run: dotnet typegen generate --project-folder .
-      - run: git diff --exit-code -- src/Frontend/src/api/generated
+      - name: Fail on tracked or untracked contract drift
+        shell: bash
+        run: |
+          contract_drift="$(git status --porcelain -- src/Frontend/src/api/generated)"
+          if [[ -n "$contract_drift" ]]; then
+            printf '%s\n' "$contract_drift"
+            git diff -- src/Frontend/src/api/generated
+            exit 1
+          fi

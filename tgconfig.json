@@ -13,6 +13,6 @@
     "System.DateTimeOffset": "string",
     "decimal": "number"
   },
-  "csNullableTranslation": "Null",
+  "csNullableTranslation": "null",
   "assemblies": ["./src/Backend/src/Tradebook.Core/bin/Debug/net9.0/Tradebook.Core.dll"]
 }

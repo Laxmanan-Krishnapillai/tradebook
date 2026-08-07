@@ -1,8 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/ConfigFile/stryker-config.schema.json",
   "stryker-config": {
+    "solution": "src/Backend/Tradebook.sln",
     "project": "Tradebook.Api.csproj",
     "test-projects": ["tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj"],
+    "configuration": "Release",
     "mutation-level": "Standard",
     "concurrency": 4,
     "reporters": ["html", "progress", "cleartext", "json"],

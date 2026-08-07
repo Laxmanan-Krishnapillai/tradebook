@@ -1,37 +1,160 @@
 name: Deploy production
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 permissions:
   contents: read
-  packages: write
   id-token: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      REGISTRY_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository }}/tradebook-api:${{ github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Verify production approval control evidence
+        shell: bash
+        env:
+          APPROVAL_POLICY_EVIDENCE: ${{ vars.PRODUCTION_APPROVAL_POLICY_EVIDENCE }}
+        run: |
+          if [[ -z "$APPROVAL_POLICY_EVIDENCE" ]]; then
+            echo 'The production environment must define PRODUCTION_APPROVAL_POLICY_EVIDENCE after required reviewers are configured.' >&2
+            exit 1
+          fi
+          printf 'Production approval policy evidence: %s\n' "$APPROVAL_POLICY_EVIDENCE"
       - uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Update Container App
-        run: az containerapp update --name tradebook-api --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" --image "ghcr.io/${{ github.repository }}/tradebook-api:${{ github.sha }}"
+      - name: Capture deployed image references
+        id: capture_images
+        shell: bash
+        run: |
+          previous_api_image="$(az containerapp show --name tradebook-api --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[?name=='api'].image | [0]" --output tsv)"
+          previous_migration_image="$(az containerapp job show --name tradebook-migration --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[?name=='migration'].image | [0]" --output tsv)"
+          previous_backup_image="$(az containerapp job show --name tradebook-backup --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[?name=='backup'].image | [0]" --output tsv)"
+          previous_restore_image="$(az containerapp job show --name tradebook-restore --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[?name=='restore'].image | [0]" --output tsv)"
+          for image in "$previous_api_image" "$previous_migration_image" "$previous_backup_image" "$previous_restore_image"; do
+            if [[ -z "$image" || "$image" == 'null' ]]; then
+              echo 'Could not capture every currently deployed image reference; refusing an unrollbackable deployment.' >&2
+              exit 1
+            fi
+          done
+          printf 'PREVIOUS_API_IMAGE=%s\n' "$previous_api_image" >> "$GITHUB_ENV"
+          printf 'PREVIOUS_MIGRATION_IMAGE=%s\n' "$previous_migration_image" >> "$GITHUB_ENV"
+          printf 'PREVIOUS_BACKUP_IMAGE=%s\n' "$previous_backup_image" >> "$GITHUB_ENV"
+          printf 'PREVIOUS_RESTORE_IMAGE=%s\n' "$previous_restore_image" >> "$GITHUB_ENV"
+      - name: Build and push immutable images
+        shell: bash
+        run: |
+          az acr login --name "$REGISTRY_NAME"
+          login_server="$(az acr show --name "$REGISTRY_NAME" --query loginServer --output tsv)"
+          docker build --target runtime --tag "$login_server/tradebook-api:$DEPLOY_SHA" .
+          docker build --target database-ops --tag "$login_server/tradebook-database-ops:$DEPLOY_SHA" .
+          docker push "$login_server/tradebook-api:$DEPLOY_SHA"
+          docker push "$login_server/tradebook-database-ops:$DEPLOY_SHA"
+          api_digest="$(az acr repository show --name "$REGISTRY_NAME" --image "tradebook-api:$DEPLOY_SHA" --query digest --output tsv)"
+          operations_digest="$(az acr repository show --name "$REGISTRY_NAME" --image "tradebook-database-ops:$DEPLOY_SHA" --query digest --output tsv)"
+          printf 'API_IMAGE=%s/tradebook-api@%s\n' "$login_server" "$api_digest" >> "$GITHUB_ENV"
+          printf 'DATABASE_OPS_IMAGE=%s/tradebook-database-ops@%s\n' "$login_server" "$operations_digest" >> "$GITHUB_ENV"
+      - name: Update database job images
+        shell: bash
+        run: |
+          printf 'DEPLOY_MUTATED=true\n' >> "$GITHUB_ENV"
+          az containerapp job update --name tradebook-migration --resource-group "$RESOURCE_GROUP" --container-name migration --image "$DATABASE_OPS_IMAGE"
+          az containerapp job update --name tradebook-backup --resource-group "$RESOURCE_GROUP" --container-name backup --image "$DATABASE_OPS_IMAGE"
+          az containerapp job update --name tradebook-restore --resource-group "$RESOURCE_GROUP" --container-name restore --image "$DATABASE_OPS_IMAGE"
+      - name: Run migrations to a successful terminal state
+        shell: bash
+        run: |
+          execution_name=''
+          execution_terminal=false
+          stop_incomplete_execution() {
+            exit_code=$?
+            if [[ "$execution_terminal" != 'true' && -n "$execution_name" ]]; then
+              echo "Stopping incomplete migration execution $execution_name before rollback." >&2
+              az containerapp job stop --name tradebook-migration --resource-group "$RESOURCE_GROUP" --job-execution-name "$execution_name"
+            fi
+            return "$exit_code"
+          }
+          trap stop_incomplete_execution EXIT
+          execution_name="$(az containerapp job start --name tradebook-migration --resource-group "$RESOURCE_GROUP" --query name --output tsv)"
+          status=''
+          for attempt in $(seq 1 120); do
+            status="$(az containerapp job execution show --name tradebook-migration --resource-group "$RESOURCE_GROUP" --job-execution-name "$execution_name" --query properties.status --output tsv)"
+            case "$status" in
+              Succeeded) execution_terminal=true; break ;;
+              Failed|Stopped|Degraded) execution_terminal=true; echo "Migration execution ended with status $status" >&2; exit 1 ;;
+            esac
+            sleep 10
+          done
+          if [[ "$status" != 'Succeeded' ]]; then
+            echo "Migration execution did not finish within 20 minutes (last status: $status)." >&2
+            exit 1
+          fi
+      - name: Deploy API digest
+        run: az containerapp update --name tradebook-api --resource-group "$RESOURCE_GROUP" --image "$API_IMAGE"
       - name: Smoke check readiness
-        run: curl --fail --retry 12 --retry-delay 5 "https://${{ vars.TRADEBOOK_API_FQDN }}/health/ready"
+        run: curl --fail --show-error --retry 18 --retry-delay 10 --retry-all-errors "https://${{ vars.TRADEBOOK_API_FQDN }}/health/ready"
+      - name: Restore prior images after deployment failure
+        if: ${{ failure() && steps.capture_images.outcome == 'success' && env.DEPLOY_MUTATED == 'true' }}
+        shell: bash
+        run: |
+          rollback_failed=0
+          az containerapp update --name tradebook-api --resource-group "$RESOURCE_GROUP" --image "$PREVIOUS_API_IMAGE" || rollback_failed=1
+          az containerapp job update --name tradebook-migration --resource-group "$RESOURCE_GROUP" --container-name migration --image "$PREVIOUS_MIGRATION_IMAGE" || rollback_failed=1
+          az containerapp job update --name tradebook-backup --resource-group "$RESOURCE_GROUP" --container-name backup --image "$PREVIOUS_BACKUP_IMAGE" || rollback_failed=1
+          az containerapp job update --name tradebook-restore --resource-group "$RESOURCE_GROUP" --container-name restore --image "$PREVIOUS_RESTORE_IMAGE" || rollback_failed=1
+          curl --fail --show-error --retry 18 --retry-delay 10 --retry-all-errors "https://${{ vars.TRADEBOOK_API_FQDN }}/health/ready" || rollback_failed=1
+          if (( rollback_failed != 0 )); then
+            echo 'One or more rollback operations failed; immediate operator intervention is required.' >&2
+            exit 1
+          fi
+
+  release:
+    needs: deploy
+    if: >-
+      needs.deploy.result == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: npm ci
+      - run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
