@@ -69,7 +69,7 @@ that succeeds when every needed job passed *or was skipped*, and require just th
       - name: Require all gates to pass (skipped is OK, failure/cancelled is not)
         shell: bash
         run: |
-          results='${{ join(needs.*.result, ",") }}'
+          results='${{ join(needs.*.result, ',') }}'
           echo "gate results: $results"
           case "$results" in
             *failure*|*cancelled*) echo "a required gate did not pass"; exit 1 ;;
