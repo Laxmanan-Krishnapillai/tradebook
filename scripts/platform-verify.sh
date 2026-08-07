@@ -33,6 +33,26 @@ http_status() {
   curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$@"
 }
 
+run_stryker() {
+  if dotnet --info >/dev/null 2>&1; then
+    dotnet stryker --config-file stryker-config.json
+    return
+  fi
+
+  echo " -> Local dotnet --info failed; running Stryker in the pinned .NET SDK container."
+  docker_repository_root="$repository_root"
+  if [[ "${OS:-}" == "Windows_NT" ]]; then
+    docker_repository_root="$(cygpath --windows "$repository_root")"
+  fi
+
+  MSYS_NO_PATHCONV=1 docker run --rm \
+    --env DOTNET_ROLL_FORWARD=Major \
+    --volume "$docker_repository_root:/workspace" \
+    --workdir /workspace \
+    mcr.microsoft.com/dotnet/sdk:9.0 \
+    bash -lc 'dotnet tool restore && dotnet stryker --config-file stryker-config.json'
+}
+
 for command_name in curl docker dotnet git npm npx psql terraform; do
   require_command "$command_name"
 done
@@ -120,7 +140,7 @@ echo " -> Terraform and compose topology PASSED."
 
 echo "[8/8] Verifying commit policy and mutation-test threshold..."
 git log -1 --pretty=%B | npx commitlint
-dotnet stryker --config-file stryker-config.json
+run_stryker
 echo " -> Governance verification PASSED."
 
 if [[ "$mode" == "foundation" ]]; then
