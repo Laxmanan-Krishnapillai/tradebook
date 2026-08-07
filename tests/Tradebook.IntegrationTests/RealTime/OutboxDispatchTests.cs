@@ -110,7 +110,7 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres) : IClassFi
     public async Task Every_whitelisted_aggregate_type_is_delivered_to_its_entity_group()
     {
         string[] aggregateTypes =
-            ["PhysicalDelivery", "Contract", "CapacityBooking", "GooCertificateTransaction", "MarketPrice", "Hedge"];
+            ["PhysicalDelivery", "Contract", "CapacityBooking", "GooCertificateTransaction", "MarketPrice", "Hedge", "WorkspaceDashboard"];
         await using var factory = CreateFactory();
         var (hub, received) = await ConnectAsync(factory, CreateToken());
         await using (hub)

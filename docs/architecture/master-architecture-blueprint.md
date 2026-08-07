@@ -838,6 +838,15 @@ $$ LANGUAGE plpgsql STABLE;
 
 ---
 
+### 3.9 Platform Workspace Persistence (Task 01 extension)
+
+`workspace_dashboards` is an explicit platform entity for Task 06, outside the
+workbook-derived trading tables. It contains `id UUID PRIMARY KEY`, JWT-sub-scoped
+`actor_id UUID NOT NULL`, `layout_json JSONB NOT NULL`, `version BIGINT NOT NULL
+DEFAULT 1`, and creation/update timestamps. It is covered by the generic Task 01 audit
+trigger. Dashboard mutations write `WorkspaceDashboard` outbox events in the same
+application transaction and Task 03 allows the corresponding SignalR entity group.
+
 ## 4. Backend .NET 9 Web API Layer Architecture
 
 ### 4.1 Native AOT & FastEndpoints REPR Pattern

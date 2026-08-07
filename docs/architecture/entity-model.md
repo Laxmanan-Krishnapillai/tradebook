@@ -603,6 +603,27 @@ Pre-calculated COGS entries linking sales to sourcing contracts (`Tradebook_Repo
 
 ---
 
+### 2.17 `workspace_dashboards` — Actor-Scoped Dashboard Workspace (Platform Entity)
+
+This is a platform entity, not a workbook-derived trading entity. It is explicitly
+owned by Task 01 to persist the Task 06 dashboard workspace. `actor_id` is always the
+authenticated JWT `sub` claim resolved by the API; clients never supply or select it.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | Dashboard identifier |
+| `actor_id` | UUID | Authenticated workspace owner; JWT `sub` scope |
+| `layout_json` | JSONB | DashboardSpecification payload defined by Task 06 |
+| `version` | BIGINT | D5 optimistic concurrency; starts at 1 |
+| `created_at` | TIMESTAMPTZ | |
+| `updated_at` | TIMESTAMPTZ | |
+
+The table is audit-triggered using `audit_log`. Dashboard writes create the
+transactional outbox aggregate type `WorkspaceDashboard`; Task 03 distributes it to
+the `entity:WorkspaceDashboard` SignalR group.
+
+---
+
 ## 3. Entity Relationship Diagram
 
 ```mermaid

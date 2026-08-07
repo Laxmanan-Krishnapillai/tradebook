@@ -9,7 +9,8 @@ public sealed class DashboardPushHub : Hub<IDashboardPushClient>
     private static readonly HashSet<string> AllowedGroups = new(StringComparer.Ordinal)
     {
         "entity:PhysicalDelivery", "entity:Contract", "entity:CapacityBooking",
-        "entity:GooCertificateTransaction", "entity:MarketPrice", "entity:Hedge"
+        "entity:GooCertificateTransaction", "entity:MarketPrice", "entity:Hedge",
+        "entity:WorkspaceDashboard"
     };
 
     public async Task Subscribe(string group)

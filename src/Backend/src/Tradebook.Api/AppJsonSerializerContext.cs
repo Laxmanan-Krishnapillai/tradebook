@@ -18,5 +18,7 @@ namespace Tradebook.Api;
 [JsonSerializable(typeof(Features.Events.GetEventsSinceResponse))]
 [JsonSerializable(typeof(JsonQueryAst))]
 [JsonSerializable(typeof(AnalyticsQueryResponse))]
+[JsonSerializable(typeof(SaveDashboardRequest))]
+[JsonSerializable(typeof(SaveDashboardResponse))]
 [JsonSerializable(typeof(FastEndpoints.ErrorResponse))]
 public partial class AppJsonSerializerContext : JsonSerializerContext;
