@@ -12,7 +12,7 @@ using Tradebook.Api.RealTime;
 using Tradebook.Core.Analytics;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default));
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolver = AppJsonSerializerContext.Default);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton<INpgsqlConnectionFactory, NpgsqlConnectionFactory>();
@@ -25,12 +25,14 @@ builder.Services.AddSingleton<SemanticQueryCompiler>();
 var signingKey = builder.Configuration["Jwt:SigningKey"] ?? throw new InvalidOperationException("Jwt:SigningKey is required.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
+    options.MapInboundClaims = false;
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true, ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidateAudience = true, ValidAudience = builder.Configuration["Jwt:Audience"],
         ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
-        ValidateLifetime = true, ClockSkew = TimeSpan.FromMinutes(1)
+        ValidateLifetime = true, ClockSkew = TimeSpan.FromMinutes(1),
+        NameClaimType = "sub", RoleClaimType = "role"
     };
     options.Events = new JwtBearerEvents
     {
@@ -57,7 +59,7 @@ builder.Services.AddDashboardPush();
 var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseFastEndpoints(config => config.Serializer.Options.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default));
+app.UseFastEndpoints(config => config.Serializer.Options.TypeInfoResolver = AppJsonSerializerContext.Default);
 app.MapHealthChecks("/health/live").AllowAnonymous();
 app.MapHealthChecks("/health/ready").AllowAnonymous();
 app.MapDashboardPushHub();

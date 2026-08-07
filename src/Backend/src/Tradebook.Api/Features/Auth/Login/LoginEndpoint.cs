@@ -36,7 +36,7 @@ public sealed class LoginEndpoint(IUserRepository users, IConfiguration configur
 
         var expiresAt = DateTimeOffset.UtcNow.Add(TokenLifetime);
         var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, user.Id.ToString()) };
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange(user.Roles.Select(role => new Claim("role", role)));
 
         var signingKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(configuration["Jwt:SigningKey"]!));
