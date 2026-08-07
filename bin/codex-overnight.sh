@@ -74,7 +74,7 @@ for NN in "${ORDER[@]}"; do
 
   if [ "$DRY_RUN" = 1 ]; then
     echo "----- task ${NN}  (effort=${eff}, timeout=${tmo}s, spec=${spec}) -----"
-    echo "codex exec --model ${MODEL} -c model_reasoning_effort=${eff} --sandbox workspace-write --ask-for-approval never \"<prompt rendered from ${TEMPLATE}>\""
+    echo "codex exec --model ${MODEL} -c model_reasoning_effort=${eff} --sandbox workspace-write -c approval_policy=never \"<prompt rendered from ${TEMPLATE}>\""
     continue
   fi
 
@@ -82,7 +82,7 @@ for NN in "${ORDER[@]}"; do
   git switch -c "$branch" >/dev/null 2>&1 || git switch "$branch"
   echo ">>> Task ${NN}  effort=${eff}  branch=${branch}"
 
-  CODEX_EXEC_FLAGS=(--model "$MODEL" -c "model_reasoning_effort=${eff}" --sandbox workspace-write --ask-for-approval never)
+  CODEX_EXEC_FLAGS=(--model "$MODEL" -c "model_reasoning_effort=${eff}" --sandbox workspace-write -c approval_policy=never)
   timeout "${tmo}" codex exec "${CODEX_EXEC_FLAGS[@]}" "$prompt"
   codex_rc=$?
 
