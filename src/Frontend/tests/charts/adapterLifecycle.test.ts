@@ -1,0 +1,6 @@
+import { describe, expect, it } from 'vitest';
+import { chartAdapterRegistry } from '../../src/lib/charts/adapterRegistry';
+import type { ChartAdapter, ChartSpec, SeriesData, ThemeTokens } from '../../src/types/visualizations';
+describe('chart adapter lifecycle', () => {
+  it('exposes the complete lifecycle contract', () => { const calls: string[] = []; const adapter: ChartAdapter = { mount: () => calls.push('mount'), update: () => calls.push('update'), resize: () => calls.push('resize'), setTheme: () => calls.push('theme'), destroy: () => calls.push('destroy') }; chartAdapterRegistry.register('BAR', () => adapter); const chart = chartAdapterRegistry.create('BAR'); const spec: ChartSpec = { chartType: 'BAR', encodings: { xAxis: 'date', yAxis: ['value'] } }; const data: SeriesData = { series: [{ name: 'value', x: [1], y: [2] }] }; const theme: ThemeTokens = { background: '', textPrimary: '', textSecondary: '', gridLine: '', axisLine: '', seriesPalette: [], positive: '', negative: '', fontFamily: '' }; chart.mount(document.createElement('div'), spec); chart.update(data); chart.resize(); chart.setTheme(theme); chart.destroy(); expect(calls).toEqual(['mount', 'update', 'resize', 'theme', 'destroy']); });
+});
