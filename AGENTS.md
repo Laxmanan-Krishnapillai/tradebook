@@ -8,6 +8,9 @@
 - Bind SQL values as parameters and whitelist every dynamic identifier.
 - Do not edit `src/Frontend/src/api/generated/` by hand. Change C# DTOs and regenerate contracts.
 - Integration tests use PostgreSQL 17 through Testcontainers; do not depend on a host database.
+  Database-backed classes derive from `DatabaseTestBase` (API-host tests) or
+  `PostgresDatabaseTestBase` (direct database tests) so Respawn clears application rows
+  before every method while preserving `schema_migrations`.
 
 ## Commands
 

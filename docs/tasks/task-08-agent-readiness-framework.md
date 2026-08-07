@@ -698,6 +698,7 @@ Unit test line coverage (e.g. 90%) can be spoofed by AI agents writing tests wit
     "solution": "src/Backend/Tradebook.sln",
     "project": "Tradebook.Api.csproj",
     "test-projects": ["tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj"],
+    "configuration": "Release",
     "mutation-level": "Standard",
     "concurrency": 4,
     "reporters": ["html", "progress", "cleartext", "json"],
