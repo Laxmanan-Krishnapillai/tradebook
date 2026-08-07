@@ -17,5 +17,5 @@ export const handlers = [
 
     return HttpResponse.json(response, { status: 201 });
   }),
-  http.get('/api/v1/deliveries', () => HttpResponse.json([]))
+  http.get('/api/v1/deliveries', () => HttpResponse.json({ items: [], totalCount: 0, page: 1, pageSize: 50, hasNextPage: false }))
 ];

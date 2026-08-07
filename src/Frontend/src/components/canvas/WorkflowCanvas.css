@@ -1,0 +1,50 @@
+.workflow-page {
+  min-width: 0;
+}
+
+.workflow-canvas {
+  background: #fff;
+  border: 1px solid #dce3da;
+  border-radius: .8rem;
+  height: min(70vh, 44rem);
+  min-height: 28rem;
+  overflow: hidden;
+}
+
+.workflow-node {
+  background: #fff;
+  border: 1px solid #a9b9ad;
+  border-radius: .7rem;
+  box-shadow: 0 8px 24px #173d2a1a;
+  min-width: 11rem;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.workflow-node--dragging {
+  border-color: #1e5b3b;
+  box-shadow: 0 12px 30px #173d2a33;
+  z-index: 2;
+}
+
+.workflow-node__drag-handle {
+  align-items: start;
+  background: transparent;
+  color: #172019;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  padding: .85rem 1rem;
+  text-align: left;
+  width: 100%;
+}
+
+.workflow-node__drag-handle:active {
+  cursor: grabbing;
+}
+
+.workflow-node__drag-handle small {
+  color: #657168;
+  font-size: .7rem;
+  font-weight: 500;
+}

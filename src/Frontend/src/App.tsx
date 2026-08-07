@@ -1,6 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
-import { CommandPalette } from './components/ui/CommandPalette';
+import { RouterProvider } from '@tanstack/react-router';
+import { router } from './app/router';
 
-const client = new QueryClient();
-export function App() { const [path, setPath] = useState('/deliveries'); return <QueryClientProvider client={client}><main><h1>{path.slice(1).replace('-', ' ')}</h1><CommandPalette onNavigate={setPath} /></main></QueryClientProvider>; }
+export function App() {
+  return <RouterProvider router={router} />;
+}
