@@ -9,3 +9,15 @@ output "postgres_fqdn" {
 output "backup_storage_name" {
   value = azurerm_storage_account.backups.name
 }
+
+output "container_registry_login_server" {
+  value = azurerm_container_registry.this.login_server
+}
+
+output "migration_job_name" {
+  value = azurerm_container_app_job.migration.name
+}
+
+output "backup_job_name" {
+  value = azurerm_container_app_job.backup.name
+}

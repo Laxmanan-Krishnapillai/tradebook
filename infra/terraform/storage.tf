@@ -25,7 +25,26 @@ resource "azurerm_storage_container" "backups" {
   container_access_type = "private"
 }
 
-resource "azurerm_storage_container_immutability_policy" "backups" {
-  storage_container_resource_manager_id = azurerm_storage_container.backups.id
-  immutability_period_in_days           = 2555
+resource "azurerm_storage_management_policy" "backups" {
+  storage_account_id = azurerm_storage_account.backups.id
+
+  rule {
+    name    = "retain-tradebook-backups-seven-years"
+    enabled = true
+
+    filters {
+      prefix_match = ["backups/tradebook/"]
+      blob_types   = ["blockBlob"]
+    }
+
+    actions {
+      base_blob {
+        tier_to_cool_after_days_since_modification_greater_than = 30
+        delete_after_days_since_modification_greater_than       = 2555
+      }
+      version {
+        delete_after_days_since_creation = 2555
+      }
+    }
+  }
 }

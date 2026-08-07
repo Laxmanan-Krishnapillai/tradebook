@@ -1,10 +1,3 @@
-resource "azurerm_user_assigned_identity" "container_app" {
-  name                = "id-${var.name_prefix}-${var.environment}-api"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  tags                = var.tags
-}
-
 resource "azurerm_key_vault" "this" {
   name                       = "kv-${var.name_prefix}-${var.environment}"
   location                   = azurerm_resource_group.this.location
@@ -19,31 +12,42 @@ resource "azurerm_key_vault" "this" {
 
 data "azurerm_client_config" "current" {}
 
-resource "random_password" "jwt_signing_key" {
+resource "azurerm_role_assignment" "terraform_key_vault_secrets_officer" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+ephemeral "random_password" "jwt_signing_key" {
   length  = 64
   special = false
 }
 
 resource "azurerm_key_vault_secret" "postgres_password" {
-  name         = "pg-admin-password"
-  value        = random_password.postgres_admin.result
+  name             = "pg-admin-password"
+  value_wo         = ephemeral.random_password.postgres_admin.result
+  value_wo_version = var.secret_version
+  key_vault_id     = azurerm_key_vault.this.id
+  depends_on       = [azurerm_role_assignment.terraform_key_vault_secrets_officer]
+}
+
+ephemeral "azurerm_key_vault_secret" "postgres_password" {
+  name         = azurerm_key_vault_secret.postgres_password.name
   key_vault_id = azurerm_key_vault.this.id
 }
 
 resource "azurerm_key_vault_secret" "jwt_signing_key" {
-  name         = "jwt-signing-key"
-  value        = random_password.jwt_signing_key.result
-  key_vault_id = azurerm_key_vault.this.id
+  name             = "jwt-signing-key"
+  value_wo         = ephemeral.random_password.jwt_signing_key.result
+  value_wo_version = var.secret_version
+  key_vault_id     = azurerm_key_vault.this.id
+  depends_on       = [azurerm_role_assignment.terraform_key_vault_secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "database_connection_string" {
-  name         = "database-connection-string"
-  value        = "Host=${azurerm_postgresql_flexible_server.this.fqdn};Database=${azurerm_postgresql_flexible_server_database.tradebook.name};Username=${var.postgres_admin_login};Password=${random_password.postgres_admin.result};Ssl Mode=Require"
-  key_vault_id = azurerm_key_vault.this.id
-}
-
-resource "azurerm_role_assignment" "key_vault_secrets_user" {
-  scope                = azurerm_key_vault.this.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.container_app.principal_id
+  name             = "database-connection-string"
+  value_wo         = "Host=${azurerm_postgresql_flexible_server.this.fqdn};Database=${azurerm_postgresql_flexible_server_database.tradebook.name};Username=${var.postgres_admin_login};Password=${ephemeral.azurerm_key_vault_secret.postgres_password.value};Ssl Mode=Require"
+  value_wo_version = var.secret_version
+  key_vault_id     = azurerm_key_vault.this.id
+  depends_on       = [azurerm_role_assignment.terraform_key_vault_secrets_officer]
 }
