@@ -15,7 +15,11 @@ RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj -c Release
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-bookworm-slim AS runtime
 WORKDIR /app
-RUN groupadd --system tradebook && useradd --system --gid tradebook --create-home tradebook
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system tradebook \
+    && useradd --system --gid tradebook --create-home tradebook
 COPY --from=backend /app/publish ./
 COPY --from=frontend /src/Frontend/dist ./wwwroot
 RUN chown -R tradebook:tradebook /app
