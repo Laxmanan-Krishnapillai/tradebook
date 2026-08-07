@@ -10,6 +10,7 @@ using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.Options;
 using Tradebook.Api.RealTime;
 using Tradebook.Core.Analytics;
+using Tradebook.Api.Features.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolver = AppJsonSerializerContext.Default);
@@ -52,7 +53,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("BackOfficePolicy", policy => policy.RequireRole("BackOffice", "Admin"));
     options.AddPolicy("AdminPolicy", policy => policy.RequireRole("Admin"));
 });
-builder.Services.AddHealthChecks();
+builder.Services.AddTradebookHealthChecks();
 builder.Services.AddFastEndpoints();
 builder.Services.AddDashboardPush();
 
@@ -60,8 +61,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseFastEndpoints(config => config.Serializer.Options.TypeInfoResolver = AppJsonSerializerContext.Default);
-app.MapHealthChecks("/health/live").AllowAnonymous();
-app.MapHealthChecks("/health/ready").AllowAnonymous();
+app.MapTradebookHealthEndpoints();
 app.MapDashboardPushHub();
 
 // SPA hosting (Task 02 §3.7): serve the built frontend; unmatched /api/* and /hubs/*
