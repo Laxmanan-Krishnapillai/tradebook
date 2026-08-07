@@ -1,0 +1,463 @@
+version: 1
+
+# Logical names are bound to local files explicitly with --workbook NAME=PATH.
+# No workbook data or business values are embedded in this repository.
+workbooks:
+  masterdata: Tradebook_Masterdata.xlsx
+  certificates: Tradebook_Certificates_v2.xlsx
+  physical: Tradebook_Physical.xlsm
+  bioticket: Tradebook_Bioticket.xlsx
+  reports: Tradebook_Reports_V2_SF_integration.xlsx
+
+# Defense in depth for every identifier composed by the importer.
+allowed_tables:
+  - companies
+  - counterparties
+  - trading_points
+  - contracts
+  - certificate_contracts
+  - physical_deliveries
+  - capacity_bookings
+  - transfers
+  - bioticket_deliveries
+  - tax_tariffs
+  - hedges
+  - market_prices
+  - capacity_price_indexes
+  - goo_certificate_transactions
+  - invoice_line_items
+  - external_cogs
+
+mappings:
+  - workbook: masterdata
+    sheets: [References]
+    table: companies
+    keys: [shorthand]
+    columns:
+      shorthand: {sources: [Company Shorthand, Shorthand], transform: text, required: true}
+      name: {sources: [Company Name, Name], transform: text, required: true}
+      country_code: {sources: [Country Code, Country], transform: text}
+      country_dial_code: {sources: [Country Dial Code, Dial Code, Code], transform: integer}
+      vat_rate: {sources: [VAT Rate, VAT], transform: decimal}
+      default_currency: {sources: [Default Currency, Currency], transform: text}
+      is_active: {sources: [Active, Is Active], transform: boolean, default: true}
+
+  - workbook: masterdata
+    sheets: [Counterparties]
+    table: counterparties
+    keys: [name]
+    columns:
+      name: {sources: [Counterparty_name, Counterparty Name, Name], transform: text, required: true}
+      shorthand: {sources: [Shorthand, Counterparty Shorthand], transform: text, required: true}
+      segment: {sources: [Counterparty Segment, Segment], transform: text}
+      country_code: {sources: [Country Code, Country], transform: text}
+      country_dial_code: {sources: [Country Dial Code, Dial Code], transform: integer}
+      vat_applicable: {sources: [VAT Applicable, VAT], transform: boolean, default: false}
+      salesforce_account_id: {sources: [Salesforce Account ID, SF Account ID, Account.Id], transform: text}
+      review_note: {sources: [review_note, Review Note], transform: text}
+      is_active: {sources: [Active, Is Active], transform: boolean, default: true}
+
+  - workbook: masterdata
+    sheets: [ContractOverview, Contract Overview]
+    table: contracts
+    keys: [contract_name]
+    columns:
+      contract_name: {sources: [Contract Name, Contract ID], transform: text, required: true}
+      company_shorthand: {sources: [Company Shorthand], transform: text}
+      country_code: {sources: [Country Code, Country], transform: text}
+      country_dial_code: {sources: [Country Dial Code], transform: integer}
+      contract_number: {sources: [No. Of Contract, Contract Number], transform: integer}
+      year_of_contract: {sources: [Year Of Contract, Contract Year], transform: integer}
+      counterparty_id:
+        sources: [Counterparty Name, Counterparty]
+        transform: text
+        required: true
+        lookup: {table: counterparties, key: name, result: id}
+      sourcing_center:
+        sources: [Sourcing Center]
+        transform: text
+        lookup: {table: companies, key: shorthand, result: id}
+      sales_center:
+        sources: [Sales Center]
+        transform: text
+        lookup: {table: companies, key: shorthand, result: id}
+      balancing_group: {sources: [Balancing Group], transform: text}
+      network_point: {sources: [Network Point], transform: text}
+      receiving_shipper: {sources: [Receiving Shipper], transform: text}
+      external_contract_ref: {sources: [External Contract, External Contract Ref], transform: text}
+      product_type: {sources: [Product Type, Product], transform: text, required: true}
+      action: {sources: [Action], transform: text, required: true}
+      goo_quality: {sources: [GoO Quality, Quality], transform: text}
+      feedstock_quality: {sources: [Feedstock Quality], transform: text}
+      gas_quality: {sources: [Gas Quality], transform: text}
+      subsidy_status: {sources: [Subsidy Status], transform: text}
+      subsidy_type: {sources: [Subsidy Type], transform: text}
+      vat_type: {sources: [VAT Type, VAT], transform: text}
+      counterparty_segment: {sources: [Counterparty Segment], transform: text}
+      signing_date: {sources: [Signing Date], transform: date}
+      price_mechanism_goo: {sources: [Price Mech. GoO, Price Mechanism GoO], transform: text}
+      fixed_price_goo_eur_mwh: {sources: [Fixed Price GoO, Fixed Price GoO EUR/MWh], transform: decimal}
+      broker_fee_eur_mwh: {sources: [Broker Fee EUR/MWh, Broker Fee], transform: decimal}
+      price_mechanism_gas: {sources: [Price Mech. Gas, Price Mechanism Gas], transform: text}
+      fixed_price_gas_eur_mwh: {sources: [Fixed Price Gas, Fixed Price Gas EUR/MWh], transform: decimal}
+      price_mechanism_ticket: {sources: [Price Mech. Ticket, Price Mechanism Ticket], transform: text}
+      fixed_price_ticket_eur_ton: {sources: [Fixed Price Ticket, Fixed Price Ticket EUR/Ton], transform: decimal}
+      invoicing_mechanism: {sources: [Invoicing Mechanism], transform: text}
+      payment_mechanism: {sources: [Payment Mechanism], transform: text}
+      days_to_invoice_after_delivery: {sources: [Days To Invoice After Delivery], transform: integer}
+      days_to_payment_after_invoice: {sources: [Days To Payment After Invoice], transform: integer}
+      delivery_type: {sources: [Delivery Type], transform: text}
+      certification_quality: {sources: [Certification Quality], transform: text}
+      includes_goo: {sources: [Includes GoO, Includes_GoO], transform: boolean, default: false}
+      includes_gas: {sources: [Includes Gas, Includes_Gas], transform: boolean, default: false}
+      includes_ticket: {sources: [Includes Ticket, Includes_Ticket], transform: boolean, default: false}
+      contract_type: {sources: [Contract Type], transform: text, default: External}
+      comment: {sources: [Comment, Comments], transform: text}
+      sf_contract_name: {sources: [SF Contract Name, Salesforce Contract Name], transform: text}
+      old_contract_name: {sources: [Old_contractName, Old Contract Name], transform: text}
+      is_active: {sources: [Active, Is Active], transform: boolean, default: true}
+
+  - workbook: certificates
+    sheets: [Contract Overview_2, Contract Overview]
+    table: certificate_contracts
+    keys: [contract_id]
+    columns:
+      contract_id:
+        sources: [Contract Name, Contract ID]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      goo_quality: {sources: [GoO Quality, Quality], transform: text}
+      feedstock_quality: {sources: [Feedstock Quality], transform: text}
+      certification_quality: {sources: [Certification Quality], transform: text}
+      customer_segment: {sources: [Customer Segment, Counterparty Segment], transform: text}
+
+  # Physical and certificate sourcing/sales sheets share the delivery-book shape.
+  - workbook: physical
+    sheets: [Sourcing]
+    table: physical_deliveries
+    keys: [contract_id, supply_month, book_type]
+    columns: &physical_delivery_columns_sourcing
+      contract_id:
+        sources: [Contract Name, Contract ID, Contract]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      book_type: {constant: Sourcing, transform: text, required: true}
+      supply_month: {sources: [Supply Month, Delivery Month, Contract Month, Month], transform: month, required: true}
+      status: {sources: [Status, Report Status], transform: text, default: Pending - No Invoice}
+      trader_comment: {sources: [Trader Comment], transform: text}
+      balancing_group: {sources: [Balancing Group], transform: text}
+      trading_area: {sources: [Trading Area], transform: text}
+      capacity_mw: {sources: [Capacity, Capacity MW], transform: decimal}
+      volume_nominated_mwh: {sources: [Volume Nominated, Volume Nominated MWh], transform: decimal}
+      volume_realised_mwh: {sources: [Volume Realised, Volume Realised MWh], transform: decimal}
+      volume_corr1_mwh: {sources: [1.Corr, Volume Corr1 MWh], transform: decimal}
+      volume_corr2_mwh: {sources: [2.Corr, Volume Corr2 MWh], transform: decimal}
+      volume_intercompany_mwh: {sources: [Intercompany, Volume Intercompany MWh], transform: decimal}
+      volume_mwh: {sources: [Volume, Volume MWh], transform: decimal}
+      price_mechanism: {sources: [Price Mech, Price Mechanism], transform: text}
+      start_day: {sources: [Start Day, Start Date], transform: date}
+      end_day: {sources: [End Day, End Date], transform: date}
+      delivery_type: {sources: [Delivery Type], transform: text}
+      product: {sources: [Product, Product Type], transform: text}
+      cost_eur_mwh: {sources: [Cost, Cost EUR/MWh], transform: decimal}
+      revenue_eur: {sources: [Revenue, Revenue EUR], transform: decimal}
+      handling_fee_eur_mwh: {sources: [Handling Fee EUR/MWh, Handling Fee], transform: decimal}
+      broker_fee_eur_mwh: {sources: [Broker Fee EUR/MWh, Broker Fee], transform: decimal}
+      tax_eur_mwh: {sources: [Tax EUR/MWh, Tax], transform: decimal}
+      tso_tariff_eur_mwh: {sources: [TSO Tariff EUR/MWh, TSO Tariff], transform: decimal}
+      dso_tariff_eur_mwh: {sources: [DSO Tariff EUR/MWh, DSO Tariff], transform: decimal}
+      adm_fee_eur_mwh: {sources: [Adm Fee EUR/MWh, Adm Fee], transform: decimal}
+      bal_fee_eur_mwh: {sources: [Bal Fee EUR/MWh, Bal Fee], transform: decimal}
+      shipping_cost_eur_mwh: {sources: [Shipping Cost EUR/MWh, Shipping Cost], transform: decimal}
+      subtotal_eur: {sources: [Subtotal, Subtotal EUR], transform: decimal}
+      vat_pct: {sources: [VAT %, VAT Pct], transform: decimal}
+      vat_eur: {sources: [VAT EUR], transform: decimal}
+      invoice_amount_eur: {sources: [Invoice Amount, Invoice Amount EUR], transform: decimal}
+      quality: {sources: [Quality, GoO Quality], transform: text}
+      sending_shipper: {sources: [Sending Shipper], transform: text}
+      receiving_shipper: {sources: [Receiving Shipper], transform: text}
+      shipper_code: {sources: [Shipper Code], transform: text}
+      invoice_date: {sources: [Invoice Date], transform: date}
+      payment_date_forecast: {sources: [Payment Date Forecast], transform: date}
+      payment_date_manual: {sources: [Payment Date Manual], transform: date}
+      payment_date: {sources: [Payment Date], transform: date}
+      document_no: {sources: [Document No., Document No], transform: text}
+      comment: {sources: [Comment, Comments], transform: text}
+
+  - workbook: physical
+    sheets: [Sales]
+    table: physical_deliveries
+    keys: [contract_id, supply_month, book_type]
+    columns:
+      <<: *physical_delivery_columns_sourcing
+      book_type: {constant: Sales, transform: text, required: true}
+
+  - workbook: certificates
+    sheets: [Sourcing]
+    table: physical_deliveries
+    keys: [contract_id, supply_month, book_type]
+    columns:
+      <<: *physical_delivery_columns_sourcing
+      book_type: {constant: Sourcing, transform: text, required: true}
+
+  - workbook: certificates
+    sheets: [Sales]
+    table: physical_deliveries
+    keys: [contract_id, supply_month, book_type]
+    columns:
+      <<: *physical_delivery_columns_sourcing
+      book_type: {constant: Sales, transform: text, required: true}
+
+  - workbook: physical
+    sheets: [Capacity Booking, CapacityBooking]
+    table: capacity_bookings
+    keys: [contract_id, supply_month]
+    columns:
+      contract_id:
+        sources: [Contract Name, Contract ID, Contract]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      supply_month: {sources: [Supply Month, Delivery Month, Month], transform: month, required: true}
+      balancing_group: {sources: [Balancing Group], transform: text}
+      counterparty_id:
+        sources: [Counterparty Name, Counterparty]
+        transform: text
+        lookup: {table: counterparties, key: name, result: id}
+      price_mechanism: {sources: [Price Mechanism, Price Mech], transform: text}
+      start_area: {sources: [Start Area], transform: text}
+      end_area: {sources: [End Area], transform: text}
+      ship_fix: {sources: [SHIP-FIX, Ship Fix], transform: text}
+      border_point: {sources: [Borderpoint, Border Point], transform: text}
+      start_day: {sources: [Start Day, Start Date], transform: date}
+      end_day: {sources: [End Day, End Date], transform: date}
+      capacity_mw: {sources: [Capacity, Capacity MW], transform: decimal}
+      capacity_price_eur_mwh: {sources: [Capacity Price, Capacity Price EUR/MWh], transform: decimal}
+      capacity_cost_eur: {sources: [Capacity Cost, Capacity Cost EUR], transform: decimal}
+      weighted_cost_eur: {sources: [Weighted Cost, Weighted Cost EUR], transform: decimal}
+      payment_week: {sources: [Payment Week], transform: integer}
+      payment_month: {sources: [Payment Month], transform: integer}
+      payment_year: {sources: [Payment Year], transform: integer}
+      comments: {sources: [Comments, Comment], transform: text}
+
+  - workbook: physical
+    sheets: [Transfer]
+    table: transfers
+    keys: [contract_id, supply_month]
+    columns:
+      contract_id:
+        sources: [Contract Name, Contract ID, Contract]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      supply_month: {sources: [Supply Month, Delivery Month, Month], transform: month, required: true}
+      balancing_group: {sources: [Balancing Group], transform: text}
+      trading_area: {sources: [Trading Area], transform: text}
+      capacity_mw: {sources: [Capacity, Capacity MW], transform: decimal}
+      booked_capacity_mw: {sources: [Booked Capacity, Booked Capacity MW], transform: decimal}
+      volume_mwh: {sources: [Volume, Volume MWh], transform: decimal}
+      balancing_effect_mwh: {sources: [Transfer_balancing_effect, Balancing Effect MWh], transform: decimal}
+      start_day: {sources: [Start Day, Start Date], transform: date}
+      end_day: {sources: [End Day, End Date], transform: date}
+      price_mechanism: {sources: [Price Mechanism, Price Mech], transform: text}
+      transport_cost_eur_mwh: {sources: [Transport Cost, Transport Cost EUR/MWh], transform: decimal}
+      capacity_cost_eur_mwh: {sources: [Capacity Cost, Capacity Cost EUR/MWh], transform: decimal}
+      match_mwh: {sources: [Match MWH, Match MWh], transform: decimal}
+      match_eur: {sources: [Match EUR], transform: decimal}
+      vat_pct: {sources: [VAT %, VAT Pct], transform: decimal}
+      corr1_mwh: {sources: [corr 1, Corr1 MWh], transform: decimal}
+      corr2_mwh: {sources: [corr 2, Corr2 MWh], transform: decimal}
+      corr3_mwh: {sources: [corr 3, Corr3 MWh], transform: decimal}
+      status: {sources: [Status, Report Status], transform: text}
+      comments: {sources: [Comments, Comment], transform: text}
+
+  - workbook: physical
+    sheets: [Tax]
+    table: tax_tariffs
+    keys: [contract_id, period_start, period_end]
+    columns:
+      contract_id:
+        sources: [Contract Name, Contract ID, Contract]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      period_start: {sources: [Period_start, Period Start], transform: date, required: true}
+      period_end: {sources: [Period_end, Period End], transform: date, required: true}
+      tax_local_cur_mwh: {sources: [Tax Local Cur./MWh, Tax Local Cur MWh], transform: decimal}
+      tso_local_cur_mwh: {sources: [TSO Local Cur./MWh, TSO Local Cur MWh], transform: decimal}
+      dso_local_cur_mwh: {sources: [DSO Local Cur./MWh, DSO Local Cur MWh], transform: decimal}
+      dso_tariff_local_cur_day: {sources: [DSO Tariff Local Cur/Day], transform: decimal}
+      adm_fee_local_cur_mwh: {sources: [Adm Fee Local Cur./MWh, Adm Fee Local Cur MWh], transform: decimal}
+      bal_fee_local_cur_mwh: {sources: [Bal Fee Local Cur./MWh, Bal Fee Local Cur MWh], transform: decimal}
+      currency: {sources: [Currency], transform: text, default: SEK, required: true}
+
+  - workbook: physical
+    sheets: [Hedge]
+    table: hedges
+    keys: [contract_id, month]
+    columns:
+      contract_id:
+        sources: [Contract Name, Contract ID, Contract]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      month: {sources: [Month, Hedge Month], transform: month, required: true}
+      hedge_amount_mwh: {sources: [Hedge Amount MWh, Hedge Amount], transform: decimal}
+      hedge_price_eur_mwh: {sources: [Hedge Price EUR/MWh, Hedge Price], transform: decimal}
+
+  - workbook: physical
+    sheets: [Prices]
+    table: market_prices
+    keys: [price_date]
+    columns: &market_price_columns
+      price_date: {sources: [Date, Price Date], transform: date, required: true}
+      ttf_eur_mwh: {sources: [TTF, TTF EUR/MWh], transform: decimal}
+      egsi_etf_eur_mwh: {sources: [EGSI ETF, EGSI ETF EUR/MWh], transform: decimal}
+      the_eur_mwh: {sources: [THE, THE EUR/MWh], transform: decimal}
+      bgo_eur_mwh: {sources: [BGO, BGO EUR/MWh], transform: decimal}
+      pgo_eur_mwh: {sources: [PGO, PGO EUR/MWh], transform: decimal}
+      eua_eur_mwh: {sources: [EUA, EUA EUR/MWh], transform: decimal}
+      within_day_mkt_eur_mwh: {sources: [WITHIN-DAY MKT, Within Day Mkt EUR/MWh], transform: decimal}
+      eur_sek: {sources: [EUR vs SEK, EUR/SEK, EUR SEK], transform: decimal}
+      eur_chf: {sources: [EUR vs CHF, EUR/CHF, EUR CHF], transform: decimal}
+      eur_gbp: {sources: [EUR vs GBP, EUR/GBP, EUR GBP], transform: decimal}
+      eur_usd: {sources: [EUR vs USD, EUR/USD, EUR USD], transform: decimal}
+      eur_dkk: {sources: [EUR vs DKK, EUR/DKK, EUR DKK], transform: decimal}
+
+  - workbook: certificates
+    sheets: [Prices]
+    table: market_prices
+    keys: [price_date]
+    columns: *market_price_columns
+
+  - workbook: physical
+    sheets: [Capacity Prices, Prices]
+    table: capacity_price_indexes
+    keys: [period_start, period_end, mechanism]
+    columns:
+      period_start: {sources: [Period_start, Period Start], transform: date, required: true}
+      period_end: {sources: [Period_end, Period End], transform: date, required: true}
+      mechanism: {sources: [Mechanism, Price Mechanism], transform: text, required: true}
+      price_eur_mwh: {sources: [Price EUR/MWh, Price], transform: decimal, required: true}
+
+  - workbook: physical
+    sheets: [Shippingfix, Shipping Fix]
+    table: trading_points
+    keys: [code]
+    columns:
+      code: {sources: [Trading Points, Code], transform: text, required: true}
+      type: {sources: [Type, Point Type], transform: text, required: true}
+      description: {sources: [Description], transform: text}
+      country: {sources: [Country], transform: text}
+      action: {sources: [Action], transform: text}
+      name: {sources: [Name], transform: text}
+      start_area: {sources: [Start Area], transform: text}
+      end_area: {sources: [End Area], transform: text}
+
+  - workbook: bioticket
+    sheets: [Sourcing]
+    table: bioticket_deliveries
+    keys: [contract_id, contract_month, book_type]
+    columns: &bioticket_columns
+      contract_id:
+        sources: [Contract Name, Contract ID, Contract]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      book_type: {constant: Sourcing, transform: text, required: true}
+      contract_month: {sources: [Contract Month, Delivery Month, Month], transform: month, required: true}
+      start_day: {sources: [Start Day, Start Date], transform: date}
+      end_day: {sources: [End Day, End Date], transform: date}
+      volume_nominated_ton: {sources: [Volume Nominated Ton, Volume Nominated], transform: decimal}
+      volume_realised_ton: {sources: [Volume Realised Ton, Volume Realised], transform: decimal}
+      volume_ton: {sources: [Volume Ton, Volume], transform: decimal}
+      cost_eur_ton: {sources: [Cost EUR/Ton, Cost], transform: decimal}
+      revenue_eur: {sources: [Revenue, Revenue EUR], transform: decimal}
+      vat_pct: {sources: [VAT %, VAT Pct], transform: decimal}
+      vat_eur: {sources: [VAT EUR], transform: decimal}
+      invoice_amount_eur: {sources: [Invoice Amount, Invoice Amount EUR], transform: decimal}
+      status: {sources: [Status, Report Status], transform: text, default: Pending - No Invoice}
+      comment: {sources: [Comment, Comments], transform: text}
+
+  - workbook: bioticket
+    sheets: [Sales]
+    table: bioticket_deliveries
+    keys: [contract_id, contract_month, book_type]
+    columns:
+      <<: *bioticket_columns
+      book_type: {constant: Sales, transform: text, required: true}
+
+  - workbook: reports
+    sheets: [Fact_Transactions, Fact Transactions]
+    table: goo_certificate_transactions
+    keys: [sf_transaction_id]
+    columns:
+      sf_transaction_id: {sources: [Id, SF Transaction ID, Salesforce Transaction ID], transform: text, required: true}
+      transaction_name: {sources: [Name, Transaction Name], transform: text}
+      batch_type: {sources: [Batch_type__c, Batch Type], transform: text}
+      certificate_transaction_id: {sources: [Certificate_transaction_ID__c, Certificate Transaction ID], transform: text}
+      country_of_production: {sources: [Country_of_production__c, Country of Production], transform: text}
+      producer_contract_id:
+        sources: [Purchase_TB_Contract, Purchase Contract Name]
+        transform: text
+        lookup: {table: contracts, key: contract_name, result: id}
+      producer_company: {sources: [Producer Company, Producer_Company__c], transform: text}
+      producer_goo_price_eur_mwh: {sources: [Producer GoO Price EUR/MWh], transform: decimal}
+      production_date: {sources: [Production Date, Production_Date__c], transform: date}
+      customer_contract_id:
+        sources: [Sales_TB_Contract, Sales Contract Name]
+        transform: text
+        lookup: {table: contracts, key: contract_name, result: id}
+      customer_company: {sources: [Customer Company, Customer_Company__c], transform: text}
+      register: {sources: [Register__c, Register], transform: text}
+      status: {sources: [Status__c, Status], transform: text}
+      transaction_start_date: {sources: [Transaction_Start_Date__c, Transaction Start Date], transform: date}
+      transaction_volume_mwh: {sources: [Transaction_Volume__c, Transaction Volume MWh], transform: decimal}
+      volume_mwh: {sources: [Volume__c, Volume MWh], transform: decimal}
+      energy_source: {sources: [Energy_source__c, Energy Source], transform: text}
+      text: {sources: [Text__c, Text], transform: text}
+
+  - workbook: reports
+    sheets: [Invoice Lines, Fact_Transactions]
+    table: invoice_line_items
+    keys: [contract_id, supply_month, sf_invoice_ref]
+    columns:
+      contract_id:
+        sources: [Sales_TB_Contract, Contract Name]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      supply_month: {sources: [Sales_Delivery_Month__c, Supply Month], transform: month, required: true}
+      invoice_date: {sources: [Invoice Date], transform: date}
+      payment_due_date: {sources: [Payment Due Date], transform: date}
+      volume_mwh: {sources: [Volume MWh, Volume__c], transform: decimal}
+      price_eur_mwh: {sources: [Price EUR/MWh], transform: decimal}
+      subtotal_eur: {sources: [Subtotal EUR], transform: decimal}
+      total_eur: {sources: [Total EUR], transform: decimal}
+      vat_pct: {sources: [VAT %, VAT Pct], transform: decimal}
+      vat_eur: {sources: [VAT EUR], transform: decimal}
+      invoicing_amount_eur: {sources: [Invoicing Amount EUR, Invoice Amount EUR], transform: decimal}
+      status: {sources: [Invoice Status, Report Status], transform: text}
+      sf_invoice_ref: {sources: [SF Invoice Ref, Invoice__c], transform: text, required: true}
+
+  - workbook: reports
+    sheets: [EXTERNAL COGS, External Cogs]
+    table: external_cogs
+    keys: [month, sales_contract_id, purchase_contract_id]
+    columns:
+      month: {sources: [Month], transform: month, required: true}
+      sales_contract_id:
+        sources: [Sales Contract, Sales Contract Name]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      purchase_contract_id:
+        sources: [Purchase contract, Purchase Contract Name]
+        transform: text
+        required: true
+        lookup: {table: contracts, key: contract_name, result: id}
+      volume_mwh: {sources: [Volume, Volume MWh], transform: decimal}
+      cost_eur_mwh: {sources: [Cost EUR/MWH, Cost EUR/MWh], transform: decimal}
+      cogs_eur: {sources: [COGS, COGS EUR], transform: decimal}
