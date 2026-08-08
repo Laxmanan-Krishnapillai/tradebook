@@ -10,7 +10,7 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
 {
     private sealed record DeliveryRow(
         Guid DeliveryId, Guid ContractId, string ContractInstanceId, string BookType,
-        DateTime SupplyMonth, decimal? CapacityMw, decimal? VolumeNominatedMwh,
+        DateOnly SupplyMonth, decimal? CapacityMw, decimal? VolumeNominatedMwh,
         decimal? VolumeRealisedMwh, decimal? VolumeMwh, string? PriceMechanism,
         decimal? RevenueEur, decimal? SubtotalEur, decimal? VatEur,
         decimal? InvoiceAmountEur, string Status, long Version, DateTime CreatedAt,
@@ -102,5 +102,5 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
         return exists ? MutationOutcome.VersionConflict : MutationOutcome.NotFound;
     }
 
-    private static PhysicalDeliveryDetailsDto ToDto(DeliveryRow row) => new(row.DeliveryId, row.ContractId, row.ContractInstanceId, row.BookType, DateOnly.FromDateTime(row.SupplyMonth), row.CapacityMw, row.VolumeNominatedMwh, row.VolumeRealisedMwh, row.VolumeMwh, row.PriceMechanism, row.RevenueEur, row.SubtotalEur, row.VatEur, row.InvoiceAmountEur, row.Status, row.Version, new DateTimeOffset(row.CreatedAt), new DateTimeOffset(row.UpdatedAt));
+    private static PhysicalDeliveryDetailsDto ToDto(DeliveryRow row) => new(row.DeliveryId, row.ContractId, row.ContractInstanceId, row.BookType, row.SupplyMonth, row.CapacityMw, row.VolumeNominatedMwh, row.VolumeRealisedMwh, row.VolumeMwh, row.PriceMechanism, row.RevenueEur, row.SubtotalEur, row.VatEur, row.InvoiceAmountEur, row.Status, row.Version, new DateTimeOffset(row.CreatedAt), new DateTimeOffset(row.UpdatedAt));
 }
