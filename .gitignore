@@ -9,3 +9,4 @@ StrykerOutput/
 stryker-run*.log
 .codegraph/
 src/Frontend/dist/
+reports/
