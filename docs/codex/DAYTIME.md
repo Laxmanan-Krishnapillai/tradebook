@@ -65,6 +65,11 @@ width is ~5-6 tasks (after 13/11 land); the critical path (13 → 15 → 16 → 
 10) is the floor no amount of parallelism beats — so landing 13 and 16 right first-time
 (best-of-N + Ultra) speeds the whole run more than adding workers.
 
+The runner deliberately refuses to reuse an existing task worktree or branch. Review and
+preserve any unfinished work first. To rerun a task, remove its worktree and delete its
+`codex/task-NN` branch only after that branch has been merged or intentionally abandoned;
+the runner never resets either one automatically.
+
 ## Optional: hand the easy ones to the cloud
 
 While you drive the hard tasks (12, 16, 17) locally, you can delegate independent,
@@ -80,4 +85,3 @@ Because you merge to `main` continuously, branch protection + the `test-integrit
 (`docs/codex/branch-protection.md`) matter more here than overnight — they're what stop a
 supervised-but-rushed merge from slipping a weakened test through.
 ```
-

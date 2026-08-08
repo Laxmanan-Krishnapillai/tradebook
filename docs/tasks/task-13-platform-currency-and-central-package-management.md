@@ -13,13 +13,23 @@
   - `Directory.Build.props`
   - `Directory.Build.targets`
   - `stryker-config.json`
+  - `tgconfig.json`
+  - `Dockerfile`
   - `.github/workflows/ci.yml`
+  - `.github/workflows/verify-contracts.yml`
+  - `.github/workflows/deploy.yml`
+  - `bin/verify.sh`
+  - `scripts/platform-verify.sh`
   - `docs/architecture/decision-log.md`
+  - `src/Backend/AGENTS.md`
   - `src/Backend/Tradebook.sln`
   - `src/Backend/src/Tradebook.Api/Tradebook.Api.csproj`
+  - `src/Backend/src/Tradebook.Api/Features/**/*.cs`
   - `src/Backend/src/Tradebook.Core/Tradebook.Core.csproj`
   - `src/Backend/src/Tradebook.Infrastructure/Tradebook.Infrastructure.csproj`
+  - `src/Backend/src/Tradebook.Infrastructure/Data/DeliveryRepository.cs`
   - `tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj`
+  - `tests/Tradebook.UnitTests/**/*.cs`
   - `tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj`
   - `tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj`
 
@@ -33,17 +43,23 @@ The solution targets `net9.0` on SDK `9.0.316`. .NET 9 reaches **end-of-support 
 
 ### 1.2 Required Outcomes
 
-- Every project targets `net10.0`; **no `net9.0` remains** anywhere in the repo.
+- Every project targets `net10.0`; **no active project, operational .NET config,
+  workflow, script, or container image remains on .NET 9**. Historical documents may
+  still describe the superseded baseline; D15 is authoritative over them.
 - `global.json` pins a `10.0.x` SDK with `rollForward: latestFeature`.
 - A root `Directory.Packages.props` is the single version source, with `ManagePackageVersionsCentrally` and `CentralPackageTransitivePinningEnabled` both `true`.
-- No `.csproj` carries a `Version=` attribute on any `<PackageReference>`; all target packages are bumped to their current (Aug 2026) versions per §3.
+- No `.csproj` carries a `Version=` attribute on any `<PackageReference>`; all target
+  packages use the reconciled, restore-compatible Task 13 versions in §3.
 - `<Nullable>enable</Nullable>` and `<ImplicitUsings>enable</ImplicitUsings>` are centralized in `Directory.Build.props`.
 - The FastEndpoints 5.30 → 8.x API is reconciled and the full suite passes on SDK 10; `GlobalPackageReference` is reserved (documented, unused) for Task 14's repo-wide analyzer rollout.
 
 ### 1.3 In Scope
 
 - All backend projects (`Tradebook.Api`, `Tradebook.Core`, `Tradebook.Infrastructure`) and all test projects (`Tradebook.UnitTests`, `Tradebook.IntegrationTests`, `Tradebook.ArchitectureTests`).
-- Root MSBuild config (new `Directory.Packages.props`, edited `Directory.Build.props`, verified `Directory.Build.targets` TypeGen 5.0.0 + `stryker-config.json`), the `global.json` SDK pin, and the `.github/workflows/ci.yml` SDK-install step.
+- Root MSBuild/tool config (new `Directory.Packages.props`, edited
+  `Directory.Build.props`, verified `Directory.Build.targets`, `tgconfig.json`, and
+  `stryker-config.json`), the `global.json` SDK pin, all .NET workflow SDK-install
+  steps, the production Docker SDK/runtime, and the platform-verification fallback image.
 - The breaking-change reconciliation (FastEndpoints, FluentValidation, Npgsql) required to compile and pass tests on the bumped versions.
 
 ### 1.4 Out of Scope
@@ -63,7 +79,11 @@ The solution targets `net9.0` on SDK `9.0.316`. .NET 9 reaches **end-of-support 
 ├── Directory.Packages.props             NEW    CPM manifest: every <PackageVersion> + CPM switches
 ├── Directory.Build.props                EDIT   centralize <Nullable> + <ImplicitUsings>
 ├── Directory.Build.targets / stryker-config.json  VERIFY TypeGen + Stryker still run on SDK 10 / net10.0
-├── .github/workflows/ci.yml             EDIT   install/use .NET 10 SDK (actions/setup-dotnet)
+├── tgconfig.json                        EDIT   load Tradebook.Core from Debug/net10.0
+├── Dockerfile                           EDIT   .NET 10 SDK/Ubuntu runtime; copy CPM + SDK inputs before restore
+├── .github/workflows/{ci,verify-contracts,deploy}.yml  EDIT use global.json for setup-dotnet
+├── bin/verify.sh                         EDIT   SDK 10 container fallback for an unhealthy local SDK probe
+├── scripts/platform-verify.sh           EDIT   .NET 10 SDK fallback image
 ├── docs/architecture/decision-log.md    EDIT   append the .NET 10 + CPM ADR entry
 ├── src/Backend/Tradebook.sln
 ├── src/Backend/src/Tradebook.Api/Tradebook.Api.csproj                       EDIT net10.0; strip Version=; FastEndpoints 8.x
@@ -100,23 +120,30 @@ The solution targets `net9.0` on SDK `9.0.316`. .NET 9 reaches **end-of-support 
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
+    <PackageVersion Include="AwesomeAssertions" Version="9.5.0" />
     <PackageVersion Include="Dapper" Version="2.1.79" />
-    <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="FastEndpoints" Version="8.2.0" />
-    <PackageVersion Include="FluentValidation" Version="12.1.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
-    <!-- dedupes Caching.Hybrid 9.3.0 previously pinned in both Api and Infrastructure -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.0.3" />
-    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.3" />
-    <!-- pin every other Microsoft.Extensions.* found by the step-1 inventory at 10.0.3 -->
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.11.0" />
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Respawn" Version="7.0.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.6.0" />
+    <PackageVersion Include="TngTech.ArchUnitNET.xUnit" Version="0.11.0" />
+    <PackageVersion Include="TypeGen" Version="5.0.0" />
+    <PackageVersion Include="YamlDotNet" Version="16.3.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.0" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.6.0" />
-    <PackageVersion Include="Respawn" Version="6.2.1" />
-    <PackageVersion Include="TngTech.ArchUnitNET.xUnit" Version="0.11.0" />
   </ItemGroup>
-  <!-- RESERVED FOR TASK 13: GlobalPackageReference applies a package to EVERY project from one line
+  <!-- RESERVED FOR TASK 14: GlobalPackageReference applies a package to EVERY project from one line
        and carries its Version inline (not split into a PackageVersion). Task 14 owns the entries:
        <ItemGroup><GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.139" PrivateAssets="All" /></ItemGroup> -->
 </Project>
@@ -139,18 +166,39 @@ The solution targets `net9.0` on SDK `9.0.316`. .NET 9 reaches **end-of-support 
 
 `Directory.Build.props` gains `<Nullable>enable</Nullable>` + `<ImplicitUsings>enable</ImplicitUsings>` in a shared `<PropertyGroup>`; its existing integration-test Respawn `<PackageReference>` is preserved but loses its `Version=` (now pinned centrally).
 
-**Target versions (Aug 2026) and migration notes:**
+**Reconciled restore-compatible Task 13 targets and migration notes:**
 
-| Package | Pin | Consumers | Migration note |
+The table below is the authoritative PLAT-05 contract. It records the exact graph that
+restores without NuGet downgrade/nearest-match warnings and passes the vulnerability
+audit; it is intentionally a verified target set rather than a claim that every retained
+package is the newest version published in August 2026.
+
+<!-- PLAT-05-PINS-START -->
+| Package | Pin | Consumers | Reconciliation note |
 |---|---|---|---|
-| Dapper | `2.1.79` | Infrastructure | Low-risk patch bump |
-| Npgsql | `10.0.3` | Infrastructure | 10.0 line ships with .NET 10; reconcile any 9.x API |
-| FastEndpoints | `8.2.0` | Api | **5.30 → 8.x multi-major** — handler/config + OpenAPI engine changed (step 8) |
-| FluentValidation | `12.1.0` | Api / Core | Apache-2.0, free; reconcile v12 validator API |
-| Microsoft.AspNetCore.OpenApi | `10.0.3` | Api | .NET 10 emits OpenAPI 3.1; FastEndpoints 8.2 routes through it |
-| Microsoft.Extensions.Caching.Hybrid | `10.0.3` | Api **+** Infrastructure | Was duplicated at 9.3.0 — one `PackageVersion` now |
-| Microsoft.AspNetCore.SignalR.Protocols.MessagePack | `10.0.3` | Api | Runtime-aligned |
-| Test stack — `Microsoft.NET.Test.Sdk` 17.14.1, `xunit` 2.9.3, `xunit.runner.visualstudio` 3.1.0, `Testcontainers.PostgreSql` 4.6.0, `Respawn` 6.2.1, `TngTech.ArchUnitNET.xUnit` 0.11.0 | see manifest | test projects | Pinned in `Directory.Packages.props`; xunit stays v2 (v3 = Task 22) |
+| `AwesomeAssertions` | `9.5.0` | UnitTests | Apache-2.0 fork replacing FluentAssertions 7 and its vulnerable System.Drawing dependency chain |
+| `Dapper` | `2.1.79` | Infrastructure | Low-risk patch bump |
+| `FastEndpoints` | `8.2.0` | Api | **5.30 → 8.x multi-major**; endpoint response APIs and OpenAPI integration changed |
+| `FluentValidation` | `12.1.1` | Api | FastEndpoints 8.2 requires `>=12.1.1`; the original 12.1.0 pin causes NU1109 under transitive pinning |
+| `Microsoft.AspNetCore.Authentication.JwtBearer` | `10.0.3` | Api | Runtime-aligned authentication package |
+| `Microsoft.AspNetCore.Mvc.Testing` | `10.0.3` | IntegrationTests | Runtime-aligned API-host test package |
+| `Microsoft.AspNetCore.OpenApi` | `10.0.10` | Api | .NET 10 servicing alignment; Microsoft.OpenApi is pinned separately for security |
+| `Microsoft.AspNetCore.SignalR.Client` | `10.0.3` | IntegrationTests | Runtime-aligned realtime client |
+| `Microsoft.AspNetCore.SignalR.Protocols.MessagePack` | `10.0.10` | Api, IntegrationTests | Replaces the vulnerable 10.0.3 dependency path and resolves MessagePack 2.5.302 |
+| `Microsoft.Extensions.Caching.Hybrid` | `10.1.0` | Api, Infrastructure | 10.0.3 was never published; 10.1.0 is the smallest exact replacement for the nearest-match restore |
+| `Microsoft.Extensions.Hosting.Abstractions` | `10.0.9` | Infrastructure | FastEndpoints.JobQueues 8.2 requires `>=10.0.9`; 10.0.3 causes NU1109 |
+| `Microsoft.NET.Test.Sdk` | `17.14.1` | All test projects | Shared test-host target |
+| `Microsoft.OpenApi` | `2.11.0` | Transitive-only | Security pin for GHSA-v5pm-xwqc-g5wc; no project references it directly |
+| `Npgsql` | `10.0.3` | Infrastructure | .NET 10 line; PostgreSQL `date` values map to `DateOnly` |
+| `Respawn` | `7.0.0` | IntegrationTests | Deliberate latest-stable .NET 10-compatible upgrade, verified by the PG17 integration suite |
+| `Testcontainers.PostgreSql` | `4.6.0` | IntegrationTests | PostgreSQL 17 Testcontainers support |
+| `TngTech.ArchUnitNET.xUnit` | `0.11.0` | ArchitectureTests | Task target retained; ArchUnitNET remains owned by Task 08 |
+| `TypeGen` | `5.0.0` | Core | Existing contract generator retained under net10.0 |
+| `YamlDotNet` | `16.3.0` | Core | Existing semantic-model parser retained |
+| `coverlet.collector` | `6.0.4` | UnitTests, IntegrationTests | Existing coverage collector retained |
+| `xunit` | `2.9.3` | All test projects | xUnit v2 retained; v3 migration belongs to Task 22 |
+| `xunit.runner.visualstudio` | `3.1.0` | All test projects | Runner target retained with the xUnit v2 suite |
+<!-- PLAT-05-PINS-END -->
 
 Docs: CPM — https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management · Support policy — https://learn.microsoft.com/en-us/dotnet/core/releases-and-support · `global.json` — https://learn.microsoft.com/en-us/dotnet/core/tools/global-json
 
@@ -164,7 +212,15 @@ Docs: CPM — https://learn.microsoft.com/en-us/nuget/consume-packages/central-p
 4. **Strip versions.** Remove the `Version=` attribute from every `<PackageReference>` in every `.csproj` and from the Respawn reference in `Directory.Build.props`; each reference keeps only `Include=` (and existing `PrivateAssets`/`IncludeAssets`).
 5. **Centralize compilation defaults.** Move `<Nullable>enable</Nullable>` and `<ImplicitUsings>enable</ImplicitUsings>` into `Directory.Build.props`; delete the per-project copies; preserve the existing Respawn `ItemGroup`.
 6. **Pin the SDK.** Update `global.json` to `"version": "10.0.103"`, `"rollForward": "latestFeature"`, `"allowPrerelease": false`.
-7. **Update CI and validate build hooks.** Point the SDK-install step in `.github/workflows/ci.yml` at .NET 10 (`actions/setup-dotnet` with `global-json-file: global.json`). Confirm `stryker-config.json` mutation runs on SDK 10 and the `Directory.Build.targets` TypeGen step runs under net10.0.
+7. **Update every operational entry point and validate build hooks.** Point every
+   `actions/setup-dotnet` step in `.github/workflows/` at `global.json`; move the
+   production Docker SDK/runtime and the `scripts/platform-verify.sh` fallback image to
+   supported 10.0 tags (the runtime uses Ubuntu 24.04 `noble` because .NET 10 does not
+   publish Debian images); keep `bin/verify.sh`'s Stryker fallback on that SDK line;
+   copy `global.json` plus `Directory.Packages.props` before Docker restore; and
+   update `tgconfig.json` to load the Core assembly from `Debug/net10.0`. Confirm
+   `stryker-config.json` mutation and the `Directory.Build.targets` TypeGen step both run
+   under SDK 10.
 8. **Reconcile the multi-major bumps.** FastEndpoints 5.30 → 8.2.0 changes endpoint/handler registration, `app.UseFastEndpoints(...)` configuration, validation wiring, and the OpenAPI engine (v8.2 routes through `Microsoft.AspNetCore.OpenApi`; .NET 10 defaults to OpenAPI 3.1). Reconcile the FluentValidation 12 and Npgsql 10 breaking changes in the endpoints and data layer. Write real code — no stubs, no `#if`-disabled blocks.
 9. **Restore, build, test.** Run the §5.1 commands; the solution must build `-c Release` and the full suite (Testcontainers PG17 + Respawn + ArchUnitNET) must pass on SDK 10.
 10. **Record the decision.** Append an ADR entry to `docs/architecture/decision-log.md` covering the .NET 10 LTS adoption, CPM as the single version source, transitive pinning for CVE control, and the reserved `GlobalPackageReference` hand-off to Task 14.
@@ -181,7 +237,9 @@ dotnet restore src/Backend/Tradebook.sln
 dotnet build   src/Backend/Tradebook.sln -c Release --no-restore    # PLAT-01
 dotnet test    src/Backend/Tradebook.sln -c Release --no-build      # PLAT-02 (PG17 container starts)
 grep -rEn '<PackageReference[^>]*\bVersion=' --include='*.csproj' . # PLAT-03: expect NO matches
-grep -rn 'net9\.0' --include='*.csproj' . ; grep -n '9\.0\.' global.json  # PLAT-06: expect NO matches
+grep -rEn --exclude-dir=bin --exclude-dir=obj 'net9\.0' src/Backend tests  # PLAT-06: expect NO matches
+grep -rEn 'net9\.0|dotnet/(sdk|aspnet):9\.0|dotnet-version: *9\.0' \
+  Dockerfile tgconfig.json .github/workflows scripts bin Directory.Build.* global.json  # expect NO matches
 grep -q 'ManagePackageVersionsCentrally>true'         Directory.Packages.props  # PLAT-04
 grep -q 'CentralPackageTransitivePinningEnabled>true' Directory.Packages.props  # PLAT-04
 grep -q '"version": *"10\.0\.' global.json ; grep -q '"rollForward": *"latestFeature"' global.json  # PLAT-07
@@ -196,11 +254,11 @@ grep -rn 'VersionOverride' --include='*.csproj' .                   # each hit m
 | PLAT-02 | Full suite builds and passes, integration tests included | §5.1 test green; PG17 container starts |
 | PLAT-03 | No `<PackageReference>` carries a `Version=` attribute | §5.1 grep returns no matches |
 | PLAT-04 | Root `Directory.Packages.props` has CPM + transitive pinning enabled | §5.1 both greps hit |
-| PLAT-05 | Every package pinned once at its §3 target version | manifest review; no duplicate `PackageVersion` |
-| PLAT-06 | No `net9.0` remains in any project or config | §5.1 greps return no matches |
+| PLAT-05 | Manifest contains exactly the marked §3 target set, with each package pinned once | `Central_package_manifest_enables_cpm_and_pins_every_reference_once`; manifest review |
+| PLAT-06 | No active project or operational .NET config/workflow/script/container image remains on .NET 9 | §5.1 greps + `All_operational_dotnet_entry_points_use_net10` |
 | PLAT-07 | `global.json` pins `10.0.x` with `rollForward: latestFeature` | §5.1 both greps hit |
 | PLAT-08 | `Nullable`/`ImplicitUsings` centralized in `Directory.Build.props`, removed from `.csproj` | file diff |
-| PLAT-09 | `.github/workflows/ci.yml` installs and uses the .NET 10 SDK | workflow diff; CI run on SDK 10 |
+| PLAT-09 | Every .NET GitHub Actions workflow installs the SDK selected by root `global.json` | workflow scan; CI run on SDK 10 |
 | PLAT-10 | FastEndpoints 8.x compiles and endpoints resolve; FluentValidation 12 + Npgsql 10 reconciled | build clean; endpoint tests pass |
 | PLAT-11 | `GlobalPackageReference` reserved and documented for Task 14; zero analyzer packages added | manifest review |
 | PLAT-12 | ADR entry appended to `docs/architecture/decision-log.md` | file diff |

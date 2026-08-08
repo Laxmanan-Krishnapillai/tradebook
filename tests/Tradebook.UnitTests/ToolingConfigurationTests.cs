@@ -46,48 +46,98 @@ public sealed class ToolingConfigurationTests
                 Assert.Null(reference.Attribute("VersionOverride"));
             }
         }
+    }
 
-        var configFiles = projectFiles.Concat(
-        [
-            Path.Combine(repositoryRoot, "Directory.Build.props"),
-            Path.Combine(repositoryRoot, "Directory.Build.targets"),
-            Path.Combine(repositoryRoot, "Directory.Packages.props"),
-            Path.Combine(repositoryRoot, "global.json"),
-            Path.Combine(repositoryRoot, "stryker-config.json"),
-            Path.Combine(repositoryRoot, ".github", "workflows", "ci.yml")
-        ]);
-        Assert.All(configFiles, path => Assert.DoesNotContain("net9.0", File.ReadAllText(path)));
+    [Fact]
+    public void All_operational_dotnet_entry_points_use_net10()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var operationalFiles = FindOperationalDotnetFiles(repositoryRoot);
+
+        Assert.NotEmpty(operationalFiles);
+        foreach (var path in operationalFiles)
+        {
+            var relativePath = Path.GetRelativePath(repositoryRoot, path);
+            var contents = File.ReadAllText(path);
+            Assert.False(
+                contents.Contains("net9.0", StringComparison.OrdinalIgnoreCase),
+                $"{relativePath} still references net9.0.");
+
+            foreach (Match image in Regex.Matches(
+                         contents,
+                         @"mcr\.microsoft\.com/dotnet/(?:sdk|aspnet):(?<version>\d+\.\d+)",
+                         RegexOptions.IgnoreCase))
+            {
+                Assert.True(
+                    image.Groups["version"].Value == "10.0",
+                    $"{relativePath} uses .NET container tag {image.Value} instead of 10.0.");
+            }
+        }
+
+        var workflowDirectory = Path.Combine(repositoryRoot, ".github", "workflows");
+        var workflows = Directory.GetFiles(workflowDirectory, "*.yml")
+            .Concat(Directory.GetFiles(workflowDirectory, "*.yaml"));
+        foreach (var workflowPath in workflows)
+        {
+            var workflowLines = File.ReadAllLines(workflowPath);
+            const string setupActionPattern = @"(?m)^[ \t]*(?:-[ \t]+)?uses:[ \t]*actions/setup-dotnet@";
+            var setupLineCount = workflowLines.Count(line => Regex.IsMatch(line, setupActionPattern));
+            var setupSteps = FindWorkflowSteps(workflowLines)
+                .Where(step => Regex.IsMatch(step, setupActionPattern))
+                .ToArray();
+
+            Assert.Equal(setupLineCount, setupSteps.Length);
+            foreach (var step in setupSteps)
+            {
+                Assert.True(
+                    Regex.IsMatch(
+                        step,
+                        @"(?m)^[ \t]+global-json-file:[ \t]*global\.json(?:[ \t]+#.*)?[ \t]*\r?$"),
+                    $"{Path.GetRelativePath(repositoryRoot, workflowPath)} has a setup-dotnet step without global.json.");
+                Assert.DoesNotContain("dotnet-version:", step);
+            }
+        }
+
+        using var typegen = JsonDocument.Parse(File.ReadAllText(Path.Combine(repositoryRoot, "tgconfig.json")));
+        var typegenAssembly = Assert.Single(
+            typegen.RootElement.GetProperty("assemblies").EnumerateArray().Select(item => item.GetString()!));
+        Assert.True(
+            typegenAssembly.Replace('\\', '/').Contains("/net10.0/", StringComparison.Ordinal),
+            $"TypeGen assembly path is not net10.0: {typegenAssembly}");
+
+        foreach (var dockerfilePath in operationalFiles.Where(
+                     path => Path.GetFileName(path).StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase)))
+        {
+            var dockerfile = File.ReadAllText(dockerfilePath);
+            var restoreIndex = dockerfile.IndexOf("RUN dotnet restore", StringComparison.Ordinal);
+            if (restoreIndex < 0)
+            {
+                continue;
+            }
+
+            var stageStart = dockerfile.LastIndexOf(
+                "\nFROM ",
+                restoreIndex,
+                StringComparison.OrdinalIgnoreCase);
+            stageStart = stageStart < 0 ? 0 : stageStart + 1;
+            var restoreStagePrefix = dockerfile[stageStart..restoreIndex];
+            foreach (var restoreInput in new[] { "global.json", "Directory.Packages.props" })
+            {
+                var copy = Regex.Match(
+                    restoreStagePrefix,
+                    $@"(?m)^COPY[^\r\n]*\b{Regex.Escape(restoreInput)}\b");
+                Assert.True(
+                    copy.Success,
+                    $"{Path.GetRelativePath(repositoryRoot, dockerfilePath)} must copy {restoreInput} in the restore stage before dotnet restore.");
+            }
+        }
     }
 
     [Fact]
     public void Central_package_manifest_enables_cpm_and_pins_every_reference_once()
     {
-        var expectedVersions = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["AwesomeAssertions"] = "9.5.0",
-            ["Dapper"] = "2.1.79",
-            ["FastEndpoints"] = "8.2.0",
-            ["FluentValidation"] = "12.1.1",
-            ["Microsoft.AspNetCore.Authentication.JwtBearer"] = "10.0.3",
-            ["Microsoft.AspNetCore.Mvc.Testing"] = "10.0.3",
-            ["Microsoft.AspNetCore.OpenApi"] = "10.0.10",
-            ["Microsoft.AspNetCore.SignalR.Client"] = "10.0.3",
-            ["Microsoft.AspNetCore.SignalR.Protocols.MessagePack"] = "10.0.10",
-            ["Microsoft.Extensions.Caching.Hybrid"] = "10.1.0",
-            ["Microsoft.Extensions.Hosting.Abstractions"] = "10.0.9",
-            ["Microsoft.NET.Test.Sdk"] = "17.14.1",
-            ["Microsoft.OpenApi"] = "2.11.0",
-            ["Npgsql"] = "10.0.3",
-            ["Respawn"] = "7.0.0",
-            ["Testcontainers.PostgreSql"] = "4.6.0",
-            ["TngTech.ArchUnitNET.xUnit"] = "0.11.0",
-            ["TypeGen"] = "5.0.0",
-            ["YamlDotNet"] = "16.3.0",
-            ["coverlet.collector"] = "6.0.4",
-            ["xunit"] = "2.9.3",
-            ["xunit.runner.visualstudio"] = "3.1.0"
-        };
         var repositoryRoot = FindRepositoryRoot();
+        var expectedVersions = ReadTargetPackageVersions(repositoryRoot);
         var manifest = XDocument.Load(Path.Combine(repositoryRoot, "Directory.Packages.props"));
 
         Assert.Equal("true", manifest.Descendants("ManagePackageVersionsCentrally").Single().Value);
@@ -185,6 +235,178 @@ public sealed class ToolingConfigurationTests
         Assert.Contains("D15 — Adopt .NET 10 LTS and NuGet Central Package Management", decisionLog);
         Assert.Contains("CentralPackageTransitivePinningEnabled", decisionLog);
         Assert.Contains("GlobalPackageReference", decisionLog);
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadTargetPackageVersions(string repositoryRoot)
+    {
+        var taskSpec = File.ReadAllLines(Path.Combine(
+            repositoryRoot,
+            "docs",
+            "tasks",
+            "task-13-platform-currency-and-central-package-management.md"));
+        var start = Array.IndexOf(taskSpec, "<!-- PLAT-05-PINS-START -->");
+        var end = Array.IndexOf(taskSpec, "<!-- PLAT-05-PINS-END -->");
+
+        Assert.True(start >= 0 && end > start, "The PLAT-05 package target table markers are missing or invalid.");
+
+        var versions = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var line in taskSpec[(start + 1)..end])
+        {
+            if (!line.StartsWith("| `", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var cells = line.Split('|', StringSplitOptions.None);
+            Assert.True(cells.Length >= 4, $"Invalid PLAT-05 package target row: {line}");
+
+            var package = cells[1].Trim().Trim('`');
+            var version = cells[2].Trim().Trim('`');
+            Assert.True(
+                versions.TryAdd(package, version),
+                $"PLAT-05 lists package '{package}' more than once.");
+        }
+
+        Assert.NotEmpty(versions);
+        return versions;
+    }
+
+    private static IReadOnlyList<string> FindWorkflowSteps(string[] lines)
+    {
+        var steps = new List<string>();
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        {
+            var header = Regex.Match(
+                lines[lineIndex],
+                @"^(?<indent>[ \t]*)steps:[ \t]*(?:#.*)?$");
+            if (!header.Success)
+            {
+                continue;
+            }
+
+            var headerIndent = header.Groups["indent"].Value.Length;
+            var cursor = lineIndex + 1;
+            while (cursor < lines.Length)
+            {
+                if (IsYamlContentLine(lines[cursor]) && GetIndentLength(lines[cursor]) <= headerIndent)
+                {
+                    break;
+                }
+
+                var stepStart = Regex.Match(lines[cursor], @"^(?<indent>[ \t]*)-[ \t]+");
+                if (!stepStart.Success || stepStart.Groups["indent"].Value.Length <= headerIndent)
+                {
+                    cursor++;
+                    continue;
+                }
+
+                var stepIndent = stepStart.Groups["indent"].Value.Length;
+                var stepEnd = cursor + 1;
+                while (stepEnd < lines.Length)
+                {
+                    if (IsYamlContentLine(lines[stepEnd]) && GetIndentLength(lines[stepEnd]) <= headerIndent)
+                    {
+                        break;
+                    }
+
+                    var nextStep = Regex.Match(lines[stepEnd], @"^(?<indent>[ \t]*)-[ \t]+");
+                    if (nextStep.Success && nextStep.Groups["indent"].Value.Length == stepIndent)
+                    {
+                        break;
+                    }
+
+                    stepEnd++;
+                }
+
+                steps.Add(string.Join(Environment.NewLine, lines[cursor..stepEnd]));
+                cursor = stepEnd;
+            }
+
+            lineIndex = cursor - 1;
+        }
+
+        return steps;
+    }
+
+    private static bool IsYamlContentLine(string line) =>
+        !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith('#');
+
+    private static int GetIndentLength(string line) =>
+        line.TakeWhile(character => character is ' ' or '\t').Count();
+
+    private static IReadOnlyList<string> FindOperationalDotnetFiles(string repositoryRoot)
+    {
+        var excludedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".codegraph",
+            ".git",
+            ".next",
+            ".stryker-output",
+            ".terraform",
+            "coverage",
+            "dist",
+            "generated",
+            "node_modules",
+            "obj",
+            "TestResults",
+        };
+        var scriptExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".bat",
+            ".cmd",
+            ".ps1",
+            ".sh",
+        };
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var directories = new Stack<string>();
+        directories.Push(repositoryRoot);
+
+        while (directories.TryPop(out var directory))
+        {
+            foreach (var subdirectory in Directory.EnumerateDirectories(directory))
+            {
+                var name = Path.GetFileName(subdirectory);
+                var isNestedBuildOutput =
+                    name.Equals("bin", StringComparison.OrdinalIgnoreCase) &&
+                    !directory.Equals(repositoryRoot, StringComparison.OrdinalIgnoreCase);
+                if (!excludedDirectories.Contains(name) && !isNestedBuildOutput)
+                {
+                    directories.Push(subdirectory);
+                }
+            }
+
+            foreach (var path in Directory.EnumerateFiles(directory))
+            {
+                var relativePath = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/');
+                var fileName = Path.GetFileName(path);
+                var extension = Path.GetExtension(path);
+                var isRootConfiguration =
+                    !relativePath.Contains('/') &&
+                    (extension.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".props", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".targets", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".yml", StringComparison.OrdinalIgnoreCase));
+                var isDotnetConfiguration =
+                    relativePath.StartsWith(".config/", StringComparison.OrdinalIgnoreCase) &&
+                    extension.Equals(".json", StringComparison.OrdinalIgnoreCase);
+                var isWorkflow =
+                    relativePath.StartsWith(".github/workflows/", StringComparison.OrdinalIgnoreCase) &&
+                    (extension.Equals(".yml", StringComparison.OrdinalIgnoreCase) ||
+                     extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase));
+
+                if (isRootConfiguration ||
+                    isDotnetConfiguration ||
+                    isWorkflow ||
+                    scriptExtensions.Contains(extension) ||
+                    fileName.StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase))
+                {
+                    files.Add(path);
+                }
+            }
+        }
+
+        return files.Order(StringComparer.Ordinal).ToArray();
     }
 
     private static string FindRepositoryRoot() =>

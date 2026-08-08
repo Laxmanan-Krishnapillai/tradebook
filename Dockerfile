@@ -5,9 +5,9 @@ RUN npm ci --legacy-peer-deps
 COPY src/Frontend/ ./
 RUN npm run build
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS backend
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
-COPY Directory.Build.props Directory.Build.targets ./
+COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props ./
 COPY src/Backend/ ./src/Backend/
 COPY tests/ ./tests/
 RUN dotnet restore src/Backend/Tradebook.sln
@@ -34,7 +34,7 @@ USER postgres
 ENTRYPOINT ["/bin/bash"]
 CMD ["/opt/tradebook/database-ops/run-migrations.sh"]
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-bookworm-slim AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime
 WORKDIR /app
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends curl \
