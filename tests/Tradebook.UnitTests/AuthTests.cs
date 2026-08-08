@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using Tradebook.Api.Features.Auth.Login;
 using Tradebook.Core.DTOs;
 

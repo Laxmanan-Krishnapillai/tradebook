@@ -64,20 +64,21 @@ public sealed class ToolingConfigurationTests
     {
         var expectedVersions = new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["AwesomeAssertions"] = "9.5.0",
             ["Dapper"] = "2.1.79",
             ["FastEndpoints"] = "8.2.0",
-            ["FluentAssertions"] = "7.0.0",
-            ["FluentValidation"] = "12.1.0",
+            ["FluentValidation"] = "12.1.1",
             ["Microsoft.AspNetCore.Authentication.JwtBearer"] = "10.0.3",
             ["Microsoft.AspNetCore.Mvc.Testing"] = "10.0.3",
-            ["Microsoft.AspNetCore.OpenApi"] = "10.0.3",
+            ["Microsoft.AspNetCore.OpenApi"] = "10.0.10",
             ["Microsoft.AspNetCore.SignalR.Client"] = "10.0.3",
-            ["Microsoft.AspNetCore.SignalR.Protocols.MessagePack"] = "10.0.3",
-            ["Microsoft.Extensions.Caching.Hybrid"] = "10.0.3",
-            ["Microsoft.Extensions.Hosting.Abstractions"] = "10.0.3",
+            ["Microsoft.AspNetCore.SignalR.Protocols.MessagePack"] = "10.0.10",
+            ["Microsoft.Extensions.Caching.Hybrid"] = "10.1.0",
+            ["Microsoft.Extensions.Hosting.Abstractions"] = "10.0.9",
             ["Microsoft.NET.Test.Sdk"] = "17.14.1",
+            ["Microsoft.OpenApi"] = "2.11.0",
             ["Npgsql"] = "10.0.3",
-            ["Respawn"] = "6.2.1",
+            ["Respawn"] = "7.0.0",
             ["Testcontainers.PostgreSql"] = "4.6.0",
             ["TngTech.ArchUnitNET.xUnit"] = "0.11.0",
             ["TypeGen"] = "5.0.0",
@@ -111,9 +112,18 @@ public sealed class ToolingConfigurationTests
             .SelectMany(path => XDocument.Load(path).Descendants("PackageReference"))
             .Select(element => element.Attribute("Include")!.Value)
             .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(expectedVersions.Keys.Order(StringComparer.Ordinal).ToArray(), referencedPackages);
+
+        // Pinned only to override a vulnerable transitive resolution (NuGetAudit NU1903:
+        // https://github.com/advisories/GHSA-v5pm-xwqc-g5wc via Microsoft.AspNetCore.OpenApi).
+        // No project references it directly, so it is exempt from the reference check below.
+        var transitiveOnlyPins = new[] { "Microsoft.OpenApi" };
+
+        Assert.Empty(referencedPackages.Except(expectedVersions.Keys, StringComparer.Ordinal));
+        Assert.Empty(
+            expectedVersions.Keys
+                .Except(referencedPackages, StringComparer.Ordinal)
+                .Except(transitiveOnlyPins, StringComparer.Ordinal));
     }
 
     [Fact]

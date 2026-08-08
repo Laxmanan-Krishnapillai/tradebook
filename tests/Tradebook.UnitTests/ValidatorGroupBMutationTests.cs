@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using FluentValidation.Results;
 using Tradebook.Api.Features.Hedges;
 using Tradebook.Api.Features.MarketPrices;
