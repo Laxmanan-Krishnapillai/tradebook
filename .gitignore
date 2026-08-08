@@ -8,3 +8,4 @@ StrykerOutput/
 !/bin/agent-commit.sh
 stryker-run*.log
 .codegraph/
+src/Frontend/dist/
