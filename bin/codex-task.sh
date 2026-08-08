@@ -10,7 +10,7 @@
 # Usage:
 #   bin/codex-task.sh 15                 # branch codex/task-15 in the current checkout
 #   bin/codex-task.sh --worktree 15      # isolated worktree ../tradebook-wt/task-15
-#   bin/codex-task.sh --profile deep 12  # force the xhigh "deep" profile
+#   bin/codex-task.sh --profile ultra 20 # force a specific profile (ultra/deep/quick/spark)
 #
 # Run several --worktree invocations in separate terminals/tmux panes to drive a
 # whole wave in parallel (keep ~3-5 in flight — review is the bottleneck, not Codex).
@@ -34,9 +34,10 @@ NN="$(printf '%02d' "$((10#$NN))")"   # 9 -> 09
 spec="$(ls docs/tasks/task-"$NN"-*.md 2>/dev/null | head -1)"
 [ -z "$spec" ] && { echo "no spec found for task $NN under docs/tasks/" >&2; exit 2; }
 
-effort_for() { case "$1" in 16|12) echo xhigh;; 09|22|10) echo medium;; *) echo high;; esac; }
+effort_for() { case "$1" in 14|16|17) echo ultra;; 12) echo xhigh;; 09|22|10) echo medium;; *) echo high;; esac; }
 eff="$(effort_for "$NN")"
-[ -z "$PROFILE" ] && case "$NN" in 16|12) PROFILE="deep";; esac
+# Effort (incl. ultra for 14/16/17, xhigh for 12) is applied via -c below;
+# --profile stays a manual override if you want to force one.
 
 command -v codex >/dev/null || { echo "codex CLI not found on PATH" >&2; exit 2; }
 command -v git   >/dev/null || { echo "git required" >&2; exit 2; }

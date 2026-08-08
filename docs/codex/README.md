@@ -25,7 +25,9 @@ respect them, and an unattended runner that sequences the tasks in dependency or
    `codex login` (use `codex login status` to confirm). Keep the CLI current — older
    builds reject `gpt-5.6-sol`.
 2. **Config:** copy `docs/codex/codex-config.toml.example` into `~/.codex/config.toml`
-   (merge with anything you already have).
+   (merge with anything you already have). It defaults to **Fast mode** (`service_tier =
+   "fast"` — quality-neutral, ~1.5x speed at ~2.5x credits; turn off for overnight) and
+   adds an `ultra` profile for the decomposable tasks (14, 16, 17).
 3. **Toolchain on PATH:** `dotnet` (SDK per `global.json`; Task 13 moves this to .NET 10),
    `node`/`npm`, `git`, and **Docker running** (integration tests use Testcontainers).
    Run the `.sh` scripts from Git Bash or WSL.

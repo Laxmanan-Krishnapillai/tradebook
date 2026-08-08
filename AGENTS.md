@@ -48,9 +48,12 @@ you do, add a commit trailer `Test-Change: <what changed and why>`. Do NOT delet
 `[Skip]`, comment out, or weaken tests to get a green gate. `bin/check-test-integrity.sh`
 flags unjustified test reductions and Stryker independently enforces strength.
 
-## Reasoning effort & execution plan
+## Reasoning effort, speed & execution plan
 
-Default `high`. Use `xhigh` for Very-High tasks (Entra auth, TypeSpec contract) and the
-hardest refactors; `medium` for mechanical/QA tasks. `docs/codex/WAVES.md` holds the
-dependency-ordered execution plan and per-task effort; `bin/codex-overnight.sh` runs it
-unattended (branch-per-task, gated, `main` untouched).
+Default `high`. Use `ultra` (top level — max reasoning + subagent delegation) for the
+genuinely decomposable tasks (14, 16, 17), `xhigh` for the deep focused one (12 Entra),
+`medium` for mechanical/QA (09, 22, 10). Fast mode (`service_tier = "fast"`) is
+quality-neutral (~1.5x speed, ~2.5x credits) — keep it on for interactive/daytime work,
+turn it off for unattended overnight runs. `docs/codex/WAVES.md` holds the
+dependency-ordered plan and per-task effort; `bin/codex-task.sh` runs one task supervised,
+`bin/codex-overnight.sh` runs the sequence unattended.

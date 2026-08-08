@@ -28,10 +28,11 @@ LOG="reports/codex-overnight-${DATE}.md"
 TEMPLATE="docs/codex/kickoff-prompt-template.md"
 DEFAULT_ORDER=(13 11 14 15 17 18 16 20 12 09 19 21 22 23 24 10)
 
-# Very-High tasks get xhigh; mechanical/QA get medium; everything else high.
-effort_for()  { case "$1" in 16|12) echo xhigh;;  09|22|10) echo medium;;  *) echo high;; esac; }
-# Per-task wall-clock cap (seconds) so one stuck task can't eat the whole night.
-timeout_for() { case "$1" in 16|12) echo 10800;;  09|10|22) echo 5400;;    *) echo 7200;; esac; }
+# Decomposable, high-value tasks get Ultra (max reasoning + subagent delegation);
+# the deep focused one gets xhigh; mechanical/QA get medium; everything else high.
+effort_for()  { case "$1" in 14|16|17) echo ultra;; 12) echo xhigh;; 09|22|10) echo medium;; *) echo high;; esac; }
+# Per-task wall-clock cap (seconds); Ultra/xhigh tasks fan out and take longer.
+timeout_for() { case "$1" in 14|16|17|12) echo 10800;; 09|10|22) echo 5400;; *) echo 7200;; esac; }
 
 DRY_RUN="${DRY_RUN:-0}"; KEEP_GOING="${KEEP_GOING:-0}"
 ORDER=("$@"); [ "${#ORDER[@]}" -eq 0 ] && ORDER=("${DEFAULT_ORDER[@]}")
@@ -74,7 +75,7 @@ for NN in "${ORDER[@]}"; do
 
   if [ "$DRY_RUN" = 1 ]; then
     echo "----- task ${NN}  (effort=${eff}, timeout=${tmo}s, spec=${spec}) -----"
-    echo "codex exec --model ${MODEL} -c model_reasoning_effort=${eff} --sandbox workspace-write -c approval_policy=never \"<prompt rendered from ${TEMPLATE}>\""
+    echo "codex exec --model ${MODEL} -c model_reasoning_effort=${eff} --sandbox workspace-write --ask-for-approval never \"<prompt rendered from ${TEMPLATE}>\""
     continue
   fi
 
@@ -82,7 +83,7 @@ for NN in "${ORDER[@]}"; do
   git switch -c "$branch" >/dev/null 2>&1 || git switch "$branch"
   echo ">>> Task ${NN}  effort=${eff}  branch=${branch}"
 
-  CODEX_EXEC_FLAGS=(--model "$MODEL" -c "model_reasoning_effort=${eff}" --sandbox workspace-write -c approval_policy=never)
+  CODEX_EXEC_FLAGS=(--model "$MODEL" -c "model_reasoning_effort=${eff}" --sandbox workspace-write --ask-for-approval never)
   timeout "${tmo}" codex exec "${CODEX_EXEC_FLAGS[@]}" "$prompt"
   codex_rc=$?
 

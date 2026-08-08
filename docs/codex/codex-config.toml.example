@@ -7,6 +7,12 @@ model = "gpt-5.6-sol"                 # flagship coding model (bare "gpt-5.6" al
 model_reasoning_effort = "high"       # default working level for tasks 09–24
 plan_mode_reasoning_effort = "high"   # planning quality compounds downstream
 
+# Fast mode: same model + reasoning, ~1.5x faster inference, quality-neutral, but
+# ~2.5x credits on GPT-5.6. Worth it when YOU are waiting (daytime/interactive); for
+# unattended overnight runs you're asleep, so comment this out (or run /fast off) to
+# save the premium. Toggle live in the TUI with: /fast on | /fast off | /fast status.
+service_tier = "fast"
+
 approval_policy = "on-request"        # supervised interactive default; the overnight
                                       # driver passes --ask-for-approval never itself.
 sandbox_mode = "workspace-write"      # never danger-full-access for this work
@@ -17,10 +23,19 @@ log_user_prompt = false               # prompts can contain source/paths — kee
 network_access = true                 # dotnet restore / npm ci / Testcontainers image pulls
 
 # --- profiles: select with `codex --profile <name>` or in the driver -------------
-# Very-High tasks (Entra auth = 12, TypeSpec contract = 16) and the hardest refactors.
+# xhigh — deep, focused hard tasks (Entra auth = 12) where reasoning depth beats
+# subagent delegation. (TypeSpec = 16 and the decomposable ones use the ultra profile.)
 [profiles.deep]
 model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
+
+# Ultra = the top reasoning level (max reasoning + automatic subagent delegation).
+# ~6-12x tokens, so use ONLY on genuinely decomposable, high-value tasks (14, 16, 17).
+# Ultra must be enabled for your account first (desktop: Settings > Configuration >
+# "Ultra in model picker slider"); it is then the 6th level in the CLI reasoning picker.
+[profiles.ultra]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "ultra"
 
 # Cheap triage / trivial edits.
 [profiles.quick]
