@@ -1,1 +1,6 @@
 * text=auto eol=lf
+
+# TypeGen emits CRLF. Check the generated API contracts out as CRLF so the
+# drift gate (`git status --porcelain`) stays clean on Linux CI too, not just on
+# Windows where core.autocrlf masks it. Blobs stay LF-normalized in the repo.
+src/Frontend/src/api/generated/** text eol=crlf
