@@ -48,6 +48,23 @@ Codex. Remove a finished worktree with `git worktree remove ../tradebook-wt/task
 > Worktrees that run integration tests each need Docker; a single local Docker/Postgres
 > is fine since Testcontainers gives every run its own container and Respawn resets state.
 
+### One command per wave
+
+`bin/codex-wave.sh <n>` does the whole fan-out for you: it creates a worktree per task in
+wave `<n>` (off `main`), runs Codex on each in parallel (headless, capped at `JOBS`,
+default 3), gates each, and reports PASS/FAIL. Prior waves must be merged to `main` first.
+
+```bash
+DRY_RUN=1 bin/codex-wave.sh 1     # show the plan, run nothing
+bin/codex-wave.sh 1               # run wave 1 (tasks 14 15 17 18) in parallel
+JOBS=2 bin/codex-wave.sh 2        # cap concurrency (each run is ~8-10 GB RAM)
+```
+
+Review the PASS branches, merge them to `main`, then run the next wave. Peak available
+width is ~5-6 tasks (after 13/11 land); the critical path (13 → 15 → 16 → 19 → 23 → 24 →
+10) is the floor no amount of parallelism beats — so landing 13 and 16 right first-time
+(best-of-N + Ultra) speeds the whole run more than adding workers.
+
 ## Optional: hand the easy ones to the cloud
 
 While you drive the hard tasks (12, 16, 17) locally, you can delegate independent,
