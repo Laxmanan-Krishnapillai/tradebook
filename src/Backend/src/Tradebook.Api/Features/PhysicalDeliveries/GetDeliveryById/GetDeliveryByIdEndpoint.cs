@@ -12,7 +12,7 @@ public sealed class GetDeliveryByIdEndpoint(IDeliveryRepository repository, ICac
     public override async Task HandleAsync(GetDeliveryByIdRequest request, CancellationToken cancellationToken)
     {
         var delivery = await cache.GetOrCreateAsync($"delivery:{request.DeliveryId}", token => new ValueTask<PhysicalDeliveryDetailsDto?>(repository.GetByIdAsync(request.DeliveryId, token)), TimeSpan.FromMinutes(5), cancellationToken);
-        if (delivery is null) { await SendNotFoundAsync(cancellationToken); return; }
-        await SendOkAsync(delivery, cancellationToken);
+        if (delivery is null) { await Send.NotFoundAsync(cancellationToken); return; }
+        await Send.OkAsync(delivery, cancellation: cancellationToken);
     }
 }

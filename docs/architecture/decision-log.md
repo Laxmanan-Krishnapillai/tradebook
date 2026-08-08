@@ -130,3 +130,17 @@ Single repository: `src/Backend`, `src/Frontend`, `src/Database`, `infra/`, `tes
 **Why**: The AWS choice was never grounded in organizational reality — the organization's identity tenant and existing production PostgreSQL run on Azure. The previous AWS spec was also internally impossible (Aurora + TimescaleDB). With TimescaleDB cut (D3), managed PostgreSQL Flexible Server becomes viable. The D6 "versioned S3 bucket" requirement is fulfilled by an Azure Storage account with blob versioning + retention policy; blueprint references to "S3" should be read as "versioned object storage".
 
 **Status**: Applied in the rewritten `tasks/task-07-infrastructure-terraform-docker.md`. Flagged for explicit user confirmation — if AWS (or another provider) is preferred, only task-07 §5–6 and this entry change; nothing else in the architecture depends on the provider.
+
+## D15 — Adopt .NET 10 LTS and NuGet Central Package Management (2026-08-08)
+
+All .NET projects target `net10.0`. The repository pins SDK `10.0.103` in `global.json`
+with `rollForward: latestFeature`, allowing newer .NET 10 feature bands while preventing
+an unintended roll to .NET 11. This supersedes the previous .NET 9 backend baseline.
+
+NuGet Central Package Management is the sole package-version source. Root
+`Directory.Packages.props` enables `ManagePackageVersionsCentrally` and
+`CentralPackageTransitivePinningEnabled`; project files keep versionless
+`PackageReference` entries. Transitive pinning makes security-response upgrades explicit
+and reviewable in one manifest instead of relying on whichever transitive version restore
+selects. `GlobalPackageReference` is deliberately documented but unused here; Task 14 owns
+the repo-wide analyzer entries.

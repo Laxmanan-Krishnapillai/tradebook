@@ -11,14 +11,14 @@ public sealed class DeletePhysicalDeliveryEndpoint(IDeliveryRepository repositor
     public override async Task HandleAsync(DeletePhysicalDeliveryRequest request, CancellationToken cancellationToken)
     {
         var outcome = await repository.CancelAtomicAsync(request.DeliveryId, request.Version, request.Reason, ActorId.From(User), cancellationToken);
-        if (outcome == MutationOutcome.NotFound) { await SendNotFoundAsync(cancellationToken); return; }
+        if (outcome == MutationOutcome.NotFound) { await Send.NotFoundAsync(cancellationToken); return; }
         if (outcome == MutationOutcome.VersionConflict)
         {
             var current = await repository.GetByIdAsync(request.DeliveryId, cancellationToken);
-            await SendAsync(current!, 409, cancellationToken); return;
+            await Send.ResponseAsync(current!, 409, cancellation: cancellationToken); return;
         }
         await cache.RemoveAsync($"delivery:{request.DeliveryId}", cancellationToken);
         await cache.RemoveAsync("deliveries:list", cancellationToken);
-        await SendNoContentAsync(cancellationToken);
+        await Send.NoContentAsync(cancellationToken);
     }
 }

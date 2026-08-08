@@ -1,5 +1,10 @@
 <Project>
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'Tradebook.IntegrationTests'">
-    <PackageReference Include="Respawn" Version="6.2.1" />
+    <PackageReference Include="Respawn" />
   </ItemGroup>
 </Project>

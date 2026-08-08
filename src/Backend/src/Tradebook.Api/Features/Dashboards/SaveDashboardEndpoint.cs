@@ -30,7 +30,7 @@ public sealed class SaveDashboardEndpoint(
                 jsonOptions.Value.SerializerOptions,
                 out var error))
         {
-            AddError(error); await SendErrorsAsync(400, cancellationToken); return;
+            AddError(error); await Send.ErrorsAsync(400, cancellation: cancellationToken); return;
         }
 
         var actorId = ActorId.From(User);
@@ -57,8 +57,8 @@ public sealed class SaveDashboardEndpoint(
         {
             await transaction.RollbackAsync(cancellationToken);
             var current = await CurrentForActorAsync(connection, request.DashboardId, actorId, cancellationToken);
-            if (current is null) { await SendNotFoundAsync(cancellationToken); return; }
-            await SendAsync(ToResponse(request.DashboardId, current), 409, cancellationToken);
+            if (current is null) { await Send.NotFoundAsync(cancellationToken); return; }
+            await Send.ResponseAsync(ToResponse(request.DashboardId, current), 409, cancellation: cancellationToken);
             return;
         }
 
@@ -68,7 +68,7 @@ public sealed class SaveDashboardEndpoint(
                     jsonb_build_object('dashboardId', @Id::text, 'actorId', @ActorId::text, 'version', @Version));
             """, new { Id = request.DashboardId, ActorId = actorId, EventType = eventType, saved.Version }, transaction, cancellationToken: cancellationToken));
         await transaction.CommitAsync(cancellationToken);
-        await SendAsync(ToResponse(request.DashboardId, saved), cancellation: cancellationToken);
+        await Send.ResponseAsync(ToResponse(request.DashboardId, saved), cancellation: cancellationToken);
     }
 
     private static Task<DashboardRow?> CurrentForActorAsync(System.Data.IDbConnection connection, Guid id, Guid actorId, CancellationToken cancellationToken) => connection.QuerySingleOrDefaultAsync<DashboardRow>(new CommandDefinition("SELECT layout_json::text AS Layout, version AS Version FROM workspace_dashboards WHERE id = @Id AND actor_id = @ActorId", new { Id = id, ActorId = actorId }, cancellationToken: cancellationToken));

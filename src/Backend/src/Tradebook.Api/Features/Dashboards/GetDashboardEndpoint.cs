@@ -18,7 +18,7 @@ public sealed class GetDashboardEndpoint(INpgsqlConnectionFactory connections) :
         var actorId = ActorId.From(User);
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
         var row = await connection.QuerySingleOrDefaultAsync<DashboardRow>(new CommandDefinition("SELECT layout_json::text AS Layout, version AS Version FROM workspace_dashboards WHERE id = @Id AND actor_id = @ActorId", new { Id = request.DashboardId, ActorId = actorId }, cancellationToken: cancellationToken));
-        if (row is null) { await SendNotFoundAsync(cancellationToken); return; }
-        await SendAsync(new SaveDashboardResponse(request.DashboardId, row.Version, JsonDocument.Parse(row.Layout).RootElement.Clone()), cancellation: cancellationToken);
+        if (row is null) { await Send.NotFoundAsync(cancellationToken); return; }
+        await Send.ResponseAsync(new SaveDashboardResponse(request.DashboardId, row.Version, JsonDocument.Parse(row.Layout).RootElement.Clone()), cancellation: cancellationToken);
     }
 }
