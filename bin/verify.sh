@@ -34,6 +34,30 @@ done
 step() { printf '\n\033[1;34m==== %s ====\033[0m\n' "$*"; }
 fail() { printf '\n\033[1;31mGATE FAILED: %s\033[0m\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+STRYKER_USED_CONTAINER=0
+
+run_stryker() {
+  if dotnet --info >/dev/null 2>&1; then
+    dotnet stryker --config-file stryker-config.json
+    return
+  fi
+
+  have docker && docker info >/dev/null 2>&1 || return 1
+  local docker_root="$ROOT"
+  if [ "${OS:-}" = "Windows_NT" ]; then
+    have cygpath || return 1
+    docker_root="$(cygpath --windows "$ROOT")"
+  fi
+
+  echo "Local dotnet --info failed; running Stryker in the pinned .NET SDK container."
+  STRYKER_USED_CONTAINER=1
+  MSYS_NO_PATHCONV=1 docker run --rm \
+    --env DOTNET_ROLL_FORWARD=Major \
+    --volume "$docker_root:/workspace" \
+    --workdir /workspace \
+    mcr.microsoft.com/dotnet/sdk:10.0 \
+    bash -lc 'dotnet tool restore && dotnet stryker --config-file stryker-config.json'
+}
 
 have dotnet || fail "dotnet SDK not found on PATH"
 SLN="src/Backend/Tradebook.sln"
@@ -64,7 +88,10 @@ if [ "$DO_BACKEND" = 1 ]; then
 
   if [ "$DO_MUTATION" = 1 ]; then
     step "mutation tests (Stryker, break=80)"
-    dotnet stryker --config-file stryker-config.json || fail "stryker mutation gate"
+    run_stryker || fail "stryker mutation gate"
+    if [ "$STRYKER_USED_CONTAINER" = 1 ]; then
+      dotnet restore "$SLN" || fail "restore host assets after containerized Stryker"
+    fi
   fi
 fi
 

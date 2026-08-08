@@ -13,6 +13,6 @@ public sealed class CreatePhysicalDeliveryEndpoint(IDeliveryRepository repositor
         var actorId = ActorId.From(User);
         var delivery = await repository.CreateAtomicAsync(request, actorId, cancellationToken);
         await cache.RemoveAsync("deliveries:list", cancellationToken);
-        await SendAsync(new CreatePhysicalDeliveryResponse(delivery.DeliveryId, delivery.ContractInstanceId, delivery.InvoiceAmountEur, delivery.Status, delivery.Version, delivery.CreatedAt), 201, cancellationToken);
+        await Send.ResponseAsync(new CreatePhysicalDeliveryResponse(delivery.DeliveryId, delivery.ContractInstanceId, delivery.InvoiceAmountEur, delivery.Status, delivery.Version, delivery.CreatedAt), 201, cancellation: cancellationToken);
     }
 }

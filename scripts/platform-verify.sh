@@ -49,7 +49,7 @@ run_stryker() {
     --env DOTNET_ROLL_FORWARD=Major \
     --volume "$docker_repository_root:/workspace" \
     --workdir /workspace \
-    mcr.microsoft.com/dotnet/sdk:9.0 \
+    mcr.microsoft.com/dotnet/sdk:10.0 \
     bash -lc 'dotnet tool restore && dotnet stryker --config-file stryker-config.json'
 }
 

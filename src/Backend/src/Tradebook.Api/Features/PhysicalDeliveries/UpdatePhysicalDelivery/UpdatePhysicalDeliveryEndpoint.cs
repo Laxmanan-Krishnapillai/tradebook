@@ -14,11 +14,11 @@ public sealed class UpdatePhysicalDeliveryEndpoint(IDeliveryRepository repositor
         if (updated is null)
         {
             var current = await repository.GetByIdAsync(request.DeliveryId, cancellationToken);
-            if (current is null) { await SendNotFoundAsync(cancellationToken); return; }
-            await SendAsync(current, 409, cancellationToken); return;
+            if (current is null) { await Send.NotFoundAsync(cancellationToken); return; }
+            await Send.ResponseAsync(current, 409, cancellation: cancellationToken); return;
         }
         await cache.RemoveAsync($"delivery:{request.DeliveryId}", cancellationToken);
         await cache.RemoveAsync("deliveries:list", cancellationToken);
-        await SendOkAsync(updated, cancellationToken);
+        await Send.OkAsync(updated, cancellation: cancellationToken);
     }
 }

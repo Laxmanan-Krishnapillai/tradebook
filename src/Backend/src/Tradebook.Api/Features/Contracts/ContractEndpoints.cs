@@ -12,7 +12,7 @@ public sealed class CreateContractEndpoint(IContractRepository repository)
 {
     public override void Configure() { Post("/api/v1/contracts"); Policies("TraderPolicy"); }
     public override async Task HandleAsync(CreateContractRequest request, CancellationToken ct) =>
-        await SendAsync(await repository.CreateAtomicAsync(request, ActorId.From(User), ct), 201, ct);
+        await Send.ResponseAsync(await repository.CreateAtomicAsync(request, ActorId.From(User), ct), 201, cancellation: ct);
 }
 
 public sealed class GetContractByIdEndpoint(IContractRepository repository)
@@ -22,8 +22,8 @@ public sealed class GetContractByIdEndpoint(IContractRepository repository)
     public override async Task HandleAsync(GetContractByIdRequest request, CancellationToken ct)
     {
         var result = await repository.GetByIdAsync(request.ContractId, ct);
-        if (result is null) { await SendNotFoundAsync(ct); return; }
-        await SendOkAsync(result, ct);
+        if (result is null) { await Send.NotFoundAsync(ct); return; }
+        await Send.OkAsync(result, cancellation: ct);
     }
 }
 
@@ -32,7 +32,7 @@ public sealed class GetContractHistoryEndpoint(IContractRepository repository)
 {
     public override void Configure() { Get("/api/v1/contracts"); Policies("ReadPolicy"); }
     public override async Task HandleAsync(GetContractHistoryRequest request, CancellationToken ct) =>
-        await SendOkAsync(await repository.GetHistoryAsync(request, ct), ct);
+        await Send.OkAsync(await repository.GetHistoryAsync(request, ct), cancellation: ct);
 }
 
 public sealed class UpdateContractEndpoint(IContractRepository repository)
@@ -42,10 +42,10 @@ public sealed class UpdateContractEndpoint(IContractRepository repository)
     public override async Task HandleAsync(UpdateContractRequest request, CancellationToken ct)
     {
         var result = await repository.UpdateAtomicAsync(request, ActorId.From(User), ct);
-        if (result is not null) { await SendOkAsync(result, ct); return; }
+        if (result is not null) { await Send.OkAsync(result, cancellation: ct); return; }
         var current = await repository.GetByIdAsync(request.ContractId, ct);
-        if (current is null) { await SendNotFoundAsync(ct); return; }
-        await SendAsync(current, 409, ct);
+        if (current is null) { await Send.NotFoundAsync(ct); return; }
+        await Send.ResponseAsync(current, 409, cancellation: ct);
     }
 }
 
@@ -57,12 +57,12 @@ public sealed class DeactivateContractEndpoint(IContractRepository repository)
     {
         var outcome = await repository.DeactivateAtomicAsync(
             request.ContractId, request.Version, request.Reason, ActorId.From(User), ct);
-        if (outcome == MutationOutcome.NotFound) { await SendNotFoundAsync(ct); return; }
+        if (outcome == MutationOutcome.NotFound) { await Send.NotFoundAsync(ct); return; }
         if (outcome == MutationOutcome.VersionConflict)
         {
-            await SendAsync((await repository.GetByIdAsync(request.ContractId, ct))!, 409, ct);
+            await Send.ResponseAsync((await repository.GetByIdAsync(request.ContractId, ct))!, 409, cancellation: ct);
             return;
         }
-        await SendNoContentAsync(ct);
+        await Send.NoContentAsync(ct);
     }
 }

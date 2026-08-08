@@ -22,7 +22,7 @@ public sealed class AnalyticsQueryEndpoint(SemanticQueryCompiler compiler, INpgs
         catch (SemanticValidationException exception)
         {
             AddError(exception.Message);
-            await SendErrorsAsync(400, cancellationToken);
+            await Send.ErrorsAsync(400, cancellation: cancellationToken);
             return;
         }
 
@@ -36,6 +36,6 @@ public sealed class AnalyticsQueryEndpoint(SemanticQueryCompiler compiler, INpgs
             var values = (IDictionary<string, object?>)row;
             return (IReadOnlyList<object?>)query.ResultColumnNames.Select(column => values.TryGetValue(column, out var value) ? value : null).ToArray();
         }).ToArray();
-        await SendAsync(new AnalyticsQueryResponse(query.ResultColumnNames, rows), 200, cancellationToken);
+        await Send.ResponseAsync(new AnalyticsQueryResponse(query.ResultColumnNames, rows), 200, cancellation: cancellationToken);
     }
 }

@@ -14,5 +14,5 @@
     "decimal": "number"
   },
   "csNullableTranslation": "null",
-  "assemblies": ["./src/Backend/src/Tradebook.Core/bin/Debug/net9.0/Tradebook.Core.dll"]
+  "assemblies": ["./src/Backend/src/Tradebook.Core/bin/Debug/net10.0/Tradebook.Core.dll"]
 }

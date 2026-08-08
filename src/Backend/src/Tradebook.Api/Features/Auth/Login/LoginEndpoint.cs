@@ -32,7 +32,7 @@ public sealed class LoginEndpoint(IUserRepository users, IOptions<JwtOptions> op
             : PasswordHasher.Verify(request.Password, UnknownUserHash);
         if (user is null || !user.IsActive || !passwordOk)
         {
-            await SendUnauthorizedAsync(cancellationToken);
+            await Send.UnauthorizedAsync(cancellationToken);
             return;
         }
 
@@ -49,7 +49,7 @@ public sealed class LoginEndpoint(IUserRepository users, IOptions<JwtOptions> op
             expires: expiresAt.UtcDateTime,
             signingCredentials: new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256));
 
-        await SendOkAsync(new LoginResponse(new JwtSecurityTokenHandler().WriteToken(token), expiresAt, user.Id), cancellationToken);
+        await Send.OkAsync(new LoginResponse(new JwtSecurityTokenHandler().WriteToken(token), expiresAt, user.Id), cancellation: cancellationToken);
     }
 
     private static readonly string UnknownUserHash = PasswordHasher.Hash(Guid.NewGuid().ToString());

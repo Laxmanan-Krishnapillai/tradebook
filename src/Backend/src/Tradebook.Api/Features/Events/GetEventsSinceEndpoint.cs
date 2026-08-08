@@ -41,6 +41,6 @@ public sealed class GetEventsSinceEndpoint(IOutboxEventReader events)
             request.Limit,
             ActorId.From(User),
             cancellationToken);
-        await SendOkAsync(response, cancellationToken);
+        await Send.OkAsync(response, cancellation: cancellationToken);
     }
 }
