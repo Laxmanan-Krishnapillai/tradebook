@@ -7,3 +7,4 @@ StrykerOutput/
 !/bin/
 !/bin/agent-commit.sh
 stryker-run*.log
+.codegraph/
