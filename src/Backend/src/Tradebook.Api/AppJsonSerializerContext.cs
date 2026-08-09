@@ -66,8 +66,6 @@ namespace Tradebook.Api;
 [JsonSerializable(typeof(GetHedgeHistoryRequest))]
 [JsonSerializable(typeof(GetHedgeHistoryResponse))]
 [JsonSerializable(typeof(DeleteHedgeRequest))]
-[JsonSerializable(typeof(LoginRequest))]
-[JsonSerializable(typeof(LoginResponse))]
 [JsonSerializable(typeof(EntityChangedEventDto))]
 [JsonSerializable(typeof(GetEventsSinceResponse))]
 [JsonSerializable(typeof(JsonQueryAst))]

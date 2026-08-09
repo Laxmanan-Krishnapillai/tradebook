@@ -39,18 +39,19 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration(
-                (_, configuration) =>
-                    configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>(StringComparer.Ordinal)
-                        {
-                            ["Database:ConnectionString"] = Postgres.ConnectionString,
-                            ["Jwt:Issuer"] = "Tradebook",
-                            ["Jwt:Audience"] = "Tradebook",
-                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
-                        }
-                    )
-            )
+            builder
+                .UseEnvironment("Testing")
+                .ConfigureAppConfiguration(
+                    (_, configuration) =>
+                        configuration.AddInMemoryCollection(
+                            new Dictionary<string, string?>(StringComparer.Ordinal)
+                            {
+                                ["Database:ConnectionString"] = Postgres.ConnectionString,
+                                ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                            }
+                        )
+                )
         );
 
     private async Task RenameVolumeColumnAsync(string from, string to)
@@ -67,14 +68,10 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
             ),
         };
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await using (connection.ConfigureAwait(false))
-        {
-            await connection.OpenAsync().ConfigureAwait(false);
-            var command = new NpgsqlCommand(sql, connection);
-            await using (command.ConfigureAwait(false))
-            {
-                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
-            }
-        }
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection.OpenAsync().ConfigureAwait(false);
+        var command = new NpgsqlCommand(sql, connection);
+        await using var configuredCommand = command.ConfigureAwait(false);
+        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 }

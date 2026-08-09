@@ -29,7 +29,7 @@ describe('API URL resolution', () => {
   });
 
   it('keeps same-origin authorization headers after resolving a relative path', async () => {
-    useAuthStore.getState().setSession('access-token', '2099-01-01T00:00:00.000Z', 'actor-id');
+    useAuthStore.getState().setSession({ accountKey: 'account-1', actorId: 'actor-id' });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

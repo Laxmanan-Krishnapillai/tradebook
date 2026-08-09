@@ -47,7 +47,7 @@ interface EntityDescriptor<T extends VersionedEntity> {
 
 function currentSessionIdentity(): string | undefined {
   const session = getAuthSession();
-  return session ? `${session.actorId}\u0000${session.accessToken}` : undefined;
+  return session ? `${session.actorId}\u0000${session.accountKey}` : undefined;
 }
 function isCurrentSession<T extends { sessionIdentity?: string }>(context: T | undefined): context is T {
   return context !== undefined && context.sessionIdentity === currentSessionIdentity();

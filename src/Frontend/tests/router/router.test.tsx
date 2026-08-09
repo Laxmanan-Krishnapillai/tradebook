@@ -9,8 +9,7 @@ import { useUiStore } from '../../src/lib/state/useUiStore';
 
 const validSession: AuthSession = {
   actorId: 'actor-1',
-  accessToken: 'token-1',
-  expiresAtUtc: '2099-01-01T00:00:00.000Z',
+  accountKey: 'account-1',
 };
 
 async function load(initialPath: string, session?: AuthSession) {

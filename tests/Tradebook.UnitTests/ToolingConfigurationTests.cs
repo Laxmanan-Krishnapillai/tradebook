@@ -664,6 +664,7 @@ public sealed class ToolingConfigurationTests
         var task20Versions = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["dbup-postgresql"] = "7.0.1",
+            ["Microsoft.Identity.Web"] = "4.14.2",
             ["CsCheck"] = "4.4.0",
             ["Microsoft.Testing.Extensions.CodeCoverage"] = "17.14.2",
             ["xunit.v3"] = "3.2.2",
