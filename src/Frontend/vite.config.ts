@@ -1,5 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
+import babel from '@rolldown/plugin-babel';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+
+const reactCompilerConfig = { target: '19' as const };
 
 export default defineConfig({
   plugins: [
@@ -10,7 +15,11 @@ export default defineConfig({
       generatedRouteTree: './src/app/routeTree.gen.ts',
       quoteStyle: 'single',
     }),
+    react(),
+    babel({ presets: [reactCompilerPreset(reactCompilerConfig)] }),
+    tailwindcss(),
   ],
+  build: { rolldownOptions: { output: {} } },
   test: {
     environment: 'jsdom',
     globals: true,

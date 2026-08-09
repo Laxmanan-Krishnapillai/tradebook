@@ -236,8 +236,8 @@ export function ContractsPage() {
           <ContractEditor
             key={row.original.version}
             contract={row.original}
-            onSave={save}
-            onDeactivate={deactivate}
+            onSave={(contract, changes) => void save(contract, changes)}
+            onDeactivate={(contract) => void deactivate(contract)}
           />
         ),
       },

@@ -1,1 +1,1 @@
-export { VirtualizedDataTable, type VirtualizedDataTableProps } from '../../lib/grid/VirtualizedDataTable';
+export { VirtualizedDataTable } from '../../lib/grid/VirtualizedDataTable';

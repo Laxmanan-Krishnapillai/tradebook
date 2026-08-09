@@ -2,7 +2,7 @@ import { queryClient } from '../query/queryClient';
 import { getAuthSession, useAuthStore, type AuthSession } from '../state/useAuthStore';
 import { useUiStore } from '../state/useUiStore';
 
-export const authenticatedRoutePaths = [
+const authenticatedRoutePaths = [
   '/deliveries',
   '/contracts',
   '/market-prices',

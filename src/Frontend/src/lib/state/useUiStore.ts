@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type GlobalModal = 'create-delivery' | null;
+type GlobalModal = 'create-delivery' | null;
 
 interface UiState {
   activeModal: GlobalModal;
