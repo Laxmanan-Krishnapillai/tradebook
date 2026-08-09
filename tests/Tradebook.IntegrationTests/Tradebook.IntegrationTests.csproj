@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
 
@@ -28,5 +29,9 @@
     <ProjectReference Include="..\..\src\Backend\src\Tradebook.Api\Tradebook.Api.csproj" />
     <ProjectReference Include="..\..\src\Backend\src\Tradebook.Core\Tradebook.Core.csproj" />
     <ProjectReference Include="..\..\src\Backend\src\Tradebook.Infrastructure\Tradebook.Infrastructure.csproj" />
+    <ProjectReference
+      Include="..\..\src\Aspire\Tradebook.AppHost\Tradebook.AppHost.csproj"
+      Aliases="apphost"
+    />
   </ItemGroup>
 </Project>

@@ -220,3 +220,12 @@ Vogen value-object round-trip and validation invariants.
 
 TUnit was rejected because xUnit v3 preserves the existing fixture and assertion model
 while carrying lower integration risk for Testcontainers, ArchUnitNET, and Stryker.
+
+## D21 — Aspire development orchestration and deployment artifacts (2026-08-09)
+
+.NET Aspire 13.4.6 is the local application orchestrator for PostgreSQL 17, the API,
+worker host, and Vite frontend, and provides their shared OpenTelemetry dashboard.
+Aspire.Hosting.Testing owns full-graph smoke coverage; Testcontainers and Respawn remain
+the isolated database-test mechanism. Aspire and `azd` may generate Azure Container Apps
+deployment artifacts, but the Task 07 Terraform remains the production infrastructure
+source of truth for Container Apps, PostgreSQL Flexible Server 17, and Key Vault.
