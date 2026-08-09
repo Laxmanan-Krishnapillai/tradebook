@@ -1,7 +1,7 @@
 import { tokenProvider } from '../auth/tokenProvider';
 
 export class ApiError extends Error { constructor(public readonly status: number, public readonly problem?: unknown) { super(`HTTP ${status}`); } }
-export class ReauthenticationRequiredError extends Error {}
+class ReauthenticationRequiredError extends Error {}
 export function resolveApiUrl(path: string, documentUrl = globalThis.location?.href): string {
   if (/^[a-z][a-z\d+.-]*:/i.test(path)) return path;
   if (!documentUrl) throw new TypeError(`Cannot resolve relative API URL '${path}' without a document URL.`);
