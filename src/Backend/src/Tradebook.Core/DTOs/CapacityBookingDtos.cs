@@ -21,7 +21,8 @@ public sealed record CreateCapacityBookingRequest(
     [property: TsOptional] Quantity? CapacityMw,
     [property: TsOptional] Quantity? CapacityPriceEurMwh,
     [property: TsOptional] Quantity? CapacityCostEur,
-    [property: TsOptional] string? Comments);
+    [property: TsOptional] string? Comments
+);
 
 [ExportTsInterface]
 public sealed record UpdateCapacityBookingRequest(
@@ -36,11 +37,15 @@ public sealed record UpdateCapacityBookingRequest(
     [property: TsOptional] Quantity? CapacityPriceEurMwh,
     [property: TsOptional] Quantity? CapacityCostEur,
     [property: TsOptional] string? Comments,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record CapacityBookingDetailsDto(
-    CapacityBookingId CapacityBookingId, ContractId ContractId, string ContractInstanceId, DateOnly SupplyMonth,
+    CapacityBookingId CapacityBookingId,
+    ContractId ContractId,
+    string ContractInstanceId,
+    DateOnly SupplyMonth,
     [property: TsOptional] CounterpartyId? CounterpartyId,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? PriceMechanism,
@@ -54,7 +59,10 @@ public sealed record CapacityBookingDetailsDto(
     [property: TsOptional] Quantity? CapacityPriceEurMwh,
     [property: TsOptional] Quantity? CapacityCostEur,
     [property: TsOptional] string? Comments,
-    long Version, DateTime CreatedAt, DateTime UpdatedAt);
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetCapacityBookingHistoryRequest(
@@ -62,11 +70,21 @@ public sealed record GetCapacityBookingHistoryRequest(
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetCapacityBookingHistoryResponse(
-    IReadOnlyList<CapacityBookingDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<CapacityBookingDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
-public sealed record DeleteCapacityBookingRequest(CapacityBookingId CapacityBookingId, string Reason, long Version);
+public sealed record DeleteCapacityBookingRequest(
+    CapacityBookingId CapacityBookingId,
+    string Reason,
+    long Version
+);

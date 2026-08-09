@@ -6,23 +6,31 @@ namespace Tradebook.Core.DTOs;
 
 [ExportTsInterface]
 public sealed record CreateHedgeRequest(
-    ContractId ContractId, DateOnly Month,
+    ContractId ContractId,
+    DateOnly Month,
     [property: TsOptional] Quantity? HedgeAmountMwh,
-    [property: TsOptional] Price? HedgePriceEurMwh);
+    [property: TsOptional] Price? HedgePriceEurMwh
+);
 
 [ExportTsInterface]
 public sealed record UpdateHedgeRequest(
     HedgeId HedgeId,
     [property: TsOptional] Quantity? HedgeAmountMwh,
     [property: TsOptional] Price? HedgePriceEurMwh,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record HedgeDetailsDto(
-    HedgeId HedgeId, ContractId ContractId, DateOnly Month,
+    HedgeId HedgeId,
+    ContractId ContractId,
+    DateOnly Month,
     [property: TsOptional] Quantity? HedgeAmountMwh,
     [property: TsOptional] Price? HedgePriceEurMwh,
-    long Version, DateTime CreatedAt, DateTime UpdatedAt);
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetHedgeHistoryRequest(
@@ -30,11 +38,17 @@ public sealed record GetHedgeHistoryRequest(
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetHedgeHistoryResponse(
-    IReadOnlyList<HedgeDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<HedgeDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
 public sealed record DeleteHedgeRequest(HedgeId HedgeId, string Reason, long Version);

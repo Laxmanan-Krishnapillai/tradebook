@@ -15,7 +15,8 @@ public sealed record CreatePhysicalDeliveryRequest(
     [property: TsOptional] Quantity? VolumeRealisedMwh,
     [property: TsOptional] string? PriceMechanism,
     [property: TsOptional] DateOnly? StartDay,
-    [property: TsOptional] DateOnly? EndDay);
+    [property: TsOptional] DateOnly? EndDay
+);
 
 [ExportTsInterface]
 public sealed record CreatePhysicalDeliveryResponse(
@@ -24,7 +25,8 @@ public sealed record CreatePhysicalDeliveryResponse(
     [property: TsOptional] Amount? InvoiceAmountEur,
     string Status,
     long Version,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt
+);
 
 [ExportTsInterface]
 public sealed record PhysicalDeliveryDetailsDto(
@@ -45,7 +47,8 @@ public sealed record PhysicalDeliveryDetailsDto(
     string Status,
     long Version,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetDeliveryHistoryRequest(
@@ -56,7 +59,8 @@ public sealed record GetDeliveryHistoryRequest(
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetDeliveryHistoryResponse(
@@ -64,14 +68,20 @@ public sealed record GetDeliveryHistoryResponse(
     int TotalCount,
     int Page,
     int PageSize,
-    bool HasNextPage);
+    bool HasNextPage
+);
 
 [ExportTsInterface]
 public sealed record UpdatePhysicalDeliveryRequest(
     DeliveryId DeliveryId,
     [property: TsOptional] Quantity? VolumeRealisedMwh,
     [property: TsOptional] string? Status,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
-public sealed record DeletePhysicalDeliveryRequest(DeliveryId DeliveryId, string Reason, long Version);
+public sealed record DeletePhysicalDeliveryRequest(
+    DeliveryId DeliveryId,
+    string Reason,
+    long Version
+);

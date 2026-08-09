@@ -42,37 +42,45 @@ public sealed class DomainPrimitiveTests
         Assert.NotEqual(typeof(DeliveryId), typeof(TransferId));
     }
 
-    public static TheoryData<object, Type> ValueObjects => new()
-    {
-        { ContractId.New(), typeof(ContractId) },
-        { DeliveryId.New(), typeof(DeliveryId) },
-        { CapacityBookingId.New(), typeof(CapacityBookingId) },
-        { TransferId.New(), typeof(TransferId) },
-        { BioticketDeliveryId.New(), typeof(BioticketDeliveryId) },
-        { CounterpartyId.New(), typeof(CounterpartyId) },
-        { CompanyId.New(), typeof(CompanyId) },
-        { TradingPointId.New(), typeof(TradingPointId) },
-        { TaxTariffId.New(), typeof(TaxTariffId) },
-        { HedgeId.New(), typeof(HedgeId) },
-        { MarketPriceId.New(), typeof(MarketPriceId) },
-        { CapacityPriceIndexId.New(), typeof(CapacityPriceIndexId) },
-        { GooCertificateTransactionId.New(), typeof(GooCertificateTransactionId) },
-        { InvoiceLineItemId.New(), typeof(InvoiceLineItemId) },
-        { UserId.New(), typeof(UserId) },
-        { DashboardId.New(), typeof(DashboardId) },
-        { EventId.New(), typeof(EventId) },
-        { AuditLogId.New(), typeof(AuditLogId) },
-        { Price.From(12.3456m), typeof(Price) },
-        { Quantity.From(12.34567890m), typeof(Quantity) },
-        { Amount.From(-12.3456m), typeof(Amount) }
-    };
+    public static TheoryData<object, Type> ValueObjects =>
+        new()
+        {
+            { ContractId.New(), typeof(ContractId) },
+            { DeliveryId.New(), typeof(DeliveryId) },
+            { CapacityBookingId.New(), typeof(CapacityBookingId) },
+            { TransferId.New(), typeof(TransferId) },
+            { BioticketDeliveryId.New(), typeof(BioticketDeliveryId) },
+            { CounterpartyId.New(), typeof(CounterpartyId) },
+            { CompanyId.New(), typeof(CompanyId) },
+            { TradingPointId.New(), typeof(TradingPointId) },
+            { TaxTariffId.New(), typeof(TaxTariffId) },
+            { HedgeId.New(), typeof(HedgeId) },
+            { MarketPriceId.New(), typeof(MarketPriceId) },
+            { CapacityPriceIndexId.New(), typeof(CapacityPriceIndexId) },
+            { GooCertificateTransactionId.New(), typeof(GooCertificateTransactionId) },
+            { InvoiceLineItemId.New(), typeof(InvoiceLineItemId) },
+            { UserId.New(), typeof(UserId) },
+            { DashboardId.New(), typeof(DashboardId) },
+            { EventId.New(), typeof(EventId) },
+            { AuditLogId.New(), typeof(AuditLogId) },
+            { Price.From(12.3456m), typeof(Price) },
+            { Quantity.From(12.34567890m), typeof(Quantity) },
+            { Amount.From(-12.3456m), typeof(Amount) },
+        };
 
     [Theory]
     [MemberData(nameof(ValueObjects))]
-    public void Every_value_object_round_trips_as_its_primitive_with_source_generated_json(object value, Type type)
+    public void Every_value_object_round_trips_as_its_primitive_with_source_generated_json(
+        object value,
+        Type type
+    )
     {
         var json = JsonSerializer.Serialize(value, type, AppJsonSerializerContext.Default.Options);
-        var deserialized = JsonSerializer.Deserialize(json, type, AppJsonSerializerContext.Default.Options);
+        var deserialized = JsonSerializer.Deserialize(
+            json,
+            type,
+            AppJsonSerializerContext.Default.Options
+        );
 
         Assert.Equal(value, deserialized);
         Assert.DoesNotContain("value", json, StringComparison.OrdinalIgnoreCase);
@@ -86,7 +94,10 @@ public sealed class DomainPrimitiveTests
         foreach (var row in ValueObjects)
         {
             var type = (Type)row[1];
-            Assert.True(Dapper.SqlMapper.HasTypeHandler(type), $"No Dapper handler is registered for {type.Name}.");
+            Assert.True(
+                Dapper.SqlMapper.HasTypeHandler(type),
+                $"No Dapper handler is registered for {type.Name}."
+            );
         }
     }
 
@@ -94,7 +105,8 @@ public sealed class DomainPrimitiveTests
     public void MessagePack_resolver_round_trips_identifier_money_and_quantity_primitives()
     {
         var options = MessagePackSerializerOptions.Standard.WithResolver(
-            CompositeResolver.Create(VogenMessagePackResolver.Instance, StandardResolver.Instance));
+            CompositeResolver.Create(VogenMessagePackResolver.Instance, StandardResolver.Instance)
+        );
 
         AssertRoundTrip(ContractId.New(), options);
         AssertRoundTrip(Price.From(12.3456m), options);
@@ -103,5 +115,11 @@ public sealed class DomainPrimitiveTests
     }
 
     private static void AssertRoundTrip<T>(T value, MessagePackSerializerOptions options) =>
-        Assert.Equal(value, MessagePackSerializer.Deserialize<T>(MessagePackSerializer.Serialize(value, options), options));
+        Assert.Equal(
+            value,
+            MessagePackSerializer.Deserialize<T>(
+                MessagePackSerializer.Serialize(value, options),
+                options
+            )
+        );
 }

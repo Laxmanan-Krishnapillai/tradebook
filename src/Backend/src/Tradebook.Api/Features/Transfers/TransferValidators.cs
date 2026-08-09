@@ -13,7 +13,9 @@ public sealed class CreateTransferValidator : Validator<CreateTransferRequest>
         RuleFor(x => x.SupplyMonth).Must(x => x != default && x.Day == 1);
         RuleFor(x => x.PriceMechanism).Must(DomainValueValidation.GasPriceMechanism);
         RuleFor(x => x.Status).Must(DomainValueValidation.ReportStatus);
-        RuleFor(x => x.EndDay).GreaterThanOrEqualTo(x => x.StartDay).When(x => x.StartDay.HasValue && x.EndDay.HasValue);
+        RuleFor(x => x.EndDay)
+            .GreaterThanOrEqualTo(x => x.StartDay)
+            .When(x => x.StartDay.HasValue && x.EndDay.HasValue);
     }
 }
 
@@ -26,11 +28,18 @@ public sealed class UpdateTransferValidator : Validator<UpdateTransferRequest>
         RuleFor(x => x.PriceMechanism).Must(DomainValueValidation.GasPriceMechanism);
         RuleFor(x => x.Status).Must(DomainValueValidation.ReportStatus);
         RuleFor(x => x)
-            .Must(x => x.TradingArea is not null || x.CapacityMw.HasValue ||
-                       x.BookedCapacityMw.HasValue || x.VolumeMwh.HasValue ||
-                       x.BalancingEffectMwh.HasValue || x.PriceMechanism is not null ||
-                       x.TransportCostEurMwh.HasValue || x.CapacityCostEurMwh.HasValue ||
-                       x.Status is not null || x.Comments is not null)
+            .Must(x =>
+                x.TradingArea is not null
+                || x.CapacityMw.HasValue
+                || x.BookedCapacityMw.HasValue
+                || x.VolumeMwh.HasValue
+                || x.BalancingEffectMwh.HasValue
+                || x.PriceMechanism is not null
+                || x.TransportCostEurMwh.HasValue
+                || x.CapacityCostEurMwh.HasValue
+                || x.Status is not null
+                || x.Comments is not null
+            )
             .WithMessage("At least one mutable field is required.");
     }
 }

@@ -16,7 +16,8 @@ public sealed record CreateTaxTariffRequest(
     [property: TsOptional] Amount? DsoTariffLocalCurDay,
     [property: TsOptional] Amount? AdmFeeLocalCurMwh,
     [property: TsOptional] Amount? BalFeeLocalCurMwh,
-    string Currency);
+    string Currency
+);
 
 [ExportTsInterface]
 public sealed record UpdateTaxTariffRequest(
@@ -28,31 +29,44 @@ public sealed record UpdateTaxTariffRequest(
     [property: TsOptional] Amount? AdmFeeLocalCurMwh,
     [property: TsOptional] Amount? BalFeeLocalCurMwh,
     string Currency,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record TaxTariffDetailsDto(
-    TaxTariffId TaxTariffId, ContractId ContractId,
+    TaxTariffId TaxTariffId,
+    ContractId ContractId,
     [property: TsOptional] CounterpartyId? CounterpartyId,
-    DateOnly PeriodStart, DateOnly PeriodEnd,
+    DateOnly PeriodStart,
+    DateOnly PeriodEnd,
     [property: TsOptional] Amount? TaxLocalCurMwh,
     [property: TsOptional] Amount? TsoLocalCurMwh,
     [property: TsOptional] Amount? DsoLocalCurMwh,
     [property: TsOptional] Amount? DsoTariffLocalCurDay,
     [property: TsOptional] Amount? AdmFeeLocalCurMwh,
     [property: TsOptional] Amount? BalFeeLocalCurMwh,
-    string Currency, long Version, DateTime CreatedAt, DateTime UpdatedAt);
+    string Currency,
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetTaxTariffHistoryRequest(
     [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] DateOnly? EffectiveOn,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetTaxTariffHistoryResponse(
-    IReadOnlyList<TaxTariffDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<TaxTariffDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
 public sealed record DeleteTaxTariffRequest(TaxTariffId TaxTariffId, string Reason, long Version);

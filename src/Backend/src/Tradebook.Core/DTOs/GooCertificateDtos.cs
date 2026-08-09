@@ -23,7 +23,8 @@ public sealed record CreateGooCertificateTransactionRequest(
     [property: TsOptional] Quantity? TransactionVolumeMwh,
     [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? EnergySource,
-    [property: TsOptional] string? Text);
+    [property: TsOptional] string? Text
+);
 
 [ExportTsInterface]
 public sealed record UpdateGooCertificateTransactionRequest(
@@ -37,7 +38,8 @@ public sealed record UpdateGooCertificateTransactionRequest(
     [property: TsOptional] Quantity? TransactionVolumeMwh,
     [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? Text,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record GooCertificateTransactionDetailsDto(
@@ -60,7 +62,10 @@ public sealed record GooCertificateTransactionDetailsDto(
     [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? EnergySource,
     [property: TsOptional] string? Text,
-    long Version, DateTime CreatedAt, DateTime UpdatedAt);
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetGooCertificateHistoryRequest(
@@ -69,16 +74,27 @@ public sealed record GetGooCertificateHistoryRequest(
     [property: TsOptional] DateOnly? FromDate,
     [property: TsOptional] DateOnly? ToDate,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetGooCertificateHistoryResponse(
     IReadOnlyList<GooCertificateTransactionDetailsDto> Items,
-    int TotalCount, int Page, int PageSize, bool HasNextPage);
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
-public sealed record RequestGooBatchExportRequest(GooCertificateTransactionId GooCertificateTransactionId, long Version);
+public sealed record RequestGooBatchExportRequest(
+    GooCertificateTransactionId GooCertificateTransactionId,
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record DeleteGooCertificateTransactionRequest(
-    GooCertificateTransactionId GooCertificateTransactionId, string Reason, long Version);
+    GooCertificateTransactionId GooCertificateTransactionId,
+    string Reason,
+    long Version
+);

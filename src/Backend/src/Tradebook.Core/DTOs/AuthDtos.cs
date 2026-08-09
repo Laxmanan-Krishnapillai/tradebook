@@ -1,5 +1,5 @@
-using TypeGen.Core.TypeAnnotations;
 using Tradebook.Core.Domain.ValueObjects.Ids;
+using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 

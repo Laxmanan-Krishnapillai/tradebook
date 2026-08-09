@@ -23,7 +23,8 @@ public sealed record CreateContractRequest(
     [property: TsOptional] string? PriceMechanismGas,
     [property: TsOptional] Price? FixedPriceGasEurMwh,
     [property: TsOptional] string? ContractType,
-    [property: TsOptional] string? Comment);
+    [property: TsOptional] string? Comment
+);
 
 [ExportTsInterface]
 public sealed record UpdateContractRequest(
@@ -45,7 +46,8 @@ public sealed record UpdateContractRequest(
     [property: TsOptional] string? ContractType,
     [property: TsOptional] string? Comment,
     [property: TsOptional] bool? IsActive,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record ContractDetailsDto(
@@ -71,7 +73,8 @@ public sealed record ContractDetailsDto(
     bool IsActive,
     long Version,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetContractHistoryRequest(
@@ -80,11 +83,17 @@ public sealed record GetContractHistoryRequest(
     [property: TsOptional] string? Action,
     [property: TsOptional] bool? IsActive,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetContractHistoryResponse(
-    IReadOnlyList<ContractDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<ContractDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
 public sealed record DeactivateContractRequest(ContractId ContractId, string Reason, long Version);

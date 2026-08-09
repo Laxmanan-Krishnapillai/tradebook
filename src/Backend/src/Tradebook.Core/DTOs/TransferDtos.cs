@@ -22,7 +22,8 @@ public sealed record CreateTransferRequest(
     [property: TsOptional] Amount? TransportCostEurMwh,
     [property: TsOptional] Quantity? CapacityCostEurMwh,
     [property: TsOptional] string? Status,
-    [property: TsOptional] string? Comments);
+    [property: TsOptional] string? Comments
+);
 
 [ExportTsInterface]
 public sealed record UpdateTransferRequest(
@@ -37,11 +38,15 @@ public sealed record UpdateTransferRequest(
     [property: TsOptional] Quantity? CapacityCostEurMwh,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comments,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record TransferDetailsDto(
-    TransferId TransferId, ContractId ContractId, string ContractInstanceId, DateOnly SupplyMonth,
+    TransferId TransferId,
+    ContractId ContractId,
+    string ContractInstanceId,
+    DateOnly SupplyMonth,
     [property: TsOptional] CounterpartyId? CounterpartyId,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? TradingArea,
@@ -56,7 +61,10 @@ public sealed record TransferDetailsDto(
     [property: TsOptional] Quantity? CapacityCostEurMwh,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comments,
-    long Version, DateTime CreatedAt, DateTime UpdatedAt);
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetTransferHistoryRequest(
@@ -65,11 +73,17 @@ public sealed record GetTransferHistoryRequest(
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetTransferHistoryResponse(
-    IReadOnlyList<TransferDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<TransferDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
 public sealed record CancelTransferRequest(TransferId TransferId, string Reason, long Version);

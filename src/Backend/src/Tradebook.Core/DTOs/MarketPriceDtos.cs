@@ -18,7 +18,8 @@ public sealed record UpsertMarketPriceRequest(
     [property: TsOptional] Amount? EurGbp,
     [property: TsOptional] Amount? EurUsd,
     [property: TsOptional] Amount? EurDkk,
-    long Version = 0);
+    long Version = 0
+);
 
 [ExportTsInterface]
 public sealed record MarketPriceDetailsDto(
@@ -35,18 +36,26 @@ public sealed record MarketPriceDetailsDto(
     [property: TsOptional] Amount? EurGbp,
     [property: TsOptional] Amount? EurUsd,
     [property: TsOptional] Amount? EurDkk,
-    long Version, DateTime CreatedAt);
+    long Version,
+    DateTime CreatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetMarketPriceHistoryRequest(
     [property: TsOptional] DateOnly? FromDate,
     [property: TsOptional] DateOnly? ToDate,
     int Page = 1,
-    int PageSize = 100);
+    int PageSize = 100
+);
 
 [ExportTsInterface]
 public sealed record GetMarketPriceHistoryResponse(
-    IReadOnlyList<MarketPriceDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<MarketPriceDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
 public sealed record DeleteMarketPriceRequest(DateOnly PriceDate, string Reason, long Version);

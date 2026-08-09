@@ -21,7 +21,8 @@ public sealed record CreateBioticketRequest(
     [property: TsOptional] Amount? VatEur,
     [property: TsOptional] Amount? InvoiceAmountEur,
     [property: TsOptional] string? Status,
-    [property: TsOptional] string? Comment);
+    [property: TsOptional] string? Comment
+);
 
 [ExportTsInterface]
 public sealed record UpdateBioticketRequest(
@@ -35,11 +36,15 @@ public sealed record UpdateBioticketRequest(
     [property: TsOptional] Amount? InvoiceAmountEur,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comment,
-    long Version);
+    long Version
+);
 
 [ExportTsInterface]
 public sealed record BioticketDetailsDto(
-    BioticketDeliveryId BioticketId, ContractId ContractId, string ContractInstanceId, string BookType,
+    BioticketDeliveryId BioticketId,
+    ContractId ContractId,
+    string ContractInstanceId,
+    string BookType,
     DateOnly ContractMonth,
     [property: TsOptional] DateOnly? StartDay,
     [property: TsOptional] DateOnly? EndDay,
@@ -53,7 +58,10 @@ public sealed record BioticketDetailsDto(
     [property: TsOptional] Amount? InvoiceAmountEur,
     string Status,
     [property: TsOptional] string? Comment,
-    long Version, DateTime CreatedAt, DateTime UpdatedAt);
+    long Version,
+    DateTime CreatedAt,
+    DateTime UpdatedAt
+);
 
 [ExportTsInterface]
 public sealed record GetBioticketHistoryRequest(
@@ -63,11 +71,21 @@ public sealed record GetBioticketHistoryRequest(
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50
+);
 
 [ExportTsInterface]
 public sealed record GetBioticketHistoryResponse(
-    IReadOnlyList<BioticketDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
+    IReadOnlyList<BioticketDetailsDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    bool HasNextPage
+);
 
 [ExportTsInterface]
-public sealed record CancelBioticketRequest(BioticketDeliveryId BioticketId, string Reason, long Version);
+public sealed record CancelBioticketRequest(
+    BioticketDeliveryId BioticketId,
+    string Reason,
+    long Version
+);

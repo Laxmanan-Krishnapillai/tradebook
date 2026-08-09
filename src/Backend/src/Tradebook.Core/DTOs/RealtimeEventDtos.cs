@@ -1,5 +1,5 @@
-using TypeGen.Core.TypeAnnotations;
 using Tradebook.Core.Domain.ValueObjects.Ids;
+using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
@@ -10,9 +10,11 @@ public sealed record EntityChangedEventDto(
     string AggregateType,
     string AggregateId,
     string EventType,
-    string PayloadJson);
+    string PayloadJson
+);
 
 [ExportTsInterface]
 public sealed record GetEventsSinceResponse(
     IReadOnlyList<EntityChangedEventDto> Events,
-    long LatestSequence);
+    long LatestSequence
+);

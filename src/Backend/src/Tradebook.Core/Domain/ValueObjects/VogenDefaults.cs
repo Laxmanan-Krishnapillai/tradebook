@@ -6,4 +6,5 @@ using Vogen;
     toPrimitiveCasting: CastOperator.Implicit,
     fromPrimitiveCasting: CastOperator.Implicit,
     systemTextJsonConverterFactoryGeneration: SystemTextJsonConverterFactoryGeneration.Generate,
-    throws: typeof(TradebookDomainException))]
+    throws: typeof(TradebookDomainException)
+)]
