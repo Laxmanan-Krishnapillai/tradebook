@@ -1,30 +1,32 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
 [ExportTsInterface]
 public sealed record CreateHedgeRequest(
-    Guid ContractId, DateOnly Month,
-    [property: TsOptional] decimal? HedgeAmountMwh,
-    [property: TsOptional] decimal? HedgePriceEurMwh);
+    ContractId ContractId, DateOnly Month,
+    [property: TsOptional] Quantity? HedgeAmountMwh,
+    [property: TsOptional] Price? HedgePriceEurMwh);
 
 [ExportTsInterface]
 public sealed record UpdateHedgeRequest(
-    Guid HedgeId,
-    [property: TsOptional] decimal? HedgeAmountMwh,
-    [property: TsOptional] decimal? HedgePriceEurMwh,
+    HedgeId HedgeId,
+    [property: TsOptional] Quantity? HedgeAmountMwh,
+    [property: TsOptional] Price? HedgePriceEurMwh,
     long Version);
 
 [ExportTsInterface]
 public sealed record HedgeDetailsDto(
-    Guid HedgeId, Guid ContractId, DateOnly Month,
-    [property: TsOptional] decimal? HedgeAmountMwh,
-    [property: TsOptional] decimal? HedgePriceEurMwh,
+    HedgeId HedgeId, ContractId ContractId, DateOnly Month,
+    [property: TsOptional] Quantity? HedgeAmountMwh,
+    [property: TsOptional] Price? HedgePriceEurMwh,
     long Version, DateTime CreatedAt, DateTime UpdatedAt);
 
 [ExportTsInterface]
 public sealed record GetHedgeHistoryRequest(
-    [property: TsOptional] Guid? ContractId,
+    [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
     int Page = 1,
@@ -35,4 +37,4 @@ public sealed record GetHedgeHistoryResponse(
     IReadOnlyList<HedgeDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
 
 [ExportTsInterface]
-public sealed record DeleteHedgeRequest(Guid HedgeId, string Reason, long Version);
+public sealed record DeleteHedgeRequest(HedgeId HedgeId, string Reason, long Version);

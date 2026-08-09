@@ -1,45 +1,47 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
 [ExportTsInterface]
 public sealed record CreatePhysicalDeliveryRequest(
-    Guid ContractId,
+    ContractId ContractId,
     [property: TsOptional] string? ContractInstanceId,
     string BookType,
     DateOnly SupplyMonth,
-    [property: TsOptional] decimal? CapacityMw,
-    [property: TsOptional] decimal? VolumeNominatedMwh,
-    [property: TsOptional] decimal? VolumeRealisedMwh,
+    [property: TsOptional] Quantity? CapacityMw,
+    [property: TsOptional] Quantity? VolumeNominatedMwh,
+    [property: TsOptional] Quantity? VolumeRealisedMwh,
     [property: TsOptional] string? PriceMechanism,
     [property: TsOptional] DateOnly? StartDay,
     [property: TsOptional] DateOnly? EndDay);
 
 [ExportTsInterface]
 public sealed record CreatePhysicalDeliveryResponse(
-    Guid DeliveryId,
+    DeliveryId DeliveryId,
     string ContractInstanceId,
-    [property: TsOptional] decimal? InvoiceAmountEur,
+    [property: TsOptional] Amount? InvoiceAmountEur,
     string Status,
     long Version,
     DateTimeOffset CreatedAt);
 
 [ExportTsInterface]
 public sealed record PhysicalDeliveryDetailsDto(
-    Guid DeliveryId,
-    Guid ContractId,
+    DeliveryId DeliveryId,
+    ContractId ContractId,
     string ContractInstanceId,
     string BookType,
     DateOnly SupplyMonth,
-    [property: TsOptional] decimal? CapacityMw,
-    [property: TsOptional] decimal? VolumeNominatedMwh,
-    [property: TsOptional] decimal? VolumeRealisedMwh,
-    [property: TsOptional] decimal? VolumeMwh,
+    [property: TsOptional] Quantity? CapacityMw,
+    [property: TsOptional] Quantity? VolumeNominatedMwh,
+    [property: TsOptional] Quantity? VolumeRealisedMwh,
+    [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? PriceMechanism,
-    [property: TsOptional] decimal? RevenueEur,
-    [property: TsOptional] decimal? SubtotalEur,
-    [property: TsOptional] decimal? VatEur,
-    [property: TsOptional] decimal? InvoiceAmountEur,
+    [property: TsOptional] Amount? RevenueEur,
+    [property: TsOptional] Amount? SubtotalEur,
+    [property: TsOptional] Amount? VatEur,
+    [property: TsOptional] Amount? InvoiceAmountEur,
     string Status,
     long Version,
     DateTimeOffset CreatedAt,
@@ -47,7 +49,7 @@ public sealed record PhysicalDeliveryDetailsDto(
 
 [ExportTsInterface]
 public sealed record GetDeliveryHistoryRequest(
-    [property: TsOptional] Guid? ContractId,
+    [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] string? ContractInstanceId,
     [property: TsOptional] string? BookType,
     [property: TsOptional] string? Status,
@@ -66,10 +68,10 @@ public sealed record GetDeliveryHistoryResponse(
 
 [ExportTsInterface]
 public sealed record UpdatePhysicalDeliveryRequest(
-    Guid DeliveryId,
-    [property: TsOptional] decimal? VolumeRealisedMwh,
+    DeliveryId DeliveryId,
+    [property: TsOptional] Quantity? VolumeRealisedMwh,
     [property: TsOptional] string? Status,
     long Version);
 
 [ExportTsInterface]
-public sealed record DeletePhysicalDeliveryRequest(Guid DeliveryId, string Reason, long Version);
+public sealed record DeletePhysicalDeliveryRequest(DeliveryId DeliveryId, string Reason, long Version);

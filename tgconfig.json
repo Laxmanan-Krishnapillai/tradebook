@@ -5,14 +5,39 @@
   "generateObsoleteAttribute": true,
   "typeUnionsForEnums": true,
   "enumStringInitializers": true,
-  "propertyNameConverters": ["TypeGen.Core.Converters.PascalCaseToCamelCaseConverter"],
+  "propertyNameConverters": [
+    "TypeGen.Core.Converters.PascalCaseToCamelCaseConverter"
+  ],
   "customTypeMappings": {
     "System.Guid": "string",
     "System.DateOnly": "string",
     "System.DateTime": "string",
     "System.DateTimeOffset": "string",
-    "decimal": "number"
+    "decimal": "number",
+    "Tradebook.Core.Domain.ValueObjects.Ids.ContractId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.DeliveryId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.CapacityBookingId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.TransferId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.BioticketDeliveryId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.CounterpartyId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.CompanyId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.TradingPointId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.TaxTariffId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.HedgeId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.MarketPriceId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.CapacityPriceIndexId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.GooCertificateTransactionId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.InvoiceLineItemId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Money.Price": "number",
+    "Tradebook.Core.Domain.ValueObjects.Money.Quantity": "number",
+    "Tradebook.Core.Domain.ValueObjects.Money.Amount": "number",
+    "Tradebook.Core.Domain.ValueObjects.Ids.UserId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.DashboardId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.EventId": "string",
+    "Tradebook.Core.Domain.ValueObjects.Ids.AuditLogId": "string"
   },
   "csNullableTranslation": "null",
-  "assemblies": ["./src/Backend/src/Tradebook.Core/bin/Debug/net10.0/Tradebook.Core.dll"]
+  "assemblies": [
+    "./src/Backend/src/Tradebook.Core/bin/Debug/net10.0/Tradebook.Core.dll"
+  ]
 }

@@ -1,3 +1,5 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -5,7 +7,7 @@ namespace Tradebook.Core.DTOs;
 [ExportTsInterface]
 public sealed record CreateContractRequest(
     string ContractName,
-    Guid CounterpartyId,
+    CounterpartyId CounterpartyId,
     string ProductType,
     string Action,
     [property: TsOptional] string? CompanyShorthand,
@@ -13,33 +15,33 @@ public sealed record CreateContractRequest(
     [property: TsOptional] short? CountryDialCode,
     [property: TsOptional] short? ContractNumber,
     [property: TsOptional] short? YearOfContract,
-    [property: TsOptional] Guid? SourcingCenter,
-    [property: TsOptional] Guid? SalesCenter,
+    [property: TsOptional] CompanyId? SourcingCenter,
+    [property: TsOptional] CompanyId? SalesCenter,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? GooQuality,
     [property: TsOptional] string? SubsidyStatus,
     [property: TsOptional] string? PriceMechanismGas,
-    [property: TsOptional] decimal? FixedPriceGasEurMwh,
+    [property: TsOptional] Price? FixedPriceGasEurMwh,
     [property: TsOptional] string? ContractType,
     [property: TsOptional] string? Comment);
 
 [ExportTsInterface]
 public sealed record UpdateContractRequest(
-    Guid ContractId,
+    ContractId ContractId,
     string ContractName,
-    Guid CounterpartyId,
+    CounterpartyId CounterpartyId,
     string ProductType,
     string Action,
     [property: TsOptional] string? CompanyShorthand,
     [property: TsOptional] string? CountryCode,
     [property: TsOptional] short? CountryDialCode,
-    [property: TsOptional] Guid? SourcingCenter,
-    [property: TsOptional] Guid? SalesCenter,
+    [property: TsOptional] CompanyId? SourcingCenter,
+    [property: TsOptional] CompanyId? SalesCenter,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? GooQuality,
     [property: TsOptional] string? SubsidyStatus,
     [property: TsOptional] string? PriceMechanismGas,
-    [property: TsOptional] decimal? FixedPriceGasEurMwh,
+    [property: TsOptional] Price? FixedPriceGasEurMwh,
     [property: TsOptional] string? ContractType,
     [property: TsOptional] string? Comment,
     [property: TsOptional] bool? IsActive,
@@ -47,9 +49,9 @@ public sealed record UpdateContractRequest(
 
 [ExportTsInterface]
 public sealed record ContractDetailsDto(
-    Guid ContractId,
+    ContractId ContractId,
     string ContractName,
-    Guid CounterpartyId,
+    CounterpartyId CounterpartyId,
     string ProductType,
     string Action,
     [property: TsOptional] string? CompanyShorthand,
@@ -57,13 +59,13 @@ public sealed record ContractDetailsDto(
     [property: TsOptional] short? CountryDialCode,
     [property: TsOptional] short? ContractNumber,
     [property: TsOptional] short? YearOfContract,
-    [property: TsOptional] Guid? SourcingCenter,
-    [property: TsOptional] Guid? SalesCenter,
+    [property: TsOptional] CompanyId? SourcingCenter,
+    [property: TsOptional] CompanyId? SalesCenter,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? GooQuality,
     [property: TsOptional] string? SubsidyStatus,
     [property: TsOptional] string? PriceMechanismGas,
-    [property: TsOptional] decimal? FixedPriceGasEurMwh,
+    [property: TsOptional] Price? FixedPriceGasEurMwh,
     string ContractType,
     [property: TsOptional] string? Comment,
     bool IsActive,
@@ -73,7 +75,7 @@ public sealed record ContractDetailsDto(
 
 [ExportTsInterface]
 public sealed record GetContractHistoryRequest(
-    [property: TsOptional] Guid? CounterpartyId,
+    [property: TsOptional] CounterpartyId? CounterpartyId,
     [property: TsOptional] string? ProductType,
     [property: TsOptional] string? Action,
     [property: TsOptional] bool? IsActive,
@@ -85,4 +87,4 @@ public sealed record GetContractHistoryResponse(
     IReadOnlyList<ContractDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
 
 [ExportTsInterface]
-public sealed record DeactivateContractRequest(Guid ContractId, string Reason, long Version);
+public sealed record DeactivateContractRequest(ContractId ContractId, string Reason, long Version);

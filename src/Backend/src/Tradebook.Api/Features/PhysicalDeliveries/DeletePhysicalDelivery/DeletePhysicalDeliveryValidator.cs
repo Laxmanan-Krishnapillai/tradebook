@@ -8,7 +8,7 @@ public sealed class DeletePhysicalDeliveryValidator : Validator<DeletePhysicalDe
 {
     public DeletePhysicalDeliveryValidator()
     {
-        RuleFor(request => request.DeliveryId).NotEmpty();
+        RuleFor(request => request.DeliveryId).Must(id => id.Value != Guid.Empty);
         RuleFor(request => request.Reason).NotEmpty().MaximumLength(500);
         RuleFor(request => request.Version).GreaterThan(0);
     }

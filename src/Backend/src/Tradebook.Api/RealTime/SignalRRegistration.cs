@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Tradebook.Core.Interfaces;
 using Tradebook.Infrastructure.Outbox;
+using MessagePack;
+using MessagePack.Resolvers;
 
 namespace Tradebook.Api.RealTime;
 
@@ -9,7 +11,9 @@ public static class SignalRRegistration
 {
     public static IServiceCollection AddDashboardPush(this IServiceCollection services)
     {
-        services.AddSignalR().AddMessagePackProtocol();
+        services.AddSignalR().AddMessagePackProtocol(options =>
+            options.SerializerOptions = MessagePackSerializerOptions.Standard.WithResolver(
+                CompositeResolver.Create(VogenMessagePackResolver.Instance, StandardResolver.Instance)));
         services.AddOptions<OutboxOptions>()
             .BindConfiguration("Outbox")
             .ValidateDataAnnotations()

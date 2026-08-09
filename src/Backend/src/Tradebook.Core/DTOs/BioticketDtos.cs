@@ -1,61 +1,63 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
 [ExportTsInterface]
 public sealed record CreateBioticketRequest(
-    Guid ContractId,
+    ContractId ContractId,
     string BookType,
     DateOnly ContractMonth,
     [property: TsOptional] string? ContractInstanceId,
     [property: TsOptional] DateOnly? StartDay,
     [property: TsOptional] DateOnly? EndDay,
-    [property: TsOptional] decimal? VolumeNominatedTon,
-    [property: TsOptional] decimal? VolumeRealisedTon,
-    [property: TsOptional] decimal? VolumeTon,
-    [property: TsOptional] decimal? CostEurTon,
-    [property: TsOptional] decimal? RevenueEur,
-    [property: TsOptional] decimal? VatPct,
-    [property: TsOptional] decimal? VatEur,
-    [property: TsOptional] decimal? InvoiceAmountEur,
+    [property: TsOptional] Quantity? VolumeNominatedTon,
+    [property: TsOptional] Quantity? VolumeRealisedTon,
+    [property: TsOptional] Quantity? VolumeTon,
+    [property: TsOptional] Amount? CostEurTon,
+    [property: TsOptional] Amount? RevenueEur,
+    [property: TsOptional] Amount? VatPct,
+    [property: TsOptional] Amount? VatEur,
+    [property: TsOptional] Amount? InvoiceAmountEur,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comment);
 
 [ExportTsInterface]
 public sealed record UpdateBioticketRequest(
-    Guid BioticketId,
-    [property: TsOptional] decimal? VolumeRealisedTon,
-    [property: TsOptional] decimal? VolumeTon,
-    [property: TsOptional] decimal? CostEurTon,
-    [property: TsOptional] decimal? RevenueEur,
-    [property: TsOptional] decimal? VatPct,
-    [property: TsOptional] decimal? VatEur,
-    [property: TsOptional] decimal? InvoiceAmountEur,
+    BioticketDeliveryId BioticketId,
+    [property: TsOptional] Quantity? VolumeRealisedTon,
+    [property: TsOptional] Quantity? VolumeTon,
+    [property: TsOptional] Amount? CostEurTon,
+    [property: TsOptional] Amount? RevenueEur,
+    [property: TsOptional] Amount? VatPct,
+    [property: TsOptional] Amount? VatEur,
+    [property: TsOptional] Amount? InvoiceAmountEur,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comment,
     long Version);
 
 [ExportTsInterface]
 public sealed record BioticketDetailsDto(
-    Guid BioticketId, Guid ContractId, string ContractInstanceId, string BookType,
+    BioticketDeliveryId BioticketId, ContractId ContractId, string ContractInstanceId, string BookType,
     DateOnly ContractMonth,
     [property: TsOptional] DateOnly? StartDay,
     [property: TsOptional] DateOnly? EndDay,
-    [property: TsOptional] decimal? VolumeNominatedTon,
-    [property: TsOptional] decimal? VolumeRealisedTon,
-    [property: TsOptional] decimal? VolumeTon,
-    [property: TsOptional] decimal? CostEurTon,
-    [property: TsOptional] decimal? RevenueEur,
-    [property: TsOptional] decimal? VatPct,
-    [property: TsOptional] decimal? VatEur,
-    [property: TsOptional] decimal? InvoiceAmountEur,
+    [property: TsOptional] Quantity? VolumeNominatedTon,
+    [property: TsOptional] Quantity? VolumeRealisedTon,
+    [property: TsOptional] Quantity? VolumeTon,
+    [property: TsOptional] Amount? CostEurTon,
+    [property: TsOptional] Amount? RevenueEur,
+    [property: TsOptional] Amount? VatPct,
+    [property: TsOptional] Amount? VatEur,
+    [property: TsOptional] Amount? InvoiceAmountEur,
     string Status,
     [property: TsOptional] string? Comment,
     long Version, DateTime CreatedAt, DateTime UpdatedAt);
 
 [ExportTsInterface]
 public sealed record GetBioticketHistoryRequest(
-    [property: TsOptional] Guid? ContractId,
+    [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] string? BookType,
     [property: TsOptional] string? Status,
     [property: TsOptional] DateOnly? FromMonth,
@@ -68,4 +70,4 @@ public sealed record GetBioticketHistoryResponse(
     IReadOnlyList<BioticketDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
 
 [ExportTsInterface]
-public sealed record CancelBioticketRequest(Guid BioticketId, string Reason, long Version);
+public sealed record CancelBioticketRequest(BioticketDeliveryId BioticketId, string Reason, long Version);
