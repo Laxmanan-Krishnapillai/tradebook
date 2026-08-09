@@ -51,33 +51,7 @@ public sealed class OptionsValidatorTests
             .ToArray();
 
         Assert.Equal(["DatabaseOptions", "EntraOptions", "OutboxOptions"], optionTypes);
-        foreach (var optionType in optionTypes)
-        {
-            // EntraOptions uses a hand-written sealed IValidateOptions with custom
-            // tenant/placeholder rules - compiled validation, no reflection (Task 12).
-            if (string.Equals(optionType, "EntraOptions", StringComparison.Ordinal))
-            {
-                Assert.Matches(
-                    @"internal\s+sealed\s+class\s+EntraOptionsValidator\s*:\s*IValidateOptions<EntraOptions>",
-                    backendSource
-                );
-                continue;
-            }
-
-            Assert.Matches(
-                $@"\[OptionsValidator\]\s+(?:public|internal)\s+sealed\s+partial\s+class\s+{optionType}Validator\b",
-                backendSource
-            );
-            Assert.Contains(
-                $"AddSingleton<IValidateOptions<{optionType}>, {optionType}Validator>()",
-                backendSource,
-                StringComparison.Ordinal
-            );
-            Assert.Matches(
-                $@"(?s)AddOptions<{optionType}>\(\)(?:(?!;).)*?ValidateOnStart\(\);",
-                backendSource
-            );
-        }
+        AssertValidatorShapes(optionTypes, backendSource);
     }
 
     [Fact]
@@ -152,5 +126,36 @@ public sealed class OptionsValidatorTests
         }
 
         throw new DirectoryNotFoundException("Could not locate the repository root.");
+    }
+
+    private static void AssertValidatorShapes(string[] optionTypes, string backendSource)
+    {
+        foreach (var optionType in optionTypes)
+        {
+            // EntraOptions uses a hand-written sealed IValidateOptions with custom
+            // tenant/placeholder rules - compiled validation, no reflection (Task 12).
+            if (string.Equals(optionType, "EntraOptions", StringComparison.Ordinal))
+            {
+                Assert.Matches(
+                    @"internal\s+sealed\s+class\s+EntraOptionsValidator\s*:\s*IValidateOptions<EntraOptions>",
+                    backendSource
+                );
+                continue;
+            }
+
+            Assert.Matches(
+                $@"\[OptionsValidator\]\s+(?:public|internal)\s+sealed\s+partial\s+class\s+{optionType}Validator\b",
+                backendSource
+            );
+            Assert.Contains(
+                $"AddSingleton<IValidateOptions<{optionType}>, {optionType}Validator>()",
+                backendSource,
+                StringComparison.Ordinal
+            );
+            Assert.Matches(
+                $@"(?s)AddOptions<{optionType}>\(\)(?:(?!;).)*?ValidateOnStart\(\);",
+                backendSource
+            );
+        }
     }
 }
