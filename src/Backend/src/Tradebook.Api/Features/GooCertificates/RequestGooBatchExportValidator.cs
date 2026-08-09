@@ -8,7 +8,7 @@ public sealed class RequestGooBatchExportValidator : Validator<RequestGooBatchEx
 {
     public RequestGooBatchExportValidator()
     {
-        RuleFor(x => x.GooCertificateTransactionId).NotEmpty();
+        RuleFor(x => x.GooCertificateTransactionId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
     }
 }

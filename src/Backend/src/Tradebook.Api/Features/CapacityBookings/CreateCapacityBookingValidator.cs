@@ -8,7 +8,7 @@ public sealed class CreateCapacityBookingValidator : Validator<CreateCapacityBoo
 {
     public CreateCapacityBookingValidator()
     {
-        RuleFor(x => x.ContractId).NotEmpty();
+        RuleFor(x => x.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.SupplyMonth).Must(x => x != default && x.Day == 1);
         RuleFor(x => x.ContractInstanceId)
             .MaximumLength(120)

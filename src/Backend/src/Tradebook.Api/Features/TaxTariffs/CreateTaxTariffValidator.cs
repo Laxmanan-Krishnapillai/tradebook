@@ -8,7 +8,7 @@ public sealed class CreateTaxTariffValidator : Validator<CreateTaxTariffRequest>
 {
     public CreateTaxTariffValidator()
     {
-        RuleFor(x => x.ContractId).NotEmpty();
+        RuleFor(x => x.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.PeriodStart).NotEqual(default(DateOnly));
         RuleFor(x => x.PeriodEnd).GreaterThanOrEqualTo(x => x.PeriodStart);
         RuleFor(x => x.Currency).NotEmpty().Length(3).Matches("^[A-Z]{3}$");

@@ -9,7 +9,7 @@ public sealed class UpdateTransferValidator : Validator<UpdateTransferRequest>
 {
     public UpdateTransferValidator()
     {
-        RuleFor(x => x.TransferId).NotEmpty();
+        RuleFor(x => x.TransferId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
         RuleFor(x => x.PriceMechanism).Must(DomainValueValidation.GasPriceMechanism);
         RuleFor(x => x.Status).Must(DomainValueValidation.ReportStatus);

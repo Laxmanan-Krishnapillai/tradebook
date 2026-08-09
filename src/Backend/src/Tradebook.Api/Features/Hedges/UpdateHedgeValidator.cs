@@ -8,7 +8,7 @@ public sealed class UpdateHedgeValidator : Validator<UpdateHedgeRequest>
 {
     public UpdateHedgeValidator()
     {
-        RuleFor(x => x.HedgeId).NotEmpty();
+        RuleFor(x => x.HedgeId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.HedgeAmountMwh).GreaterThanOrEqualTo(0).When(x => x.HedgeAmountMwh.HasValue);
         RuleFor(x => x.HedgePriceEurMwh)
             .GreaterThanOrEqualTo(0)

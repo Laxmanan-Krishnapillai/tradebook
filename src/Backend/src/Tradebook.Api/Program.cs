@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Tradebook_Core;
 using Tradebook.Api;
@@ -24,11 +25,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
 );
-builder
-    .Services.AddOptions<DatabaseOptions>()
-    .BindConfiguration("Database")
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateOnStart();
 builder.Services.AddTradebookPersistence();
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton<ICacheService, HybridCacheService>();

@@ -9,7 +9,7 @@ public sealed class UpdateBioticketValidator : Validator<UpdateBioticketRequest>
 {
     public UpdateBioticketValidator()
     {
-        RuleFor(x => x.BioticketId).NotEmpty();
+        RuleFor(x => x.BioticketId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
         RuleFor(x => x.VolumeRealisedTon)
             .GreaterThanOrEqualTo(0)

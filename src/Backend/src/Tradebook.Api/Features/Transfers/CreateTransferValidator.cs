@@ -9,7 +9,7 @@ public sealed class CreateTransferValidator : Validator<CreateTransferRequest>
 {
     public CreateTransferValidator()
     {
-        RuleFor(x => x.ContractId).NotEmpty();
+        RuleFor(x => x.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.SupplyMonth).Must(x => x != default && x.Day == 1);
         RuleFor(x => x.PriceMechanism).Must(DomainValueValidation.GasPriceMechanism);
         RuleFor(x => x.Status).Must(DomainValueValidation.ReportStatus);

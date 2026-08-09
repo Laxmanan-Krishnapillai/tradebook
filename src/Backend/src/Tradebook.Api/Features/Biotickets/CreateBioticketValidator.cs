@@ -9,7 +9,7 @@ public sealed class CreateBioticketValidator : Validator<CreateBioticketRequest>
 {
     public CreateBioticketValidator()
     {
-        RuleFor(x => x.ContractId).NotEmpty();
+        RuleFor(x => x.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.BookType).Must(x => x is "Sourcing" or "Sales");
         RuleFor(x => x.ContractMonth).Must(x => x != default && x.Day == 1);
         RuleFor(x => x.EndDay)

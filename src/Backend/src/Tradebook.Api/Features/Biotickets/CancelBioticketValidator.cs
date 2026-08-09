@@ -9,7 +9,7 @@ public sealed class CancelBioticketValidator : Validator<CancelBioticketRequest>
 {
     public CancelBioticketValidator()
     {
-        RuleFor(x => x.BioticketId).NotEmpty();
+        RuleFor(x => x.BioticketId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Version).GreaterThan(0);
     }

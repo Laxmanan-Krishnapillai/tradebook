@@ -9,7 +9,7 @@ public sealed class DeleteGooCertificateValidator
 {
     public DeleteGooCertificateValidator()
     {
-        RuleFor(x => x.GooCertificateTransactionId).NotEmpty();
+        RuleFor(x => x.GooCertificateTransactionId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Version).GreaterThan(0);
     }
