@@ -1,5 +1,6 @@
 import { endSession } from '../session/sessionController';
 import { useAuthStore } from '../state/useAuthStore';
+import { z } from 'zod';
 
 export class ApiError extends Error {
   constructor(public readonly status: number, public readonly problem?: unknown) {
@@ -33,7 +34,7 @@ function fetchCompatibleSignal(url: string, signal: AbortSignal | null | undefin
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: string, init: RequestInit = {}, schema?: z.ZodType<T>): Promise<T> {
   const token = useAuthStore.getState().accessToken;
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
@@ -44,12 +45,15 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const response = await fetch(url, { ...init, headers, signal: fetchCompatibleSignal(url, init.signal) });
   if (!response.ok) {
     let problem: unknown;
-    try { problem = await response.json(); } catch { problem = undefined; }
+    try { problem = z.json().parse(await response.json()); } catch { problem = undefined; }
     if (response.status === 401 && token) {
       void endSession('unauthorized', { expectedAccessToken: token });
     }
     throw new ApiError(response.status, problem);
   }
 
-  return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+  if (response.status === 204) return undefined as T;
+  const payload: unknown = await response.json();
+  if (schema) return schema.parse(payload);
+  return z.json().parse(payload) as T;
 }

@@ -1,5 +1,6 @@
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type QueryClient, type QueryKey, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import type { GetDeliveryHistoryResponse } from '../api/generated/get-delivery-history-response';
 import type { PhysicalDeliveryDetailsDto } from '../api/generated/physical-delivery-details-dto';
 import { ApiError, apiFetch } from '../lib/api/client';
@@ -34,8 +35,9 @@ export const affectedQueryRoots: Record<KnownAggregateType, readonly QueryKey[]>
 
 function eventVersion(event: EntityChangedEvent): number | undefined {
   try {
-    const value = (JSON.parse(event.payloadJson) as { version?: unknown }).version;
-    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+    const value: unknown = JSON.parse(event.payloadJson);
+    const parsed = z.object({ version: z.number().int().nonnegative().optional() }).safeParse(value);
+    return parsed.success ? parsed.data.version : undefined;
   } catch {
     return undefined;
   }

@@ -1,31 +1,67 @@
-import { type FormEvent, useState } from 'react';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
+import { Controller, useForm } from 'react-hook-form';
+import { z } from 'zod';
 import type { LoginRequest } from '../../api/generated/login-request';
-import type { LoginResponse } from '../../api/generated/login-response';
 import { ApiError, apiFetch } from '../../lib/api/client';
 import { beginSession } from '../../lib/session/sessionController';
+import { applyProblemDetails } from '../../lib/validation/problem-details';
+import { Button } from '../ui/button';
+import { Form } from '../ui/form';
+
+const loginSchema = z.object({
+  username: z.string().trim().min(1, 'Enter your username.'),
+  password: z.string().min(1, 'Enter your password.'),
+}) satisfies z.ZodType<LoginRequest>;
+
+const loginResponseSchema = z.object({
+  accessToken: z.string().min(1),
+  expiresAtUtc: z.iso.datetime({ offset: true }),
+  actorId: z.string().min(1),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
 
 export function LoginForm({ returnPath }: { returnPath?: string }) {
-  const [credentials, setCredentials] = useState<LoginRequest>({ username: '', password: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const form = useForm<LoginValues>({
+    resolver: standardSchemaResolver(loginSchema),
+    defaultValues: { username: '', password: '' },
+  });
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError('');
+  const submit = form.handleSubmit(async (credentials) => {
+    form.clearErrors();
     try {
-      const response = await apiFetch<LoginResponse>('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
-      await beginSession({
-        accessToken: response.accessToken,
-        expiresAtUtc: response.expiresAtUtc,
-        actorId: response.actorId,
-      }, returnPath);
+      const response = await apiFetch('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      }, loginResponseSchema);
+      await beginSession(response, returnPath);
     } catch (failure) {
-      setError(failure instanceof ApiError && failure.status === 401 ? 'Invalid username or password.' : 'Unable to sign in.');
-    } finally {
-      setSubmitting(false);
+      if (applyProblemDetails(failure, form.setError)) return;
+      form.setError('root', {
+        type: 'server',
+        message: failure instanceof ApiError && failure.status === 401
+          ? 'Invalid username or password.'
+          : 'Unable to sign in.',
+      });
     }
-  };
+  });
 
-  return <main className="login-shell"><form className="login-card" onSubmit={(event) => void submit(event)}><p className="eyebrow">BioGem Tradebook</p><h1>Sign in</h1><label>Username<input autoComplete="username" required value={credentials.username} onChange={(event) => setCredentials((value) => ({ ...value, username: event.target.value }))} /></label><label>Password<input autoComplete="current-password" required type="password" value={credentials.password} onChange={(event) => setCredentials((value) => ({ ...value, password: event.target.value }))} /></label>{error && <p role="alert">{error}</p>}<button type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button></form></main>;
+  return (
+    <main className="login-shell">
+      <Form {...form}>
+        <form className="login-card" onSubmit={(event) => void submit(event)} noValidate>
+          <p className="eyebrow">BioGem Tradebook</p>
+          <h1>Sign in</h1>
+          <Controller control={form.control} name="username" render={({ field, fieldState }) => (
+            <label>Username<input autoComplete="username" aria-invalid={fieldState.invalid} {...field} />{fieldState.error && <span role="alert">{fieldState.error.message}</span>}</label>
+          )} />
+          <Controller control={form.control} name="password" render={({ field, fieldState }) => (
+            <label>Password<input autoComplete="current-password" type="password" aria-invalid={fieldState.invalid} {...field} />{fieldState.error && <span role="alert">{fieldState.error.message}</span>}</label>
+          )} />
+          {form.formState.errors.root && <p role="alert">{form.formState.errors.root.message}</p>}
+          <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}</Button>
+        </form>
+      </Form>
+    </main>
+  );
 }

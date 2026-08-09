@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { z } from 'zod';
 import type { ContractDetailsDto } from "../../api/generated/contract-details-dto";
 import type { CreateContractRequest } from "../../api/generated/create-contract-request";
 import type { GetContractHistoryResponse } from "../../api/generated/get-contract-history-response";
@@ -17,6 +18,7 @@ import {
 import { queryKeys } from '../../lib/query/queryKeys';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
+import { ValidatedForm } from '../ui/validated-form';
 
 const productTypes = [
   "GoO",
@@ -41,6 +43,13 @@ const initialCreate: CreateContractRequest = {
   action: "Buy",
   contractType: "External",
 };
+const createContractSchema = z.custom<CreateContractRequest>((candidate): candidate is CreateContractRequest => {
+  const value = candidate as Partial<CreateContractRequest>;
+  return typeof value.contractName === 'string' && value.contractName.trim().length > 0 && value.contractName.length <= 100
+    && typeof value.counterpartyId === 'string' && value.counterpartyId.trim().length > 0
+    && typeof value.productType === 'string' && productTypes.includes(value.productType as (typeof productTypes)[number])
+    && typeof value.action === 'string' && actions.includes(value.action as (typeof actions)[number]);
+}, { error: 'Complete the required contract fields.' });
 
 function currentChanges(
   contract: ContractDetailsDto,
@@ -245,12 +254,11 @@ export function ContractsPage() {
     [deactivate, save],
   );
 
-  const submitCreate = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitCreate = async (validatedRequest: CreateContractRequest) => {
     setError("");
-    attempted.current = createRequest;
+    attempted.current = validatedRequest;
     try {
-      const request = { ...createRequest };
+      const request = { ...validatedRequest };
       let created: ContractDetailsDto | undefined;
       let version = 0;
       const command: Command = {
@@ -341,7 +349,7 @@ export function ContractsPage() {
           aria-modal="true"
           aria-label="Create contract"
         >
-          <form onSubmit={(event) => void submitCreate(event)}>
+          <ValidatedForm schema={createContractSchema} values={createRequest} onValid={submitCreate}>
             <h3>Create contract</h3>
             <label>
               Contract name
@@ -442,7 +450,7 @@ export function ContractsPage() {
                 Create
               </button>
             </div>
-          </form>
+          </ValidatedForm>
         </section>
       )}
       {conflict && (

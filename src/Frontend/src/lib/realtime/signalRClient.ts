@@ -2,8 +2,11 @@ import * as signalR from '@microsoft/signalr';
 import { MessagePackHubProtocol } from '@microsoft/signalr-protocol-msgpack';
 import { apiFetch } from '../api/client';
 import { useAuthStore } from '../state/useAuthStore';
+import { z } from 'zod';
 export interface EntityChangedEvent { eventId: string; sequenceId: number; aggregateType: string; aggregateId: string; eventType: string; payloadJson: string; }
 export interface CatchUpResponse { events: EntityChangedEvent[]; latestSequence: number; }
+const entityChangedEventSchema = z.object({ eventId: z.string().min(1), sequenceId: z.number().int().nonnegative(), aggregateType: z.string().min(1), aggregateId: z.string().min(1), eventType: z.string().min(1), payloadJson: z.string() });
+const catchUpResponseSchema = z.object({ events: z.array(entityChangedEventSchema), latestSequence: z.number().int().nonnegative() });
 export const subscribedAggregateTypes = [
   'PhysicalDelivery',
   'Contract',
@@ -65,13 +68,17 @@ export class DashboardStreamClient {
       .withHubProtocol(new MessagePackHubProtocol())
       .withAutomaticReconnect()
       .build();
-    this.fetchPage = dependencies.fetchPage ?? ((afterSequence) => apiFetch<CatchUpResponse>(`/api/v1/events?afterSequence=${afterSequence}&limit=500`));
+    this.fetchPage = dependencies.fetchPage ?? ((afterSequence) => apiFetch(`/api/v1/events?afterSequence=${afterSequence}&limit=500`, {}, catchUpResponseSchema));
     const actorId = useAuthStore.getState().actorId;
     this.groups = dependencies.groups ?? (actorId ? [...dashboardSubscriptionGroups, `dashboard:${actorId}`] : dashboardSubscriptionGroups);
     this.onError = dependencies.onError ?? (() => undefined);
     this.initialRetryDelayMs = dependencies.initialRetryDelayMs ?? 500;
     this.maximumInitialRetryDelayMs = dependencies.maximumInitialRetryDelayMs ?? 10_000;
-    this.connection.on('EntityChanged', (eventId: string, sequenceId: number, aggregateType: string, aggregateId: string, eventType: string, payloadJson: string) => this.receiveLive({ eventId, sequenceId, aggregateType, aggregateId, eventType, payloadJson }));
+    this.connection.on('EntityChanged', (eventId: string, sequenceId: number, aggregateType: string, aggregateId: string, eventType: string, payloadJson: string) => {
+      const parsed = entityChangedEventSchema.safeParse({ eventId, sequenceId, aggregateType, aggregateId, eventType, payloadJson });
+      if (parsed.success) this.receiveLive(parsed.data);
+      else this.onError(parsed.error);
+    });
     this.connection.onreconnected(() => {
       this.reconnectRecovery = this.reconnectRecovery.then(() => this.restoreAfterReconnect()).catch((error) => this.onError(error));
     });
