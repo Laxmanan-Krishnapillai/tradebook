@@ -19,12 +19,14 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
     [Theory]
     [InlineData(null)]
     [InlineData("not-a-guid")]
-    public async Task Rest_api_rejects_tokens_without_a_valid_uuid_subject(string? subject)
+    public async Task RestApiRejectsTokensWithoutAValidUuidSubject(string? subject)
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", CreateToken(subject, includeReadRole: true));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(subject, includeReadRole: true)
+        );
 
         using var response = await client.GetAsync("/api/v1/events?afterSequence=0&limit=1");
 
@@ -34,45 +36,60 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
     [Theory]
     [InlineData(null)]
     [InlineData("not-a-guid")]
-    public async Task Dashboard_hub_rejects_tokens_without_a_valid_uuid_subject(string? subject)
+    public async Task DashboardHubRejectsTokensWithoutAValidUuidSubject(string? subject)
     {
         await using var factory = CreateFactory();
-        await using var hub = BuildHubConnection(factory, CreateToken(subject, includeReadRole: true));
+        await using var hub = BuildHubConnection(
+            factory,
+            CreateToken(subject, includeReadRole: true)
+        );
 
         await Assert.ThrowsAsync<HttpRequestException>(() => hub.StartAsync());
     }
 
     [Fact]
-    public async Task Dashboard_hub_requires_a_read_role()
+    public async Task DashboardHubRequiresAReadRole()
     {
         await using var factory = CreateFactory();
         await using var hub = BuildHubConnection(
             factory,
-            CreateToken(Guid.NewGuid().ToString(), includeReadRole: false));
+            CreateToken(Guid.NewGuid().ToString(), includeReadRole: false)
+        );
 
         await Assert.ThrowsAsync<HttpRequestException>(() => hub.StartAsync());
     }
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.UseEnvironment("Testing").ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = Postgres.ConnectionString,
-                    ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
-                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222"
-                })));
+            builder
+                .UseEnvironment("Testing")
+                .ConfigureAppConfiguration(
+                    (_, configuration) =>
+                        configuration.AddInMemoryCollection(
+                            new Dictionary<string, string?>
+                            {
+                                ["Database:ConnectionString"] = Postgres.ConnectionString,
+                                ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                            }
+                        )
+                )
+        );
 
     private static HubConnection BuildHubConnection(
         WebApplicationFactory<Program> factory,
-        string token) =>
+        string token
+    ) =>
         new HubConnectionBuilder()
-            .WithUrl(new Uri(factory.Server.BaseAddress, "hubs/dashboard"), options =>
-            {
-                options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
-                options.Transports = HttpTransportType.LongPolling;
-                options.AccessTokenProvider = () => Task.FromResult<string?>(token);
-            })
+            .WithUrl(
+                new Uri(factory.Server.BaseAddress, "hubs/dashboard"),
+                options =>
+                {
+                    options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
+                    options.Transports = HttpTransportType.LongPolling;
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                }
+            )
             .Build();
 
     private static string CreateToken(string? subject, bool includeReadRole)
@@ -88,14 +105,16 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
             claims.Add(new Claim("role", "Admin"));
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey));
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)
+        );
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = "Tradebook",
             Audience = "Tradebook",
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddMinutes(5),
-            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         };
         var handler = new JwtSecurityTokenHandler();
         return handler.WriteToken(handler.CreateToken(descriptor));

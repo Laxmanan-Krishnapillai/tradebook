@@ -163,7 +163,16 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
     }
 
     private static ClaimsPrincipal Principal(Guid actorId) =>
-        new(new ClaimsIdentity([new Claim("oid", actorId.ToString()), new("tid", "11111111-1111-1111-1111-111111111111"), new("tradebook_tenant", "11111111-1111-1111-1111-111111111111")], "test"));
+        new(
+            new ClaimsIdentity(
+                [
+                    new Claim("oid", actorId.ToString()),
+                    new("tid", "11111111-1111-1111-1111-111111111111"),
+                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
+                ],
+                "test"
+            )
+        );
 
     private static JsonElement DashboardLayout(Guid dashboardId) =>
         JsonSerializer.SerializeToElement(

@@ -15,7 +15,16 @@ public sealed class DeliveryEndpointTests
     private static readonly Guid Actor = Guid.NewGuid();
 
     private static ClaimsPrincipal Principal() =>
-        new(new ClaimsIdentity([new Claim("oid", Actor.ToString()), new("tid", "11111111-1111-1111-1111-111111111111"), new("tradebook_tenant", "11111111-1111-1111-1111-111111111111")], "test"));
+        new(
+            new ClaimsIdentity(
+                [
+                    new Claim("oid", Actor.ToString()),
+                    new("tid", "11111111-1111-1111-1111-111111111111"),
+                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
+                ],
+                "test"
+            )
+        );
 
     [Fact]
     public async Task CreateReturns201WithMappedResponseAndEvictsListCache()

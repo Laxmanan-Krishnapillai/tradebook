@@ -30,20 +30,28 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
+        await _container.StartAsync().ConfigureAwait(false);
         _connection = new NpgsqlConnection(ConnectionString);
-        await _connection.OpenAsync();
+        await _connection.OpenAsync().ConfigureAwait(false);
 
-        await using var connections = new NpgsqlConnectionFactory(Options.Create(
-            new DatabaseOptions { ConnectionString = ConnectionString }));
-        await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance).MigrateAsync();
+        await using var connections = new NpgsqlConnectionFactory(
+            Options.Create(new DatabaseOptions { ConnectionString = ConnectionString })
+        );
+        await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance)
+            .MigrateAsync()
+            .ConfigureAwait(false);
 
-        _respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"],
-            TablesToIgnore = ["schema_migrations"]
-        });
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_migrations"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
     public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
@@ -51,22 +59,25 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Database:ConnectionString"] = ConnectionString,
-                ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
-                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222"
-            }));
+        builder.ConfigureAppConfiguration(
+            (_, configuration) =>
+                configuration.AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["Database:ConnectionString"] = ConnectionString,
+                        ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                        ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                    }
+                )
+        );
     }
 
     public override async ValueTask DisposeAsync()
     {
-        await _connection.DisposeAsync();
-        await _container.DisposeAsync();
-        await base.DisposeAsync();
+        await _connection.DisposeAsync().ConfigureAwait(false);
+        await _container.DisposeAsync().ConfigureAwait(false);
+        await base.DisposeAsync().ConfigureAwait(false);
     }
 
     Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
-
 }

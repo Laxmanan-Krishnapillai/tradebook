@@ -19,16 +19,12 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Duplicate_domain_create_returns_safe_conflict_response()
+    public async Task DuplicateDomainCreateReturnsSafeConflictResponse()
     {
         var contractId = await SeedContractAsync();
         await using var factory = CreateFactory();
         using var client = AuthenticatedClient(factory);
-        var request = new
-        {
-            contractId,
-            supplyMonth = "2026-01-01"
-        };
+        var request = new { contractId, supplyMonth = "2026-01-01" };
 
         using var created = await client.PostAsJsonAsync("/api/v1/capacity-bookings", request);
         using var duplicate = await client.PostAsJsonAsync("/api/v1/capacity-bookings", request);
@@ -42,18 +38,21 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
     }
 
     [Fact]
-    public async Task Partial_date_update_against_stored_counterpart_returns_bad_request_and_rolls_back()
+    public async Task PartialDateUpdateAgainstStoredCounterpartReturnsBadRequestAndRollsBack()
     {
         var contractId = await SeedContractAsync();
         await using var factory = CreateFactory();
         using var client = AuthenticatedClient(factory);
-        using var created = await client.PostAsJsonAsync("/api/v1/capacity-bookings", new
-        {
-            contractId,
-            supplyMonth = "2026-02-01",
-            startDay = "2026-02-10",
-            endDay = "2026-02-20"
-        });
+        using var created = await client.PostAsJsonAsync(
+            "/api/v1/capacity-bookings",
+            new
+            {
+                contractId,
+                supplyMonth = "2026-02-01",
+                startDay = "2026-02-10",
+                endDay = "2026-02-20",
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         using var createdBody = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
         var capacityBookingId = createdBody.RootElement.GetProperty("capacityBookingId").GetGuid();
@@ -65,40 +64,62 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             {
                 capacityBookingId,
                 endDay = "2026-02-05",
-                version
-            });
+                version,
+            }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, invalidUpdate.StatusCode);
-        Assert.Equal("application/problem+json", invalidUpdate.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "application/problem+json",
+            invalidUpdate.Content.Headers.ContentType?.MediaType
+        );
         var errorBody = await invalidUpdate.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("ck_capacity_delivery_dates", errorBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "ck_capacity_delivery_dates",
+            errorBody,
+            StringComparison.OrdinalIgnoreCase
+        );
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         var persisted = await connection.QuerySingleAsync<(DateOnly EndDay, long Version)>(
             "SELECT end_day AS EndDay, version AS Version FROM capacity_bookings WHERE id = @Id",
-            new { Id = capacityBookingId });
+            new { Id = capacityBookingId }
+        );
         Assert.Equal(new DateOnly(2026, 2, 20), persisted.EndDay);
         Assert.Equal(version, persisted.Version);
-        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM outbox_events WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @Id",
-            new { Id = capacityBookingId.ToString() }));
+        Assert.Equal(
+            1,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM outbox_events WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @Id",
+                new { Id = capacityBookingId.ToString() }
+            )
+        );
     }
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.UseEnvironment("Testing").ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = Postgres.ConnectionString,
-                    ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
-                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222"
-                })));
+            builder
+                .UseEnvironment("Testing")
+                .ConfigureAppConfiguration(
+                    (_, configuration) =>
+                        configuration.AddInMemoryCollection(
+                            new Dictionary<string, string?>
+                            {
+                                ["Database:ConnectionString"] = Postgres.ConnectionString,
+                                ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                            }
+                        )
+                )
+        );
 
     private static HttpClient AuthenticatedClient(WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Token(Guid.NewGuid()));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            Token(Guid.NewGuid())
+        );
         return client;
     }
 
@@ -110,12 +131,15 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             Audience = "Tradebook",
             Subject = new ClaimsIdentity([
                 new Claim("sub", actorId.ToString()),
-                new Claim("role", "Trader")
+                new Claim("role", "Trader"),
             ]),
-            Expires = DateTime.UtcNow.AddMinutes(5),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)),
-                SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)
+                ),
+                SecurityAlgorithms.HmacSha256
+            ),
         };
         var handler = new JwtSecurityTokenHandler();
         return handler.WriteToken(handler.CreateToken(descriptor));
@@ -123,30 +147,38 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
 
     private async Task<Guid> SeedContractAsync()
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var connection = new NpgsqlConnection(Postgres.ConnectionString).ConfigureAwait(
+            false
+        );
         var counterpartyId = Guid.NewGuid();
-        await connection.ExecuteAsync(
-            "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
-            new
-            {
-                Id = counterpartyId,
-                Name = $"Constraint Counterparty {counterpartyId:N}",
-                Shorthand = $"CE{counterpartyId:N}"[..20]
-            });
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
+                new
+                {
+                    Id = counterpartyId,
+                    Name = $"Constraint Counterparty {counterpartyId:N}",
+                    Shorthand = $"CE{counterpartyId:N}"[..20],
+                }
+            )
+            .ConfigureAwait(false);
         var contractId = Guid.NewGuid();
-        await connection.ExecuteAsync(
-            """
-            INSERT INTO contracts
-                (id, contract_name, counterparty_id, product_type, action, subsidy_status)
-            VALUES
-                (@Id, @Name, @CounterpartyId, 'Gas', 'Sell', 'SUB')
-            """,
-            new
-            {
-                Id = contractId,
-                Name = $"ERR45.SG.{contractId:N}.NOQS",
-                CounterpartyId = counterpartyId
-            });
+        await connection
+            .ExecuteAsync(
+                """
+                INSERT INTO contracts
+                    (id, contract_name, counterparty_id, product_type, action, subsidy_status)
+                VALUES
+                    (@Id, @Name, @CounterpartyId, 'Gas', 'Sell', 'SUB')
+                """,
+                new
+                {
+                    Id = contractId,
+                    Name = $"ERR45.SG.{contractId:N}.NOQS",
+                    CounterpartyId = counterpartyId,
+                }
+            )
+            .ConfigureAwait(false);
         return contractId;
     }
 }
