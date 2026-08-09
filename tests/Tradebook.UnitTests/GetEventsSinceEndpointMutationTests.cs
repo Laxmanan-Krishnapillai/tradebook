@@ -79,7 +79,16 @@ public sealed class GetEventsSinceEndpointMutationTests
     }
 
     private static ClaimsPrincipal Principal(Guid actorId) =>
-        new(new ClaimsIdentity([new Claim("sub", actorId.ToString())], "test"));
+        new(
+            new ClaimsIdentity(
+                [
+                    new Claim("oid", actorId.ToString()),
+                    new("tid", "11111111-1111-1111-1111-111111111111"),
+                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
+                ],
+                "test"
+            )
+        );
 
     private sealed class RecordingOutboxEventReader(GetEventsSinceResponse response)
         : IOutboxEventReader

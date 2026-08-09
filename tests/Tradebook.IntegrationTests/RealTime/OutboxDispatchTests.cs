@@ -85,7 +85,7 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
             response.EnsureSuccessStatusCode();
             var created = await response.Content.ReadFromJsonAsync<CreatedDelivery>();
 
-            var pushed = await WaitForAsync(
+            var pushed = await AssertEventReceivedAsync(
                 events.Received,
                 e =>
                     string.Equals(
@@ -157,12 +157,12 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
             await hub.InvokeAsync("Subscribe", "entity:PhysicalDelivery");
             var aggregateId = await InsertOutboxEventAsync("PhysicalDelivery");
 
-            var first = await WaitForAsync(
+            var first = await AssertEventReceivedAsync(
                 events.Received,
                 e => string.Equals(e.AggregateId, aggregateId, StringComparison.Ordinal),
                 TimeSpan.FromSeconds(5)
             );
-            var second = await WaitForAsync(
+            var second = await AssertEventReceivedAsync(
                 events.Received,
                 e => string.Equals(e.AggregateId, aggregateId, StringComparison.Ordinal),
                 TimeSpan.FromSeconds(10),
@@ -188,23 +188,56 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
         var (hub, events) = await ConnectAsync(factory, CreateToken());
         await using (hub)
         {
-            await SubscribeToAllAggregateGroupsAsync(hub);
+            await SubscribeToAggregateGroupsAsync(hub);
+
             using var client = factory.CreateClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
                 "Bearer",
                 CreateToken()
             );
+            var (
+                contractId,
+                deliveryId,
+                capacityBookingId,
+                transferId,
+                bioticketId,
+                certificateId
+            ) = await CreateOperationalEntitiesAsync(client);
+            var (priceDate, taxTariffId, hedgeId) = await CreateFinancialEntitiesAsync(
+                client,
+                contractId
+            );
+            var dashboardId = await CreateDashboardAsync(client);
 
-            var (contractId, expected) = await CreateCoreAggregateEventsAsync(client);
-            await AddMarketTaxAndHedgeEventsAsync(client, contractId, expected);
-            var dashboardId = await CreateDashboardEventAsync(client);
-            expected[OutboxAggregateTypes.WorkspaceDashboard] = dashboardId.ToString();
+            var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [OutboxAggregateTypes.Contract] = contractId.ToString(),
+                [OutboxAggregateTypes.PhysicalDelivery] = deliveryId.ToString(),
+                [OutboxAggregateTypes.CapacityBooking] = capacityBookingId.ToString(),
+                [OutboxAggregateTypes.Transfer] = transferId.ToString(),
+                [OutboxAggregateTypes.BioticketDelivery] = bioticketId.ToString(),
+                [OutboxAggregateTypes.GooCertificateTransaction] = certificateId.ToString(),
+                [OutboxAggregateTypes.MarketPrice] = priceDate,
+                [OutboxAggregateTypes.TaxTariff] = taxTariffId.ToString(),
+                [OutboxAggregateTypes.Hedge] = hedgeId.ToString(),
+                [OutboxAggregateTypes.WorkspaceDashboard] = dashboardId.ToString(),
+            };
+            Assert.Equal(OutboxAggregateTypes.All.Count, expected.Count);
 
-            await AssertExpectedEventsAsync(events, expected);
+            foreach (var (aggregateType, aggregateId) in expected)
+            {
+                var pushed = await AssertEventReceivedAsync(
+                    events.Received,
+                    e => string.Equals(e.AggregateId, aggregateId, StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(10)
+                );
+                Assert.Equal(aggregateType, pushed.AggregateType);
+                Assert.Equal("Created", pushed.EventType);
+            }
         }
     }
 
-    private static async Task SubscribeToAllAggregateGroupsAsync(HubConnection hub)
+    private static async Task SubscribeToAggregateGroupsAsync(HubConnection hub)
     {
         foreach (var aggregateType in OutboxAggregateTypes.All)
         {
@@ -227,36 +260,15 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
 
     private async Task<(
         Guid ContractId,
-        Dictionary<string, string> Expected
-    )> CreateCoreAggregateEventsAsync(HttpClient client)
-    {
-        var contractId = await CreateContractEventAsync(client).ConfigureAwait(false);
-        var (deliveryId, capacityBookingId, transferId) = await CreatePhysicalFlowEventsAsync(
-                client,
-                contractId
-            )
-            .ConfigureAwait(false);
-        var (bioticketId, certificateId) = await CreateSustainabilityEventsAsync(client, contractId)
-            .ConfigureAwait(false);
-
-        return (
-            contractId,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [OutboxAggregateTypes.Contract] = contractId.ToString(),
-                [OutboxAggregateTypes.PhysicalDelivery] = deliveryId.ToString(),
-                [OutboxAggregateTypes.CapacityBooking] = capacityBookingId.ToString(),
-                [OutboxAggregateTypes.Transfer] = transferId.ToString(),
-                [OutboxAggregateTypes.BioticketDelivery] = bioticketId.ToString(),
-                [OutboxAggregateTypes.GooCertificateTransaction] = certificateId.ToString(),
-            }
-        );
-    }
-
-    private async Task<Guid> CreateContractEventAsync(HttpClient client)
+        Guid DeliveryId,
+        Guid CapacityBookingId,
+        Guid TransferId,
+        Guid BioticketId,
+        Guid CertificateId
+    )> CreateOperationalEntitiesAsync(HttpClient client)
     {
         var counterpartyId = await SeedCounterpartyAsync().ConfigureAwait(false);
-        return await PostAndReadGuidAsync(
+        var contractId = await PostAndReadGuidAsync(
                 client,
                 "/api/v1/contracts",
                 new
@@ -270,14 +282,6 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
                 "contractId"
             )
             .ConfigureAwait(false);
-    }
-
-    private static async Task<(
-        Guid DeliveryId,
-        Guid CapacityBookingId,
-        Guid TransferId
-    )> CreatePhysicalFlowEventsAsync(HttpClient client, Guid contractId)
-    {
         var deliveryId = await PostAndReadGuidAsync(
                 client,
                 "/api/v1/deliveries",
@@ -304,14 +308,6 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
                 "transferId"
             )
             .ConfigureAwait(false);
-        return (deliveryId, capacityBookingId, transferId);
-    }
-
-    private static async Task<(
-        Guid BioticketId,
-        Guid CertificateId
-    )> CreateSustainabilityEventsAsync(HttpClient client, Guid contractId)
-    {
         var bioticketId = await PostAndReadGuidAsync(
                 client,
                 "/api/v1/biotickets",
@@ -324,25 +320,28 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
                 "bioticketId"
             )
             .ConfigureAwait(false);
-        var certificateId = await PostAndReadGuidAsync(
-                client,
-                "/api/v1/goo-certificates",
-                new
-                {
-                    transactionName = $"dispatch-{Guid.NewGuid():N}",
-                    producerContractId = contractId,
-                },
-                "gooCertificateTransactionId"
-            )
-            .ConfigureAwait(false);
-        return (bioticketId, certificateId);
+        var certificateId = await CreateCertificateAsync(client, contractId).ConfigureAwait(false);
+
+        return (contractId, deliveryId, capacityBookingId, transferId, bioticketId, certificateId);
     }
 
-    private static async Task AddMarketTaxAndHedgeEventsAsync(
-        HttpClient client,
-        Guid contractId,
-        Dictionary<string, string> expected
-    )
+    private static Task<Guid> CreateCertificateAsync(HttpClient client, Guid contractId) =>
+        PostAndReadGuidAsync(
+            client,
+            "/api/v1/goo-certificates",
+            new
+            {
+                transactionName = $"dispatch-{Guid.NewGuid():N}",
+                producerContractId = contractId,
+            },
+            "gooCertificateTransactionId"
+        );
+
+    private static async Task<(
+        string PriceDate,
+        Guid TaxTariffId,
+        Guid HedgeId
+    )> CreateFinancialEntitiesAsync(HttpClient client, Guid contractId)
     {
         const string priceDate = "2026-05-01";
         using (
@@ -389,64 +388,48 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
             )
             .ConfigureAwait(false);
 
-        expected[OutboxAggregateTypes.MarketPrice] = priceDate;
-        expected[OutboxAggregateTypes.TaxTariff] = taxTariffId.ToString();
-        expected[OutboxAggregateTypes.Hedge] = hedgeId.ToString();
+        return (priceDate, taxTariffId, hedgeId);
     }
 
-    private static async Task<Guid> CreateDashboardEventAsync(HttpClient client)
+    private static async Task<Guid> CreateDashboardAsync(HttpClient client)
     {
         var dashboardId = Guid.NewGuid();
-        using var response = await client
-            .PutAsJsonAsync(
-                $"/api/v1/dashboards/{dashboardId}",
-                new
-                {
-                    dashboardId,
-                    version = 0,
-                    layout = new
+        using (
+            var response = await client
+                .PutAsJsonAsync(
+                    $"/api/v1/dashboards/{dashboardId}",
+                    new
                     {
                         dashboardId,
-                        title = "Realtime producer coverage",
                         version = 0,
-                        theme = "SYSTEM",
-                        refreshRateMs = 30_000,
-                        gridLayout = new
+                        layout = new
                         {
-                            columns = 12,
-                            rowHeight = 30,
-                            items = Array.Empty<object>(),
+                            dashboardId,
+                            title = "Realtime producer coverage",
+                            version = 0,
+                            theme = "SYSTEM",
+                            refreshRateMs = 30_000,
+                            gridLayout = new
+                            {
+                                columns = 12,
+                                rowHeight = 30,
+                                items = Array.Empty<object>(),
+                            },
+                            widgets = Array.Empty<object>(),
                         },
-                        widgets = Array.Empty<object>(),
-                    },
-                }
-            )
-            .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+                    }
+                )
+                .ConfigureAwait(false)
+        )
+        {
+            response.EnsureSuccessStatusCode();
+        }
+
         return dashboardId;
     }
 
-    private static async Task AssertExpectedEventsAsync(
-        ClientEventSink events,
-        Dictionary<string, string> expected
-    )
-    {
-        Assert.Equal(OutboxAggregateTypes.All.Count, expected.Count);
-        foreach (var (aggregateType, aggregateId) in expected)
-        {
-            var pushed = await WaitForAsync(
-                    events.Received,
-                    e => string.Equals(e.AggregateId, aggregateId, StringComparison.Ordinal),
-                    TimeSpan.FromSeconds(10)
-                )
-                .ConfigureAwait(false);
-            Assert.Equal(aggregateType, pushed.AggregateType);
-            Assert.Equal("Created", pushed.EventType);
-        }
-    }
-
     [Fact] // Task 03 §6 T7 — NOTIFY wake-up, not the fallback poll
-    public async Task ANewOutboxRowIsDeliveredViaNOTIFYWithoutWaitingForTheFallbackPoll()
+    public async Task ANewOutboxRowIsDeliveredViaNotifyWithoutWaitingForTheFallbackPoll()
     {
         await using var factory = CreateFactory(
             config: new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -462,12 +445,11 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
 
             var start = TimeProvider.System.GetUtcNow();
             var aggregateId = await InsertOutboxEventAsync("PhysicalDelivery");
-            var pushed = await WaitForAsync(
+            await AssertEventReceivedAsync(
                 events.Received,
                 e => string.Equals(e.AggregateId, aggregateId, StringComparison.Ordinal),
                 TimeSpan.FromSeconds(5)
             );
-            Assert.Equal(aggregateId, pushed.AggregateId);
             // Recorded, not gated (D10):
             Console.WriteLine(
                 $"insert->push latency: {(TimeProvider.System.GetUtcNow() - start).TotalMilliseconds:F0} ms"
@@ -496,15 +478,15 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
     ) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                 {
                     var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
                     {
                         ["Database:ConnectionString"] = Postgres.ConnectionString,
-                        ["Jwt:Issuer"] = "Tradebook",
-                        ["Jwt:Audience"] = "Tradebook",
-                        ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                        ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
                     };
                     foreach (var pair in config ?? [])
                         settings[pair.Key] = pair.Value;
@@ -565,7 +547,7 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
         return (hub, events);
     }
 
-    private static async Task<PushedEvent> WaitForAsync(
+    private static async Task<PushedEvent> AssertEventReceivedAsync(
         ConcurrentQueue<PushedEvent> received,
         Func<PushedEvent, bool> predicate,
         TimeSpan timeout,
@@ -593,27 +575,25 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
     private async Task<bool> WaitForProcessedAsync(Guid eventId, TimeSpan timeout)
     {
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await using (connection.ConfigureAwait(false))
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        var deadline = TimeProvider.System.GetUtcNow() + timeout;
+        while (TimeProvider.System.GetUtcNow() < deadline)
         {
-            var deadline = TimeProvider.System.GetUtcNow() + timeout;
-            while (TimeProvider.System.GetUtcNow() < deadline)
+            var processed = await connection
+                .ExecuteScalarAsync<bool>(
+                    "SELECT processed_at IS NOT NULL FROM outbox_events WHERE event_id = @EventId",
+                    new { EventId = eventId }
+                )
+                .ConfigureAwait(false);
+            if (processed)
             {
-                var processed = await connection
-                    .ExecuteScalarAsync<bool>(
-                        "SELECT processed_at IS NOT NULL FROM outbox_events WHERE event_id = @EventId",
-                        new { EventId = eventId }
-                    )
-                    .ConfigureAwait(false);
-                if (processed)
-                {
-                    return true;
-                }
-
-                await Task.Delay(100).ConfigureAwait(false);
+                return true;
             }
 
-            return false;
+            await Task.Delay(100).ConfigureAwait(false);
         }
+
+        return false;
     }
 
     private async Task<string> InsertOutboxEventAsync(
@@ -623,79 +603,73 @@ public sealed class OutboxDispatchTests(PostgresTestFixture postgres)
     {
         aggregateId ??= Guid.NewGuid().ToString();
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await using (connection.ConfigureAwait(false))
-        {
-            await connection
-                .ExecuteAsync(
-                    """
-                    INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-                    VALUES (@AggregateType, @AggregateId, 'Created', '{"source":"OutboxDispatchTests"}'::jsonb)
-                    """,
-                    new { AggregateType = aggregateType, AggregateId = aggregateId }
-                )
-                .ConfigureAwait(false);
-            return aggregateId;
-        }
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection
+            .ExecuteAsync(
+                """
+                INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
+                VALUES (@AggregateType, @AggregateId, 'Created', '{"source":"OutboxDispatchTests"}'::jsonb)
+                """,
+                new { AggregateType = aggregateType, AggregateId = aggregateId }
+            )
+            .ConfigureAwait(false);
+        return aggregateId;
     }
 
     private async Task<Guid> SeedContractAsync()
     {
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await using (connection.ConfigureAwait(false))
-        {
-            await connection.OpenAsync().ConfigureAwait(false);
-            var counterpartyId = Guid.NewGuid();
-            await connection
-                .ExecuteAsync(
-                    "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
-                    new
-                    {
-                        Id = counterpartyId,
-                        Name = $"Counterparty-{counterpartyId}",
-                        Shorthand = $"CP{counterpartyId:N}"[..20],
-                    }
-                )
-                .ConfigureAwait(false);
-            var contractId = Guid.NewGuid();
-            await connection
-                .ExecuteAsync(
-                    "INSERT INTO contracts (id, contract_name, counterparty_id, product_type, action) VALUES (@Id, @Name, @CounterpartyId, 'Gas', 'Sell')",
-                    new
-                    {
-                        Id = contractId,
-                        Name = $"TEST45.SG.{contractId:N}"[..40],
-                        CounterpartyId = counterpartyId,
-                    }
-                )
-                .ConfigureAwait(false);
-            return contractId;
-        }
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection.OpenAsync().ConfigureAwait(false);
+        var counterpartyId = Guid.NewGuid();
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
+                new
+                {
+                    Id = counterpartyId,
+                    Name = $"Counterparty-{counterpartyId}",
+                    Shorthand = $"CP{counterpartyId:N}"[..20],
+                }
+            )
+            .ConfigureAwait(false);
+        var contractId = Guid.NewGuid();
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO contracts (id, contract_name, counterparty_id, product_type, action) VALUES (@Id, @Name, @CounterpartyId, 'Gas', 'Sell')",
+                new
+                {
+                    Id = contractId,
+                    Name = $"TEST45.SG.{contractId:N}"[..40],
+                    CounterpartyId = counterpartyId,
+                }
+            )
+            .ConfigureAwait(false);
+        return contractId;
     }
 
     private async Task<Guid> SeedCounterpartyAsync()
     {
         var counterpartyId = Guid.NewGuid();
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await using (connection.ConfigureAwait(false))
-        {
-            await connection
-                .ExecuteAsync(
-                    """
-                    INSERT INTO counterparties
-                        (id, name, shorthand, segment, country_code, country_dial_code)
-                    VALUES
-                        (@Id, @Name, @Shorthand, 'Traders', 'DK', 45)
-                    """,
-                    new
-                    {
-                        Id = counterpartyId,
-                        Name = $"Counterparty-{counterpartyId:N}",
-                        Shorthand = $"CP{counterpartyId:N}"[..20],
-                    }
-                )
-                .ConfigureAwait(false);
-            return counterpartyId;
-        }
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection
+            .ExecuteAsync(
+                """
+                INSERT INTO counterparties
+                    (id, name, shorthand, segment, country_code, country_dial_code)
+                VALUES
+                    (@Id, @Name, @Shorthand, 'Traders', 'DK', 45)
+                """,
+                new
+                {
+                    Id = counterpartyId,
+                    Name = $"Counterparty-{counterpartyId:N}",
+                    Shorthand = $"CP{counterpartyId:N}"[..20],
+                }
+            )
+            .ConfigureAwait(false);
+        return counterpartyId;
     }
 
     private static async Task<Guid> PostAndReadGuidAsync(

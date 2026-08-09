@@ -1,9 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record GetMarketPriceHistoryRequest
 {
     public GetMarketPriceHistoryRequest() { }
@@ -21,10 +19,8 @@ public sealed record GetMarketPriceHistoryRequest
         this.PageSize = PageSize;
     }
 
-    [TsOptional]
     public DateOnly? FromDate { get; init; }
 
-    [TsOptional]
     public DateOnly? ToDate { get; init; }
 
     public int Page { get; init; } = 1;

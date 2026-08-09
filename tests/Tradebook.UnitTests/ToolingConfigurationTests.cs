@@ -117,7 +117,6 @@ public sealed class ToolingConfigurationTests
         Assert.NotEmpty(operationalFiles);
         AssertOperationalFilesUseNet10(repositoryRoot, operationalFiles);
         AssertWorkflowsUseGlobalJson(repositoryRoot);
-        AssertTypegenTargetsNet10(repositoryRoot);
         AssertDockerRestoreInputsAreCopied(repositoryRoot, operationalFiles);
     }
 
@@ -189,23 +188,6 @@ public sealed class ToolingConfigurationTests
         }
     }
 
-    private static void AssertTypegenTargetsNet10(string repositoryRoot)
-    {
-        using var typegen = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(repositoryRoot, "tgconfig.json"))
-        );
-        var typegenAssembly = Assert.Single(
-            typegen
-                .RootElement.GetProperty("assemblies")
-                .EnumerateArray()
-                .Select(item => item.GetString()!)
-        );
-        Assert.True(
-            typegenAssembly.Replace('\\', '/').Contains("/net10.0/", StringComparison.Ordinal),
-            $"TypeGen assembly path is not net10.0: {typegenAssembly}"
-        );
-    }
-
     private static void AssertDockerRestoreInputsAreCopied(
         string repositoryRoot,
         string[] operationalFiles
@@ -263,11 +245,7 @@ public sealed class ToolingConfigurationTests
                         StringComparison.Ordinal
                     )
             );
-            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
-            var expectedVersion = string.Equals(expected.Key, "TypeGen", StringComparison.Ordinal)
-                ? "7.0.0"
-                : expected.Value;
-            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
+            Assert.Equal(expected.Value, entry.Attribute("Version")?.Value);
         }
     }
 
@@ -398,14 +376,14 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
-    public void CiUsesGlobalJsonForBothDotnetSdkInstallations()
+    public void CiUsesGlobalJsonForDotnetSdkInstallation()
     {
         var workflow = File.ReadAllText(
             Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml")
         );
 
         Assert.Equal(
-            2,
+            1,
             Regex.Count(
                 workflow,
                 @"global-json-file:\s*global\.json",
@@ -661,6 +639,7 @@ public sealed class ToolingConfigurationTests
     private static Dictionary<string, string> ReadExpectedPackageVersions(string repositoryRoot)
     {
         var versions = ReadTargetPackageVersions(repositoryRoot)
+            .Where(pair => !string.Equals(pair.Key, "TypeGen", StringComparison.Ordinal))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         versions.Remove("Microsoft.NET.Test.Sdk");
         versions.Remove("coverlet.collector");
@@ -685,6 +664,7 @@ public sealed class ToolingConfigurationTests
         var task20Versions = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["dbup-postgresql"] = "7.0.1",
+            ["Microsoft.Identity.Web"] = "4.14.2",
             ["CsCheck"] = "4.4.0",
             ["Microsoft.Testing.Extensions.CodeCoverage"] = "17.14.2",
             ["xunit.v3"] = "3.2.2",

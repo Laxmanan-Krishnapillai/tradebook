@@ -145,3 +145,9 @@ runner against an existing volume with:
 ```powershell
 docker compose exec -e PGHOST=/var/run/postgresql -e PGDATABASE=tradebook -e PGUSER=tradebook postgres bash /opt/tradebook/database-ops/run-migrations.sh
 ```
+
+## Microsoft Entra tenant-admin checklist
+
+Terraform manages the single-tenant Tradebook API/SPA applications and service principals, delegated `access_as_user` permission, exact user roles, exact redirect URIs, admin-consent grant, and assignment-required API enterprise application. Supply the public tenant UUID and three environment redirect URIs; outputs are non-secret IDs suitable for the API and frontend build. Do not create an SPA secret or request Microsoft Graph permissions.
+
+A tenant application owner must review the plan, confirm owners, grant consent where CI lacks directory permission, assign users/groups only through the three app roles, and retain the plan plus assignment drift output as release evidence.

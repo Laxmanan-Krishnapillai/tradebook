@@ -57,9 +57,8 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                     new Dictionary<string, string?>(StringComparer.Ordinal)
                     {
                         ["Database:ConnectionString"] = ConnectionString,
-                        ["Jwt:Issuer"] = "Tradebook",
-                        ["Jwt:Audience"] = "Tradebook",
-                        ["Jwt:SigningKey"] = JwtSigningKey,
+                        ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                        ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
                     }
                 )
         );

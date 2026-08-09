@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { GetDeliveryHistoryResponse } from '../../src/api/generated/get-delivery-history-response';
-import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/physical-delivery-details-dto';
+import type { GetDeliveryHistoryResponse } from '../../src/api/generated/types.gen';
+import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/types.gen';
 import {
   useCreateDelivery,
   useDeleteDelivery,
@@ -21,10 +21,10 @@ vi.mock('../../src/components/visualizations/QueryBindingConfigurator', () => ({
 
 const original = {
   deliveryId: 'delivery-1', contractId: 'contract-1', contractInstanceId: 'instance-1', bookType: 'Sales',
-  supplyMonth: '2026-01-01', volumeRealisedMwh: 10, status: 'Pending - No Invoice', version: 1,
+  supplyMonth: '2026-01-01', volumeRealisedMwh: '10', status: 'Pending - No Invoice', version: 1,
   createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
 } as PhysicalDeliveryDetailsDto;
-const authoritative = { ...original, volumeRealisedMwh: 25, status: 'Issue', version: 2 };
+const authoritative = { ...original, volumeRealisedMwh: '25', status: 'Issue', version: 2 };
 const listKey = queryKeys.deliveries.list({ page: 1, pageSize: 100 });
 const dashboard: DashboardSpecification = {
   dashboardId: 'actor-dashboard', title: 'Private dashboard', description: '', version: 1, theme: 'LIGHT',
@@ -128,7 +128,7 @@ describe('mutation safety and reconciliation', () => {
 
   it('does not let a late actor A mutation repopulate actor B cache data', async () => {
     const client = createTradebookQueryClient();
-    useAuthStore.getState().setSession('token-a', '2099-01-01T00:00:00.000Z', 'actor-a');
+    useAuthStore.getState().setSession({ accountKey: 'account-a', actorId: 'actor-a' });
     client.setQueryData(listKey, history());
     let resolve!: (response: Response) => void;
     const fetchMock = vi.fn(() => new Promise<Response>((next) => { resolve = next; }));
@@ -140,7 +140,7 @@ describe('mutation safety and reconciliation', () => {
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     });
 
-    useAuthStore.getState().setSession('token-b', '2099-01-01T00:00:00.000Z', 'actor-b');
+    useAuthStore.getState().setSession({ accountKey: 'account-b', actorId: 'actor-b' });
     const actorB = { ...original, contractInstanceId: 'private-b', version: 8 };
     client.clear();
     client.setQueryData(listKey, history(actorB));
@@ -153,7 +153,7 @@ describe('mutation safety and reconciliation', () => {
 
   it('shows the dashboard conflict prompt and installs authoritative 409 layout', async () => {
     const client = createTradebookQueryClient();
-    useAuthStore.getState().setSession('token-dashboard', '2099-01-01T00:00:00.000Z', dashboard.dashboardId);
+    useAuthStore.getState().setSession({ accountKey: 'account-dashboard', actorId: dashboard.dashboardId });
     const serverDashboard = { ...dashboard, title: 'Server dashboard', version: 2 };
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ dashboardId: dashboard.dashboardId, version: 1, layout: dashboard }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
