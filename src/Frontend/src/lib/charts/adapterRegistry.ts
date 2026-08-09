@@ -1,5 +1,5 @@
 import type { ChartAdapter, ChartType } from '../../types/visualizations';
-export type ChartAdapterFactory = () => ChartAdapter;
+type ChartAdapterFactory = () => ChartAdapter;
 class ChartAdapterRegistry {
   private readonly factories = new Map<ChartType, ChartAdapterFactory>();
   register(type: ChartType, factory: ChartAdapterFactory): void { this.factories.set(type, factory); }

@@ -1,0 +1,14 @@
+{
+  "name": "Tradebook .NET 10",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:2-10.0-noble",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/itsmechlark/features/postgresql:1": {
+      "version": "17"
+    }
+  },
+  "postCreateCommand": "dotnet tool restore && npm ci && npm --prefix src/Frontend ci",
+  "remoteUser": "vscode"
+}

@@ -4,32 +4,23 @@ Use this runbook to plan, deploy, verify, or roll back the Azure Tier-1 Tradeboo
 platform. The intended readers are the release owner, database owner, and incident
 commander for the production change.
 
-## Current launch blockers
+## Launch controls
 
-Do not deploy until all of these are resolved and reviewed:
-
-- Task 09 must be merged, verified, and marked `Implemented` in the task index.
-- The Azure backup module's immutable-container policy conflicts with decision D6. A
-  non-WORM seven-year version-retention contract must replace it.
-- Production database migration execution and the scheduled `pg_dump` identity/job have
-  no reviewed runtime contract yet.
-- Task 10 mentions Caddy, but the implemented D14 topology uses Azure Container Apps
-  ingress directly and contains no Caddy deployment contract. This runbook follows the
-  implemented Azure ingress topology and does not claim Caddy is present.
-
-The detailed gaps and proposed resolutions are recorded in
-[`spec-issues.md`](../architecture/spec-issues.md).
+The shipped Tier-1 topology uses Azure Container Apps ingress, scheduled migration and
+backup jobs, and versioned non-WORM Blob retention. Before deployment, independently
+review the immutable application image, saved Terraform plan, migration list, backup
+retention settings, and the latest successful restore-rehearsal evidence.
 
 ## Prerequisites
 
 - A clean checkout of the exact release commit, with Tasks 01–10 marked `Implemented`.
-- Independent approval of the immutable container image and Terraform plan.
+- Independent approval of the content-addressed container image and Terraform plan.
 - Azure CLI authentication to the intended tenant and subscription.
 - Terraform backend and non-secret production variable files stored outside source
   control.
 - PostgreSQL network access and credentials supplied through `DATABASE_URL`.
 - A valid test identity JWT in `API_JWT` for authenticated k6 requests.
-- Docker, .NET 9, Node.js, npm, PostgreSQL client tools, Terraform, k6, and Git Bash.
+- Docker, .NET 10, Node.js, npm, PostgreSQL client tools, Terraform, k6, and Git Bash.
 
 Never put passwords, JWT signing keys, access tokens, backend configuration, or production
 variable files in this repository.
@@ -48,7 +39,7 @@ Stop if the displayed Azure tenant/subscription is not the approved production t
 
 ## 2. Plan infrastructure
 
-Use an immutable image reference such as a digest in the reviewed variable file. Then:
+Use a content-addressed image reference such as a digest in the reviewed variable file. Then:
 
 ```bash
 export TF_BACKEND_CONFIG=/secure/path/backend.prod.hcl
@@ -143,3 +134,13 @@ mismatch fails. Retain its terminal output with the release evidence.
 
 Record the failing command, exact exit code, release commit, image digest, Azure
 subscription, UTC timestamp, and relevant logs in the incident record.
+
+## Microsoft Entra identity operations (Task 12)
+
+Identity application owners must review the Terraform-managed single-tenant API and SPA registrations quarterly. The API exposes only `access_as_user`; its enterprise application requires assignment and defines `Trader`, `BackOffice`, and `Admin`. A tenant administrator owns admin consent and role assignment. The SPA is public and must never have a credential. Redirect URIs are exact environment origins.
+
+Conditional Access and MFA remain tenant policy. Monitor Entra sign-in logs, service-principal/app-role audit logs, API 401/403 rates, and claims-validation failures; alerts and incident artifacts must never contain authorization headers, MSAL caches, authorization codes, or `access_token` query values.
+
+Before cutover, inventory `users.id`, `workspace_dashboards.actor_id`, and distinct `audit_log.actor_id`; obtain an application-owner-approved local-ID to Entra `oid` mapping; abort for every unmapped active dashboard owner. Migrate mutable dashboard ownership in one reviewed transaction. Never update historical `audit_log` rows. Store the approved mapping or signed zero-row query output with release evidence, not in source control.
+
+Use a maintenance window. Validate least-privilege staging sign-in, MFA/Conditional Access return, all three roles, denial without assignment, actor attribution, and SignalR renewal/logout before production. Rollback requires incident-commander approval and restores the prior immutable image and configuration together. Never leave both issuers enabled. Registration recovery uses Terraform import/plan plus tenant-owner approval; because validation uses public metadata, there is no API authentication secret to rotate. Rotate only normal workload/database credentials through their existing process.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { apiFetch, resolveApiUrl } from '../../src/lib/api/client';
+import { apiFetch, problemFieldErrors, resolveApiUrl } from '../../src/lib/api/client';
 import { server } from '../../src/mocks/server';
 import { useAuthStore } from '../../src/lib/state/useAuthStore';
 
@@ -10,6 +10,12 @@ afterEach(() => {
 });
 
 describe('API URL resolution', () => {
+  it('maps Problem Details field errors by property path', () => {
+    expect(problemFieldErrors({ errors: { 'order.price': ['Price is required.'], ignored: 42 } })).toEqual({
+      'order.price': ['Price is required.'],
+    });
+  });
+
   it('resolves relative paths against the current document origin', () => {
     const documentUrl = 'https://tradebook.example/dashboards/current?tab=charts';
 
@@ -23,7 +29,7 @@ describe('API URL resolution', () => {
   });
 
   it('keeps same-origin authorization headers after resolving a relative path', async () => {
-    useAuthStore.getState().setSession('access-token', '2099-01-01T00:00:00.000Z', 'actor-id');
+    useAuthStore.getState().setSession({ accountKey: 'account-1', actorId: 'actor-id' });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -34,7 +40,7 @@ describe('API URL resolution', () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(new URL('/api/v1/test', globalThis.location.href).toString());
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer access-token');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fake-test-access-token');
   });
 
   it('allows MSW to intercept a resolved relative request', async () => {

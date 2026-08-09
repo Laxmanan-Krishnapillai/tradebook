@@ -134,7 +134,14 @@ internal static class MetricExpressionParser
             }
 
             var token = source[start..Position];
-            if (!decimal.TryParse(token, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _))
+            if (
+                !decimal.TryParse(
+                    token,
+                    NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture,
+                    out _
+                )
+            )
             {
                 throw new FormatException($"Invalid numeric literal '{token}'.");
             }

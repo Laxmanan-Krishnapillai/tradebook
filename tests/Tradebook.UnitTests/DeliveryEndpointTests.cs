@@ -15,23 +15,48 @@ public sealed class DeliveryEndpointTests
     private static readonly Guid Actor = Guid.NewGuid();
 
     private static ClaimsPrincipal Principal() =>
-        new(new ClaimsIdentity([new Claim("sub", Actor.ToString())], "test"));
+        new(
+            new ClaimsIdentity(
+                [
+                    new Claim("oid", Actor.ToString()),
+                    new("tid", "11111111-1111-1111-1111-111111111111"),
+                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
+                ],
+                "test"
+            )
+        );
 
     [Fact]
-    public async Task Create_returns_201_with_mapped_response_and_evicts_list_cache()
+    public async Task CreateReturns201WithMappedResponseAndEvictsListCache()
     {
         var repository = new FakeDeliveryRepository { CreateResult = TestData.Delivery() };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<CreatePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<CreatePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
         var request = new CreatePhysicalDeliveryRequest(
-            Guid.NewGuid(), "TEST45.SG.2601.NOQS-1-2026", "Sales", new DateOnly(2026, 1, 1),
-            null, 10m, 9m, "TTF", null, null);
+            Guid.NewGuid(),
+            "TEST45.SG.2601.NOQS-1-2026",
+            "Sales",
+            new DateOnly(2026, 1, 1),
+            null,
+            10m,
+            9m,
+            "TTF",
+            null,
+            null
+        );
 
         await endpoint.HandleAsync(request, default);
 
         Assert.Equal(201, endpoint.HttpContext.Response.StatusCode);
         Assert.Equal(repository.CreateResult.DeliveryId, endpoint.Response.DeliveryId);
-        Assert.Equal(repository.CreateResult.ContractInstanceId, endpoint.Response.ContractInstanceId);
+        Assert.Equal(
+            repository.CreateResult.ContractInstanceId,
+            endpoint.Response.ContractInstanceId
+        );
         Assert.Equal(repository.CreateResult.InvoiceAmountEur, endpoint.Response.InvoiceAmountEur);
         Assert.Equal(repository.CreateResult.Status, endpoint.Response.Status);
         Assert.Equal(repository.CreateResult.Version, endpoint.Response.Version);
@@ -41,12 +66,19 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task Update_returns_200_and_evicts_both_cache_keys()
+    public async Task UpdateReturns200AndEvictsBothCacheKeys()
     {
         var deliveryId = Guid.NewGuid();
-        var repository = new FakeDeliveryRepository { UpdateResult = TestData.Delivery(deliveryId, version: 2) };
+        var repository = new FakeDeliveryRepository
+        {
+            UpdateResult = TestData.Delivery(deliveryId, version: 2),
+        };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<UpdatePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<UpdatePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
         var request = new UpdatePhysicalDeliveryRequest(deliveryId, 11m, null, 1);
 
         await endpoint.HandleAsync(request, default);
@@ -59,14 +91,25 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task Update_version_conflict_returns_409_with_current_state_and_keeps_cache()
+    public async Task UpdateVersionConflictReturns409WithCurrentStateAndKeepsCache()
     {
         var deliveryId = Guid.NewGuid();
-        var repository = new FakeDeliveryRepository { UpdateResult = null, GetByIdResult = TestData.Delivery(deliveryId, version: 5) };
+        var repository = new FakeDeliveryRepository
+        {
+            UpdateResult = null,
+            GetByIdResult = TestData.Delivery(deliveryId, version: 5),
+        };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<UpdatePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<UpdatePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
 
-        await endpoint.HandleAsync(new UpdatePhysicalDeliveryRequest(deliveryId, 11m, null, 1), default);
+        await endpoint.HandleAsync(
+            new UpdatePhysicalDeliveryRequest(deliveryId, 11m, null, 1),
+            default
+        );
 
         Assert.Equal(409, endpoint.HttpContext.Response.StatusCode);
         Assert.Same(repository.GetByIdResult, endpoint.Response);
@@ -74,27 +117,41 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task Update_of_missing_delivery_returns_404()
+    public async Task UpdateOfMissingDeliveryReturns404()
     {
         var repository = new FakeDeliveryRepository { UpdateResult = null, GetByIdResult = null };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<UpdatePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<UpdatePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
 
-        await endpoint.HandleAsync(new UpdatePhysicalDeliveryRequest(Guid.NewGuid(), 11m, null, 1), default);
+        await endpoint.HandleAsync(
+            new UpdatePhysicalDeliveryRequest(Guid.NewGuid(), 11m, null, 1),
+            default
+        );
 
         Assert.Equal(404, endpoint.HttpContext.Response.StatusCode);
         Assert.Empty(cache.RemovedKeys);
     }
 
     [Fact]
-    public async Task Delete_returns_204_and_evicts_both_cache_keys()
+    public async Task DeleteReturns204AndEvictsBothCacheKeys()
     {
         var deliveryId = Guid.NewGuid();
         var repository = new FakeDeliveryRepository { CancelOutcome = null };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<DeletePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<DeletePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
 
-        await endpoint.HandleAsync(new DeletePhysicalDeliveryRequest(deliveryId, "Duplicate entry", 3), default);
+        await endpoint.HandleAsync(
+            new DeletePhysicalDeliveryRequest(deliveryId, "Duplicate entry", 3),
+            default
+        );
 
         Assert.Equal(204, endpoint.HttpContext.Response.StatusCode);
         Assert.Equal((deliveryId, 3L, "Duplicate entry", Actor), repository.LastCancel);
@@ -102,13 +159,20 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task Delete_of_missing_delivery_returns_404()
+    public async Task DeleteOfMissingDeliveryReturns404()
     {
         var repository = new FakeDeliveryRepository { CancelOutcome = MutationOutcome.NotFound };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<DeletePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<DeletePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
 
-        await endpoint.HandleAsync(new DeletePhysicalDeliveryRequest(Guid.NewGuid(), "Duplicate entry", 3), default);
+        await endpoint.HandleAsync(
+            new DeletePhysicalDeliveryRequest(Guid.NewGuid(), "Duplicate entry", 3),
+            default
+        );
 
         Assert.Equal(404, endpoint.HttpContext.Response.StatusCode);
         Assert.Equal(0, repository.GetByIdCalls);
@@ -116,14 +180,25 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task Delete_version_conflict_returns_409_with_current_state()
+    public async Task DeleteVersionConflictReturns409WithCurrentState()
     {
         var deliveryId = Guid.NewGuid();
-        var repository = new FakeDeliveryRepository { CancelOutcome = MutationOutcome.VersionConflict, GetByIdResult = TestData.Delivery(deliveryId, version: 7) };
+        var repository = new FakeDeliveryRepository
+        {
+            CancelOutcome = MutationOutcome.VersionConflict,
+            GetByIdResult = TestData.Delivery(deliveryId, version: 7),
+        };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<DeletePhysicalDeliveryEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<DeletePhysicalDeliveryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
 
-        await endpoint.HandleAsync(new DeletePhysicalDeliveryRequest(deliveryId, "Duplicate entry", 1), default);
+        await endpoint.HandleAsync(
+            new DeletePhysicalDeliveryRequest(deliveryId, "Duplicate entry", 1),
+            default
+        );
 
         Assert.Equal(409, endpoint.HttpContext.Response.StatusCode);
         Assert.Same(repository.GetByIdResult, endpoint.Response);
@@ -131,12 +206,19 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task GetById_reads_through_cache_with_exact_key_and_returns_200()
+    public async Task GetByIdReadsThroughCacheWithExactKeyAndReturns200()
     {
         var deliveryId = Guid.NewGuid();
-        var repository = new FakeDeliveryRepository { GetByIdResult = TestData.Delivery(deliveryId) };
+        var repository = new FakeDeliveryRepository
+        {
+            GetByIdResult = TestData.Delivery(deliveryId),
+        };
         var cache = new FakeCacheService();
-        var endpoint = Factory.Create<GetDeliveryByIdEndpoint>(ctx => ctx.User = Principal(), repository, cache);
+        var endpoint = Factory.Create<GetDeliveryByIdEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            cache
+        );
 
         await endpoint.HandleAsync(new GetDeliveryByIdRequest(deliveryId), default);
 
@@ -147,10 +229,14 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task GetById_returns_404_when_absent()
+    public async Task GetByIdReturns404WhenAbsent()
     {
         var repository = new FakeDeliveryRepository { GetByIdResult = null };
-        var endpoint = Factory.Create<GetDeliveryByIdEndpoint>(ctx => ctx.User = Principal(), repository, new FakeCacheService());
+        var endpoint = Factory.Create<GetDeliveryByIdEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository,
+            new FakeCacheService()
+        );
 
         await endpoint.HandleAsync(new GetDeliveryByIdRequest(Guid.NewGuid()), default);
 
@@ -158,13 +244,16 @@ public sealed class DeliveryEndpointTests
     }
 
     [Fact]
-    public async Task History_forwards_request_and_returns_repository_response()
+    public async Task HistoryForwardsRequestAndReturnsRepositoryResponse()
     {
         var repository = new FakeDeliveryRepository
         {
             HistoryResult = new([TestData.Delivery()], 1, 2, 25, false),
         };
-        var endpoint = Factory.Create<GetDeliveryHistoryEndpoint>(ctx => ctx.User = Principal(), repository);
+        var endpoint = Factory.Create<GetDeliveryHistoryEndpoint>(
+            ctx => ctx.User = Principal(),
+            repository
+        );
         var request = new GetDeliveryHistoryRequest(null, null, "Sales", null, null, null, 2, 25);
 
         await endpoint.HandleAsync(request, default);

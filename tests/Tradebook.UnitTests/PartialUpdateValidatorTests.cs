@@ -10,51 +10,183 @@ namespace Tradebook.UnitTests;
 
 public sealed class PartialUpdateValidatorTests
 {
-    [Fact]
-    public void Empty_partial_updates_are_rejected()
-    {
-        Assert.False(new UpdatePhysicalDeliveryValidator().Validate(
-            new UpdatePhysicalDeliveryRequest(Guid.NewGuid(), null, null, 1)).IsValid,
-            "physical delivery update");
-        Assert.False(new UpdateCapacityBookingValidator().Validate(
+    private static readonly bool EmptyPhysicalDeliveryIsValid =
+        new UpdatePhysicalDeliveryValidator()
+            .Validate(new UpdatePhysicalDeliveryRequest(Guid.NewGuid(), null, null, 1))
+            .IsValid;
+    private static readonly bool EmptyCapacityBookingIsValid = new UpdateCapacityBookingValidator()
+        .Validate(
             new UpdateCapacityBookingRequest(
-                Guid.NewGuid(), null, null, null, null, null, null, null, null, null, null, 1)).IsValid,
-            "capacity booking update");
-        Assert.False(new UpdateTransferValidator().Validate(
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1
+            )
+        )
+        .IsValid;
+    private static readonly bool EmptyTransferIsValid = new UpdateTransferValidator()
+        .Validate(
             new UpdateTransferRequest(
-                Guid.NewGuid(), null, null, null, null, null, null, null, null, null, null, 1)).IsValid,
-            "transfer update");
-        Assert.False(new UpdateBioticketValidator().Validate(
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1
+            )
+        )
+        .IsValid;
+    private static readonly bool EmptyBioticketIsValid = new UpdateBioticketValidator()
+        .Validate(
             new UpdateBioticketRequest(
-                Guid.NewGuid(), null, null, null, null, null, null, null, null, null, 1)).IsValid,
-            "bioticket update");
-        Assert.False(new UpdateGooCertificateValidator().Validate(
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1
+            )
+        )
+        .IsValid;
+    private static readonly bool EmptyGooCertificateIsValid = new UpdateGooCertificateValidator()
+        .Validate(
             new UpdateGooCertificateTransactionRequest(
-                Guid.NewGuid(), null, null, null, null, null, null, null, null, null, 1)).IsValid,
-            "GoO certificate update");
-        Assert.False(new UpdateHedgeValidator().Validate(
-            new UpdateHedgeRequest(Guid.NewGuid(), null, null, 1)).IsValid,
-            "hedge update");
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1
+            )
+        )
+        .IsValid;
+    private static readonly bool EmptyHedgeIsValid = new UpdateHedgeValidator()
+        .Validate(new UpdateHedgeRequest(Guid.NewGuid(), null, null, 1))
+        .IsValid;
+
+    private static readonly bool PhysicalDeliveryWithOneFieldIsValid =
+        new UpdatePhysicalDeliveryValidator()
+            .Validate(new UpdatePhysicalDeliveryRequest(Guid.NewGuid(), 0m, null, 1))
+            .IsValid;
+    private static readonly bool CapacityBookingWithOneFieldIsValid =
+        new UpdateCapacityBookingValidator()
+            .Validate(
+                new UpdateCapacityBookingRequest(
+                    Guid.NewGuid(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0m,
+                    null,
+                    null,
+                    null,
+                    1
+                )
+            )
+            .IsValid;
+    private static readonly bool TransferWithOneFieldIsValid = new UpdateTransferValidator()
+        .Validate(
+            new UpdateTransferRequest(
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                0m,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1
+            )
+        )
+        .IsValid;
+    private static readonly bool BioticketWithOneFieldIsValid = new UpdateBioticketValidator()
+        .Validate(
+            new UpdateBioticketRequest(
+                Guid.NewGuid(),
+                null,
+                0m,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                1
+            )
+        )
+        .IsValid;
+    private static readonly bool GooCertificateWithOneFieldIsValid =
+        new UpdateGooCertificateValidator()
+            .Validate(
+                new UpdateGooCertificateTransactionRequest(
+                    Guid.NewGuid(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    "Processing",
+                    null,
+                    null,
+                    null,
+                    null,
+                    1
+                )
+            )
+            .IsValid;
+    private static readonly bool HedgeWithOneFieldIsValid = new UpdateHedgeValidator()
+        .Validate(new UpdateHedgeRequest(Guid.NewGuid(), 0m, null, 1))
+        .IsValid;
+
+    [Fact]
+    public void EmptyPartialUpdatesAreRejected()
+    {
+        Assert.False(EmptyPhysicalDeliveryIsValid, "physical delivery update");
+        Assert.False(EmptyCapacityBookingIsValid, "capacity booking update");
+        Assert.False(EmptyTransferIsValid, "transfer update");
+        Assert.False(EmptyBioticketIsValid, "bioticket update");
+        Assert.False(EmptyGooCertificateIsValid, "GoO certificate update");
+        Assert.False(EmptyHedgeIsValid, "hedge update");
     }
 
     [Fact]
-    public void A_single_supplied_mutable_field_is_a_valid_partial_update()
+    public void ASingleSuppliedMutableFieldIsAValidPartialUpdate()
     {
-        Assert.True(new UpdatePhysicalDeliveryValidator().Validate(
-            new UpdatePhysicalDeliveryRequest(Guid.NewGuid(), 0m, null, 1)).IsValid);
-        Assert.True(new UpdateCapacityBookingValidator().Validate(
-            new UpdateCapacityBookingRequest(
-                Guid.NewGuid(), null, null, null, null, null, null, 0m, null, null, null, 1)).IsValid);
-        Assert.True(new UpdateTransferValidator().Validate(
-            new UpdateTransferRequest(
-                Guid.NewGuid(), null, null, null, 0m, null, null, null, null, null, null, 1)).IsValid);
-        Assert.True(new UpdateBioticketValidator().Validate(
-            new UpdateBioticketRequest(
-                Guid.NewGuid(), null, 0m, null, null, null, null, null, null, null, 1)).IsValid);
-        Assert.True(new UpdateGooCertificateValidator().Validate(
-            new UpdateGooCertificateTransactionRequest(
-                Guid.NewGuid(), null, null, null, null, "Processing", null, null, null, null, 1)).IsValid);
-        Assert.True(new UpdateHedgeValidator().Validate(
-            new UpdateHedgeRequest(Guid.NewGuid(), 0m, null, 1)).IsValid);
+        Assert.True(PhysicalDeliveryWithOneFieldIsValid);
+        Assert.True(CapacityBookingWithOneFieldIsValid);
+        Assert.True(TransferWithOneFieldIsValid);
+        Assert.True(BioticketWithOneFieldIsValid);
+        Assert.True(GooCertificateWithOneFieldIsValid);
+        Assert.True(HedgeWithOneFieldIsValid);
     }
 }

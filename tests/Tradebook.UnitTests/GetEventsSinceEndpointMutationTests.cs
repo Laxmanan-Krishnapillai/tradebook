@@ -11,13 +11,11 @@ public sealed class GetEventsSinceEndpointMutationTests
     [Theory]
     [InlineData(0L, 1)]
     [InlineData(long.MaxValue, 500)]
-    public void Validator_accepts_inclusive_sequence_and_limit_boundaries(long afterSequence, int limit)
+    public void ValidatorAcceptsInclusiveSequenceAndLimitBoundaries(long afterSequence, int limit)
     {
-        var result = new GetEventsSinceValidator().Validate(new GetEventsSinceRequest
-        {
-            AfterSequence = afterSequence,
-            Limit = limit
-        });
+        var result = new GetEventsSinceValidator().Validate(
+            new GetEventsSinceRequest { AfterSequence = afterSequence, Limit = limit }
+        );
 
         Assert.True(result.IsValid);
         Assert.Empty(result.Errors);
@@ -27,39 +25,46 @@ public sealed class GetEventsSinceEndpointMutationTests
     [InlineData(-1L, 1, nameof(GetEventsSinceRequest.AfterSequence))]
     [InlineData(0L, 0, nameof(GetEventsSinceRequest.Limit))]
     [InlineData(0L, 501, nameof(GetEventsSinceRequest.Limit))]
-    public void Validator_rejects_each_neighbor_outside_the_allowed_bounds(
+    public void ValidatorRejectsEachNeighborOutsideTheAllowedBounds(
         long afterSequence,
         int limit,
-        string propertyName)
+        string propertyName
+    )
     {
-        var result = new GetEventsSinceValidator().Validate(new GetEventsSinceRequest
-        {
-            AfterSequence = afterSequence,
-            Limit = limit
-        });
+        var result = new GetEventsSinceValidator().Validate(
+            new GetEventsSinceRequest { AfterSequence = afterSequence, Limit = limit }
+        );
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, error => error.PropertyName == propertyName);
+        Assert.Contains(
+            result.Errors,
+            error => string.Equals(error.PropertyName, propertyName, StringComparison.Ordinal)
+        );
     }
 
     [Fact]
-    public async Task Handler_forwards_the_exact_cursor_limit_actor_and_cancellation_token()
+    public async Task HandlerForwardsTheExactCursorLimitActorAndCancellationToken()
     {
         var actorId = Guid.NewGuid();
         using var cancellation = new CancellationTokenSource();
         var response = new GetEventsSinceResponse(
-            [new EntityChangedEventDto(
-                Guid.NewGuid(),
-                42,
-                "WorkspaceDashboard",
-                Guid.NewGuid().ToString(),
-                "Updated",
-                "{\"version\":2}")],
-            42);
-        var reader = new RecordingRealtimeEventReader(response);
+            [
+                new EntityChangedEventDto(
+                    Guid.NewGuid(),
+                    42,
+                    "WorkspaceDashboard",
+                    Guid.NewGuid().ToString(),
+                    "Updated",
+                    "{\"version\":2}"
+                ),
+            ],
+            42
+        );
+        var reader = new RecordingOutboxEventReader(response);
         var endpoint = Factory.Create<GetEventsSinceEndpoint>(
             context => context.User = Principal(actorId),
-            reader);
+            reader
+        );
         var request = new GetEventsSinceRequest { AfterSequence = 17, Limit = 23 };
 
         await endpoint.HandleAsync(request, cancellation.Token);
@@ -74,9 +79,19 @@ public sealed class GetEventsSinceEndpointMutationTests
     }
 
     private static ClaimsPrincipal Principal(Guid actorId) =>
-        new(new ClaimsIdentity([new Claim("sub", actorId.ToString())], "test"));
+        new(
+            new ClaimsIdentity(
+                [
+                    new Claim("oid", actorId.ToString()),
+                    new("tid", "11111111-1111-1111-1111-111111111111"),
+                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
+                ],
+                "test"
+            )
+        );
 
-    private sealed class RecordingRealtimeEventReader(GetEventsSinceResponse response) : IRealtimeEventReader
+    private sealed class RecordingOutboxEventReader(GetEventsSinceResponse response)
+        : IOutboxEventReader
     {
         public int Calls { get; private set; }
         public long AfterSequence { get; private set; }
@@ -88,7 +103,8 @@ public sealed class GetEventsSinceEndpointMutationTests
             long afterSequence,
             int limit,
             Guid actorId,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken
+        )
         {
             Calls++;
             AfterSequence = afterSequence;

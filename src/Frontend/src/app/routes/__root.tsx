@@ -3,9 +3,9 @@ import type { TradebookRouteContext } from '../routeContext';
 
 function NotFoundView() {
   return (
-    <main className="login-shell">
-      <section className="login-card">
-        <p className="eyebrow">404</p>
+    <main className="flex min-h-screen items-center justify-center p-4">
+      <section className="grid w-full max-w-md gap-4 rounded-card border border-gray-200 bg-white p-8 shadow-xl">
+        <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">404</p>
         <h1>Page not found</h1>
         <p>The requested Tradebook page does not exist.</p>
       </section>

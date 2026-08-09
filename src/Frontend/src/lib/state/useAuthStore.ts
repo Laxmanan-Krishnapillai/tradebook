@@ -1,28 +1,17 @@
 import { create } from 'zustand';
 
-export interface AuthSession {
-  accessToken: string;
-  expiresAtUtc: string;
-  actorId: string;
-}
-
-interface AuthState {
-  accessToken: string;
-  expiresAtUtc?: string;
-  actorId?: string;
-  setSession: (accessToken: string, expiresAtUtc: string, actorId: string) => void;
+export interface AuthSession { accountKey: string; actorId: string; displayName?: string }
+interface AuthState extends Partial<AuthSession> {
+  isAuthenticated: boolean;
+  setSession: (session: AuthSession) => void;
   clearSession: () => void;
 }
-
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: '',
-  expiresAtUtc: undefined,
-  actorId: undefined,
-  setSession: (accessToken, expiresAtUtc, actorId) => set({ accessToken, expiresAtUtc, actorId }),
-  clearSession: () => set({ accessToken: '', expiresAtUtc: undefined, actorId: undefined })
+  isAuthenticated: false,
+  setSession: (session) => set({ ...session, isAuthenticated: true }),
+  clearSession: () => set({ accountKey: undefined, actorId: undefined, displayName: undefined, isAuthenticated: false }),
 }));
-
 export function getAuthSession(): AuthSession | undefined {
-  const { accessToken, expiresAtUtc, actorId } = useAuthStore.getState();
-  return accessToken && expiresAtUtc && actorId ? { accessToken, expiresAtUtc, actorId } : undefined;
+  const { isAuthenticated, accountKey, actorId, displayName } = useAuthStore.getState();
+  return isAuthenticated && accountKey && actorId ? { accountKey, actorId, displayName } : undefined;
 }

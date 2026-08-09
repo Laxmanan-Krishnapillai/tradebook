@@ -1,0 +1,14 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "toolbar",
+  "title": "Toolbar",
+  "description": "Keyboard-first action bar with focus-visible controls.",
+  "files": [
+    {
+      "path": "registry/tradebook/toolbar/toolbar.tsx",
+      "content": "import type { HTMLAttributes, ReactNode } from 'react';\n\nexport interface ToolbarProps extends HTMLAttributes<HTMLDivElement> {\n  label: string;\n  children: ReactNode;\n}\n\nexport function Toolbar({ children, label, ...props }: ToolbarProps) {\n  return (\n    <div aria-label={label} className=\"flex items-center gap-2\" role=\"toolbar\" {...props}>\n      {children}\n    </div>\n  );\n}\n",
+      "type": "registry:component"
+    }
+  ],
+  "type": "registry:base"
+}

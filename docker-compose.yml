@@ -1,3 +1,5 @@
+# Superseded by `aspire run` for full local application orchestration. This file remains
+# available for database-only maintenance and compatibility workflows.
 services:
   postgres:
     image: postgres:17
@@ -9,20 +11,30 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./infra/compose/postgres-init:/docker-entrypoint-initdb.d:ro
       - ./infra/database-ops:/opt/tradebook/database-ops:ro
-      - ./src/Database/Migrations:/opt/tradebook/migrations:ro
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          test "$$(cat /proc/1/comm)" = postgres &&
-          test "$$(psql --username tradebook --dbname tradebook --tuples-only --no-align
-          --command 'SELECT count(*) FROM schema_migrations' 2>/dev/null)" -eq
-          "$$(find /opt/tradebook/migrations -maxdepth 1 -type f -name '*.sql' | wc -l)"
+      test: ["CMD-SHELL", "pg_isready --username tradebook --dbname tradebook"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  migrations:
+    profiles: ["ops"]
+    build:
+      context: .
+      target: database-ops
+    volumes:
+      - ops-backup:/tmp/tradebook-backup
+    environment:
+      PGHOST: postgres
+      PGDATABASE: tradebook
+      PGUSER: tradebook
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
 volumes:
   pgdata:
+  ops-backup:

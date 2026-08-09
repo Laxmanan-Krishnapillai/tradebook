@@ -8,5 +8,6 @@ public interface IRealtimeEventReader
         long afterSequence,
         int limit,
         Guid actorId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken
+    );
 }

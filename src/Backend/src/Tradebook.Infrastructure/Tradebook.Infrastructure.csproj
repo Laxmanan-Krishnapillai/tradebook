@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <ItemGroup>
     <ProjectReference Include="..\Tradebook.Core\Tradebook.Core.csproj" />
   </ItemGroup>
@@ -10,14 +9,18 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" />
+    <PackageReference Include="dbup-postgresql" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Riok.Mapperly" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\..\..\Database\Migrations\*.sql"
-                      LogicalName="Tradebook.Database.Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource
+      Include="..\..\..\Database\Migrations\*.sql"
+      LogicalName="Tradebook.Database.Migrations.%(Filename)%(Extension)"
+    />
   </ItemGroup>
-
 </Project>

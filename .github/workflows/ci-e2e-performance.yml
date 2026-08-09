@@ -1,0 +1,89 @@
+name: CI E2E and Performance
+on:
+  pull_request:
+  schedule:
+    - cron: '0 2 * * *'
+permissions:
+  contents: read
+env:
+  NO_PROXY: localhost,127.0.0.1
+  no_proxy: localhost,127.0.0.1
+  POSTGRES_PASSWORD: tradebook-e2e-ci
+  DATABASE_URL: postgresql://tradebook:tradebook-e2e-ci@127.0.0.1:5432/tradebook
+  E2E_CONTRACT_ID: 09000000-0000-4000-8000-000000000003
+  E2E_USERNAME: e2e-trader
+  E2E_PASSWORD: Tradebook-E2E-Only-2026!
+jobs:
+  real-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: npm, cache-dependency-path: tests/e2e/package-lock.json }
+      - run: docker compose up -d --wait
+      - run: psql "$DATABASE_URL" -f tests/e2e/seed/seed-100k-deliveries.sql
+      - name: Start API and frontend
+        env:
+          Database__ConnectionString: Host=127.0.0.1;Port=5432;Database=tradebook;Username=tradebook;Password=tradebook-e2e-ci
+          Jwt__SigningKey: ci-only-task-09-signing-key-at-least-32-bytes
+          ASPNETCORE_URLS: http://127.0.0.1:5000
+          VITE_API_PROXY_TARGET: http://127.0.0.1:5000
+        run: |
+          dotnet run --project src/Backend/src/Tradebook.Api/Tradebook.Api.csproj > /tmp/tradebook-api.log 2>&1 &
+          npm --prefix src/Frontend ci --legacy-peer-deps
+          npm --prefix src/Frontend run dev -- --host 127.0.0.1 > /tmp/tradebook-ui.log 2>&1 &
+          timeout 120 bash -c 'until curl -fsS http://127.0.0.1:5000/health/ready && curl -fsS http://127.0.0.1:5173; do sleep 2; done'
+      - run: npm ci
+        working-directory: tests/e2e
+      - run: npx playwright install --with-deps
+        working-directory: tests/e2e
+      - run: npx playwright test --grep-invert @nightly
+        working-directory: tests/e2e
+      - uses: grafana/setup-k6-action@v1
+      - name: Authenticate k6
+        run: |
+          API_JWT=$(curl -fsS -H 'Content-Type: application/json' -d '{"username":"e2e-trader","password":"Tradebook-E2E-Only-2026!"}' http://127.0.0.1:5000/api/v1/auth/login | jq -r .accessToken)
+          echo "API_JWT=$API_JWT" >> "$GITHUB_ENV"
+      - name: k6 real-stack scenarios
+        if: github.event_name != 'schedule'
+        working-directory: tests/performance
+        run: |
+          k6 run -e PROFILE=smoke -e API_JWT -e E2E_CONTRACT_ID k6/api-delivery-ingestion.js
+          k6 run -e PROFILE=smoke -e API_JWT k6/deliveries-read.js
+      - name: Nightly sustained load with concurrent interactive browsers
+        if: github.event_name == 'schedule'
+        run: |
+          (cd tests/performance && k6 run -e PROFILE=sustained -e API_JWT -e E2E_CONTRACT_ID k6/api-delivery-ingestion.js && k6 run -e PROFILE=sustained -e API_JWT k6/deliveries-read.js) &
+          K6_PID=$!
+          (cd tests/e2e && npx playwright test --grep @nightly)
+          wait "$K6_PID"
+      - name: D10 regression comparison
+        working-directory: tests/performance
+        run: |
+          if jq -e '.scenarios[] | .throughputReqPerSec != null and .p99Ms != null' baseline.json >/dev/null; then
+            node compare-baseline.mjs api-delivery-ingestion
+            node compare-baseline.mjs deliveries-read
+          else
+            echo 'Baseline placeholders retained until the documented D10 reference-machine recording.'
+          fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-09-reports
+          path: |
+            reports/
+            tests/performance/last-run.*.json
+          if-no-files-found: warn
+  harness-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: node --test tests/performance/test/*.test.mjs
+      - run: npm ci && npm run typecheck
+        working-directory: tests/e2e

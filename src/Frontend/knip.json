@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/app/routes/**/*.tsx",
+    "src/mocks/handlers.ts",
+    "vite.config.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "tests/**/*.{ts,tsx}",
+    "vite.config.ts"
+  ],
+  "ignore": [
+    "src/api/generated/**",
+    "src/app/routeTree.gen.ts"
+  ],
+  "ignoreDependencies": [
+    "tailwindcss",
+    "shadcn",
+    "@argos-ci/cli"
+  ],
+  "vite": {
+    "config": [
+      "vite.config.ts"
+    ]
+  },
+  "vitest": {
+    "config": [
+      "vite.config.ts"
+    ],
+    "entry": [
+      "tests/**/*.test.{ts,tsx}",
+      "tests/setup.ts"
+    ]
+  }
+}

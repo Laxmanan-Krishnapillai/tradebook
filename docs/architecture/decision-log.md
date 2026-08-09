@@ -157,3 +157,111 @@ NuGet Central Package Management is the sole package-version source. Root
 and reviewable in one manifest instead of relying on whichever transitive version restore
 selects. `GlobalPackageReference` is deliberately documented but unused here; Task 14 owns
 the repo-wide analyzer entries.
+
+## D16 — Frontend compiler and quality platform (2026-08-09)
+
+The frontend is compiled with Vite 8's default Rolldown pipeline and React Compiler
+1.0 for every React source file. `@vitejs/plugin-react` 6 moved compiler integration
+from its removed `babel` option to the official `reactCompilerPreset` together with
+`@rolldown/plugin-babel`; this is the supported Vite 8 equivalent of the originally
+specified plugin-react 5 configuration. React Hooks 7 exposes compiler diagnostics as
+individual rules rather than a rule named `react-compiler`, so the flat configuration
+enables the supported `config` rule alongside the Rules of Hooks.
+
+Tailwind 4 is CSS-first through `@tailwindcss/vite`; design tokens live in
+`src/Frontend/src/styles.css`, with no JavaScript Tailwind configuration. ESLint 10 uses
+only flat configuration and type-aware typescript-eslint rules. Boundaries 7 is used
+instead of the task draft's 5.x pin because 5.x calls an ESLint context API removed by
+ESLint 10. Knip is a required frontend CI gate. JSON APIs are made `unknown` by
+`@total-typescript/ts-reset` so validation remains mandatory at external boundaries.
+
+The exact adopted platform matrix is: React/React DOM 19.2.8, TypeScript 5.9.3,
+Vite 8.2.1, `@vitejs/plugin-react` 6.0.5, React Compiler 1.0.0,
+Tailwind/`@tailwindcss/vite` 4.3.3, ESLint 10.8.1, typescript-eslint 8.66.0,
+React Hooks 7.1.1, jsx-a11y 6.10.2, Testing Library ESLint 7.16.2,
+Vitest ESLint 1.6.26, boundaries 7.1.0, and Knip 6.32.0. Node support is restricted
+to the Vite-supported 20.19+, 22.13+, and 24+ release lines.
+
+selects. D15 reserves `GlobalPackageReference` for Task 14; D17 activates it for the
+repo-wide analyzer entries.
+
+## D18 — Agent UI guardrails and visual QA (ADR-0023, 2026-08-09)
+
+UI consistency is enforced in descending order of determinism: ESLint rejects
+off-token Tailwind values and raw Base UI imports from feature code; the private
+`@tradebook` shadcn registry guides composition; Storybook/Argos visual regression and
+Playwright/axe accessibility jobs are required pull-request checks. `DESIGN.md` is
+mandatory agent context. The Playwright-driven design review command is advisory and
+cannot override a failing deterministic gate. Dynamic screenshot masks are restricted
+to live prices and timestamps.
+
+## D17 — Backend compile-time safety toolchain (2026-08-09)
+
+Analyzer findings are build failures on every .NET project. The repository enables the
+SDK analyzers plus Meziantou.Analyzer 3.0.139, SonarAnalyzer.CSharp 10.30.0.144632,
+Microsoft.CodeAnalysis.BannedApiAnalyzers 5.6.0, and
+Microsoft.VisualStudio.Threading.Analyzers 18.7.23 as `GlobalPackageReference` entries
+with `PrivateAssets="all"`. `BannedSymbols.txt` makes direct wall-clock reads, lossy
+decimal/double money conversions, and culture-implicit numeric parsing compile-time
+errors. Test projects additionally reference xunit.analyzers 1.27.0.
+
+CSharpier 1.3.0 is the sole backend formatter. The matching `CSharpier.MsBuild` global
+package checks formatting during builds, while the pinned local-tool manifest drives the
+same whole-repository `csharpier check` command in local verification and CI. Keeping the
+CLI and MSBuild package at one version makes formatting deterministic across editors,
+developer machines, and CI.
+
+DTO/domain mapping uses Riok.Mapperly 4.3.1 source-generated partial mappers. Options use
+Microsoft.Extensions.Options 10.0.10 source-generated `[OptionsValidator]` validators and
+startup `.ValidateOnStart()` checks. These choices keep mapping and configuration
+validation compile-time generated, with no reflection-based mapping or validation path.
+
+## D18 — DbUp and schema-checked SQL safety gates (2026-08-09)
+
+Database migrations are forward-only embedded SQL applied exclusively by DbUp, one
+transaction per ordered script, with the standard journal stored as
+`public.schema_journal`. Startup and the out-of-band migration executable call the same
+runner. Recovery from an applied migration is always a later numbered script.
+
+Authored static application queries are checked by sqlc against
+`src/Database/Migrations`; the pinned `sqlc-gen-csharp` WASM output is committed and must
+regenerate without drift. Dynamic identifier-whitelisted analytics SQL, binary COPY,
+runtime-arity filters, and administrative tooling remain the only hand-written Dapper
+fallbacks. Squawk owns migration lock/rewrite safety and sqlfluff owns PostgreSQL SQL
+linting. If the pre-1.0 C# plugin cannot represent a PostgreSQL construct, the narrow
+fallback is an enumerated hand-written Dapper query rather than changing the schema or
+introducing an ORM.
+
+## D19 — .NET test platform and property testing (2026-08-09)
+
+All .NET test projects use xUnit v3 3.2.x directly on Microsoft.Testing.Platform. The
+VSTest bridge, xUnit v2 packages, and Coverlet collector are not part of the test stack;
+MTP's code-coverage extension produces coverage artifacts and Stryker 4.16 runs the unit
+suite through its MTP runner. CsCheck 4.x supplies seeded, shrinking property tests for
+the semantic compiler's parameterization and identifier-whitelist invariants and for
+Vogen value-object round-trip and validation invariants.
+
+TUnit was rejected because xUnit v3 preserves the existing fixture and assertion model
+while carrying lower integration risk for Testcontainers, ArchUnitNET, and Stryker.
+
+## D20 — TypeSpec governs the API contract (2026-08-09)
+
+TypeSpec is the single source of truth for every REST endpoint and transport DTO. It emits
+OpenAPI 3.1, from which Hey API generates TypeScript types, Zod runtime validators, a fetch
+client, and TanStack Query v5 options. FastEndpoints remains the server implementation;
+the authenticated ASP.NET OpenAPI document and the TypeSpec document are compared by the
+blocking contract-drift gate. The alpha TypeSpec C# emitter is not used.
+
+This supersedes D12/D13's TypeGen ownership statements and Task 08's types-only pipeline.
+TypeGen is removed because assembly reflection produced no runtime validation, client, or
+query integration and made C# rather than the cross-stack contract authoritative. Money is
+represented as a decimal-formatted JSON string and enums use string wire values.
+
+## D21 — Aspire development orchestration and deployment artifacts (2026-08-09)
+
+.NET Aspire 13.4.6 is the local application orchestrator for PostgreSQL 17, the API,
+worker host, and Vite frontend, and provides their shared OpenTelemetry dashboard.
+Aspire.Hosting.Testing owns full-graph smoke coverage; Testcontainers and Respawn remain
+the isolated database-test mechanism. Aspire and `azd` may generate Azure Container Apps
+deployment artifacts, but the Task 07 Terraform remains the production infrastructure
+source of truth for Container Apps, PostgreSQL Flexible Server 17, and Key Vault.

@@ -4,6 +4,7 @@
     "solution": "src/Backend/Tradebook.sln",
     "project": "Tradebook.Api.csproj",
     "test-projects": ["tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj"],
+    "test-runner": "mtp",
     "configuration": "Release",
     "mutation-level": "Standard",
     "concurrency": 4,

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "@tradebook",
+  "homepage": "https://ui.tradebook.internal/r",
+  "items": [
+    { "name": "toolbar", "type": "registry:base", "title": "Toolbar", "description": "Keyboard-first action bar with focus-visible controls.", "files": [{ "path": "registry/tradebook/toolbar/toolbar.tsx", "type": "registry:component" }] },
+    { "name": "combobox", "type": "registry:base", "title": "Combobox", "description": "Labelled keyboard-first option picker.", "files": [{ "path": "registry/tradebook/combobox/combobox.tsx", "type": "registry:component" }] },
+    { "name": "data-grid", "type": "registry:component", "title": "DataGrid", "description": "Trading grid with 28px rows, stable live values, and color-independent P/L.", "registryDependencies": ["@tradebook/toolbar", "@tradebook/combobox"], "files": [{ "path": "registry/tradebook/data-grid/data-grid.tsx", "type": "registry:component" }] }
+  ]
+}

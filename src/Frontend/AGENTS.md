@@ -1,9 +1,11 @@
 # Frontend Guide
 
+- Read `../../docs/design/DESIGN.md` before UI work. Compose components from the
+  `@tradebook` registry instead of importing raw Base UI primitives in feature code.
 - Use React 19 and TypeScript.
 - Import API contracts only from `src/api/generated`; regenerate them from C# DTOs rather than editing output.
 - Use MSW 2 handlers from `src/mocks` for frontend tests.
-- Keep feature imports within `.eslintrc.cjs`: feature components may consume shared UI,
+- Keep feature imports within `eslint.config.js`: feature components may consume shared UI,
   hooks, libraries, types, and generated contracts, but may not import sibling features.
 - Code under `src/lib` may depend only on other library modules, types, generated
   contracts, and workers. Framework-independent chart mapping belongs in

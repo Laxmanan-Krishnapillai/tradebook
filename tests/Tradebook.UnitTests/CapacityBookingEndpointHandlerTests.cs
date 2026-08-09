@@ -9,48 +9,54 @@ public sealed class CapacityBookingEndpointHandlerTests
 {
     private static readonly Guid ActorId = Guid.Parse("dc6f1f4c-27ae-48e5-a268-c498a052aa0f");
 
-    private static CreateCapacityBookingRequest CreateRequest() => new(
-        Guid.NewGuid(),
-        new DateOnly(2026, 2, 1),
-        "NRGD.49.GAS.THE.CBC.MON-2-2026",
-        Guid.NewGuid(),
-        "NRGD",
-        "GTF/THE - Monthly",
-        "GTF",
-        "THE",
-        "GTF-ELLUND-THE",
-        "ELLUND",
-        new DateOnly(2026, 2, 1),
-        new DateOnly(2026, 2, 28),
-        15m,
-        2.5m,
-        37.5m,
-        "Reserve monthly capacity");
+    private static CreateCapacityBookingRequest CreateRequest() =>
+        new(
+            Guid.NewGuid(),
+            new DateOnly(2026, 2, 1),
+            "NRGD.49.GAS.THE.CBC.MON-2-2026",
+            Guid.NewGuid(),
+            "NRGD",
+            "GTF/THE - Monthly",
+            "GTF",
+            "THE",
+            "GTF-ELLUND-THE",
+            "ELLUND",
+            new DateOnly(2026, 2, 1),
+            new DateOnly(2026, 2, 28),
+            15m,
+            2.5m,
+            37.5m,
+            "Reserve monthly capacity"
+        );
 
-    private static UpdateCapacityBookingRequest UpdateRequest(Guid id) => new(
-        id,
-        "NRGD",
-        "GTF/THE - Monthly",
-        "GTF",
-        "THE",
-        new DateOnly(2026, 2, 1),
-        new DateOnly(2026, 2, 28),
-        15m,
-        2.5m,
-        37.5m,
-        "Adjusted capacity",
-        3);
+    private static UpdateCapacityBookingRequest UpdateRequest(Guid id) =>
+        new(
+            id,
+            "NRGD",
+            "GTF/THE - Monthly",
+            "GTF",
+            "THE",
+            new DateOnly(2026, 2, 1),
+            new DateOnly(2026, 2, 28),
+            15m,
+            2.5m,
+            37.5m,
+            "Adjusted capacity",
+            3
+        );
 
     [Fact]
-    public async Task Create_returns_201_and_forwards_exact_request_actor_and_token()
+    public async Task CreateReturns201AndForwardsExactRequestActorAndToken()
     {
         var repository = new FakeCapacityBookingEndpointRepository
         {
-            CreateResult = DomainEndpointTestData.CapacityBooking(version: 1)
+            CreateResult = DomainEndpointTestData.CapacityBooking(version: 1),
         };
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<CreateCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
         var request = CreateRequest();
 
         await endpoint.HandleAsync(request, cancellation.Token);
@@ -64,12 +70,12 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Get_by_id_returns_200_and_forwards_exact_id()
+    public async Task GetByIdReturns200AndForwardsExactId()
     {
         var id = Guid.NewGuid();
         var repository = new FakeCapacityBookingEndpointRepository
         {
-            GetByIdResult = DomainEndpointTestData.CapacityBooking(id)
+            GetByIdResult = DomainEndpointTestData.CapacityBooking(id),
         };
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<GetCapacityBookingByIdEndpoint>(repository);
@@ -84,7 +90,7 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Get_by_id_returns_404_when_repository_has_no_match()
+    public async Task GetByIdReturns404WhenRepositoryHasNoMatch()
     {
         var id = Guid.NewGuid();
         var repository = new FakeCapacityBookingEndpointRepository { GetByIdResult = null };
@@ -97,14 +103,19 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task History_returns_200_and_forwards_the_exact_filter_object()
+    public async Task HistoryReturns200AndForwardsTheExactFilterObject()
     {
         var repository = new FakeCapacityBookingEndpointRepository
         {
-            HistoryResult = new([DomainEndpointTestData.CapacityBooking()], 1, 2, 25, false)
+            HistoryResult = new([DomainEndpointTestData.CapacityBooking()], 1, 2, 25, false),
         };
         var request = new GetCapacityBookingHistoryRequest(
-            Guid.NewGuid(), new DateOnly(2026, 1, 1), new DateOnly(2026, 3, 1), 2, 25);
+            Guid.NewGuid(),
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 3, 1),
+            2,
+            25
+        );
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<GetCapacityBookingHistoryEndpoint>(repository);
 
@@ -118,17 +129,19 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Update_success_returns_200_and_does_not_fetch_current_state()
+    public async Task UpdateSuccessReturns200AndDoesNotFetchCurrentState()
     {
         var id = Guid.NewGuid();
         var repository = new FakeCapacityBookingEndpointRepository
         {
-            UpdateResult = DomainEndpointTestData.CapacityBooking(id, version: 4)
+            UpdateResult = DomainEndpointTestData.CapacityBooking(id, version: 4),
         };
         var request = UpdateRequest(id);
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<UpdateCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
 
         await endpoint.HandleAsync(request, cancellation.Token);
 
@@ -142,17 +155,19 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Update_returns_404_when_update_and_current_lookup_are_missing()
+    public async Task UpdateReturns404WhenUpdateAndCurrentLookupAreMissing()
     {
         var id = Guid.NewGuid();
         var repository = new FakeCapacityBookingEndpointRepository
         {
             UpdateResult = null,
-            GetByIdResult = null
+            GetByIdResult = null,
         };
         var request = UpdateRequest(id);
         var endpoint = Factory.Create<UpdateCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
 
         await endpoint.HandleAsync(request, default);
 
@@ -164,18 +179,20 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Update_returns_409_with_current_state_on_version_conflict()
+    public async Task UpdateReturns409WithCurrentStateOnVersionConflict()
     {
         var id = Guid.NewGuid();
         var current = DomainEndpointTestData.CapacityBooking(id, version: 8);
         var repository = new FakeCapacityBookingEndpointRepository
         {
             UpdateResult = null,
-            GetByIdResult = current
+            GetByIdResult = current,
         };
         var request = UpdateRequest(id);
         var endpoint = Factory.Create<UpdateCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
 
         await endpoint.HandleAsync(request, default);
 
@@ -188,14 +205,16 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Delete_success_returns_204_and_forwards_all_mutation_arguments()
+    public async Task DeleteSuccessReturns204AndForwardsAllMutationArguments()
     {
         var id = Guid.NewGuid();
         var repository = new FakeCapacityBookingEndpointRepository { DeleteResult = null };
         var request = new DeleteCapacityBookingRequest(id, "Booked against wrong route", 3);
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<DeleteCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
 
         await endpoint.HandleAsync(request, cancellation.Token);
 
@@ -210,44 +229,55 @@ public sealed class CapacityBookingEndpointHandlerTests
     }
 
     [Fact]
-    public async Task Delete_returns_404_for_not_found_without_fetching_current_state()
+    public async Task DeleteReturns404ForNotFoundWithoutFetchingCurrentState()
     {
         var id = Guid.NewGuid();
-        var repository = new FakeCapacityBookingEndpointRepository { DeleteResult = MutationOutcome.NotFound };
+        var repository = new FakeCapacityBookingEndpointRepository
+        {
+            DeleteResult = MutationOutcome.NotFound,
+        };
         var request = new DeleteCapacityBookingRequest(id, "Booked against wrong route", 3);
         var endpoint = Factory.Create<DeleteCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
 
         await endpoint.HandleAsync(request, default);
 
         Assert.Equal(404, endpoint.HttpContext.Response.StatusCode);
         var call = Assert.Single(repository.DeleteCalls);
-        Assert.Equal((id, 3L, "Booked against wrong route", ActorId),
-            (call.Id, call.Version, call.Reason, call.ActorId));
+        Assert.Equal(
+            (id, 3L, "Booked against wrong route", ActorId),
+            (call.Id, call.Version, call.Reason, call.ActorId)
+        );
         Assert.Empty(repository.GetByIdCalls);
     }
 
     [Fact]
-    public async Task Delete_returns_409_with_current_state_for_version_conflict()
+    public async Task DeleteReturns409WithCurrentStateForVersionConflict()
     {
         var id = Guid.NewGuid();
         var current = DomainEndpointTestData.CapacityBooking(id, version: 9);
         var repository = new FakeCapacityBookingEndpointRepository
         {
             DeleteResult = MutationOutcome.VersionConflict,
-            GetByIdResult = current
+            GetByIdResult = current,
         };
         var request = new DeleteCapacityBookingRequest(id, "Booked against wrong route", 3);
         var endpoint = Factory.Create<DeleteCapacityBookingEndpoint>(
-            context => context.User = DomainEndpointTestData.Principal(ActorId), repository);
+            context => context.User = DomainEndpointTestData.Principal(ActorId),
+            repository
+        );
 
         await endpoint.HandleAsync(request, default);
 
         Assert.Equal(409, endpoint.HttpContext.Response.StatusCode);
         Assert.Same(current, endpoint.Response);
         var call = Assert.Single(repository.DeleteCalls);
-        Assert.Equal((id, 3L, "Booked against wrong route", ActorId),
-            (call.Id, call.Version, call.Reason, call.ActorId));
+        Assert.Equal(
+            (id, 3L, "Booked against wrong route", ActorId),
+            (call.Id, call.Version, call.Reason, call.ActorId)
+        );
         Assert.Equal(id, Assert.Single(repository.GetByIdCalls).Id);
     }
 }

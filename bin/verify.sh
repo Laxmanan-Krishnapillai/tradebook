@@ -7,7 +7,7 @@
 # kickoff prompt: an agent must get exit 0 here before declaring a task complete.
 #
 # Usage:
-#   bin/verify.sh                 # all gates (build/unit/integration/arch/mutation/contracts/frontend)
+#   bin/verify.sh                 # all gates (format/analyzers/build/tests/contracts/frontend)
 #   bin/verify.sh --backend-only  # backend gates only
 #   bin/verify.sh --frontend-only # frontend gates only
 #   bin/verify.sh --fast          # skip integration + mutation (quick inner loop)
@@ -68,6 +68,12 @@ if [ "$DO_BACKEND" = 1 ]; then
   dotnet restore "$SLN" || fail "restore solution"
   dotnet restore tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj || fail "restore architecture tests"
 
+  step "formatting (CSharpier)"
+  dotnet tool run csharpier check . || fail "CSharpier formatting check"
+
+  step "banned API analyzer negative compile probe"
+  bash bin/check-banned-api.sh || fail "RS0030 banned API probe"
+
   step "build (warnings as errors)"
   dotnet build "$SLN" -c Debug --no-restore -warnaserror || fail "build -warnaserror"
 
@@ -97,14 +103,7 @@ fi
 
 if [ "$DO_CONTRACTS" = 1 ]; then
   step "contract generation + drift check"
-  dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug || fail "build Tradebook.Core"
-  dotnet typegen generate --project-folder . || fail "typegen generate"
-  drift="$(git status --porcelain -- src/Frontend/src/api/generated)"
-  if [ -n "$drift" ]; then
-    printf '%s\n' "$drift"
-    git --no-pager diff -- src/Frontend/src/api/generated
-    fail "generated contracts drifted — regenerate & commit (never hand-edit generated/)"
-  fi
+  bash scripts/check-contract-drift.sh || fail "TypeSpec, generated client, or runtime contract drift"
 fi
 
 if [ "$DO_FRONTEND" = 1 ]; then
@@ -113,7 +112,7 @@ if [ "$DO_FRONTEND" = 1 ]; then
   (
     cd src/Frontend
     if [ ! -d node_modules ]; then npm ci; fi
-    npm run lint && npm run build && npm test -- --run
+    npm run lint && npm run knip && npm run build && npm test -- --run
   ) || fail "frontend gates"
 fi
 

@@ -2,8 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ContractDetailsDto } from '../../src/api/generated/contract-details-dto';
-import type { HedgeDetailsDto } from '../../src/api/generated/hedge-details-dto';
+import type { ContractDetailsDto } from '../../src/api/generated/types.gen';
+import type { HedgeDetailsDto } from '../../src/api/generated/types.gen';
 import {
   domainQueryKeys,
   type PagedEntityCache,

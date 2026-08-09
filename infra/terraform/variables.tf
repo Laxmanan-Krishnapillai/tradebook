@@ -77,3 +77,15 @@ variable "alert_email" {
     error_message = "alert_email must be a valid email address and is required when environment is prod."
   }
 }
+
+variable "entra_tenant_id" {
+  type        = string
+  description = "Microsoft Entra workforce tenant UUID."
+  validation { condition = can(regex("^[0-9a-fA-F-]{36}$", var.entra_tenant_id)) error_message = "entra_tenant_id must be a UUID." }
+}
+
+variable "entra_redirect_uris" {
+  type        = list(string)
+  description = "Exact local, staging, and production SPA redirect URIs."
+  validation { condition = length(var.entra_redirect_uris) == 3 && alltrue([for uri in var.entra_redirect_uris : can(regex("^https?://", uri))]) error_message = "Provide exactly three absolute redirect URIs." }
+}

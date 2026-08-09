@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, type DragEndEvent, type Modifier } from '@dnd-kit/core';
+import { DndContext, type DragEndEvent, type Modifier } from '@dnd-kit/core';
 import { useViewport } from '@xyflow/react';
 import { type ReactNode, useMemo } from 'react';
 
@@ -21,9 +21,4 @@ export function ZoomAwareDndContext({
   const { zoom } = useViewport();
   const modifiers = useMemo(() => [createZoomModifier(zoom)], [zoom]);
   return <DndContext modifiers={modifiers} onDragEnd={onDragEnd}>{children}</DndContext>;
-}
-
-export function ZoomAwareDragOverlay({ children }: { children: ReactNode }) {
-  const { zoom } = useViewport();
-  return <DragOverlay dropAnimation={null}><div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>{children}</div></DragOverlay>;
 }

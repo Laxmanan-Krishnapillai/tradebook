@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "data-grid",
+  "title": "DataGrid",
+  "description": "Trading grid with 28px rows, stable live values, and color-independent P/L.",
+  "registryDependencies": [
+    "@tradebook/toolbar",
+    "@tradebook/combobox"
+  ],
+  "files": [
+    {
+      "path": "registry/tradebook/data-grid/data-grid.tsx",
+      "content": "export interface DataGridColumn<Row> { key: keyof Row; label: string; numeric?: boolean }\nexport interface DataGridProps<Row extends { id: string }> {\n  caption: string;\n  columns: readonly DataGridColumn<Row>[];\n  rows: readonly Row[];\n}\n\nexport function DataGrid<Row extends { id: string }>({ caption, columns, rows }: DataGridProps<Row>) {\n  return (\n    <table>\n      <caption className=\"sr-only\">{caption}</caption>\n      <thead><tr>{columns.map((column) => <th key={String(column.key)} scope=\"col\">{column.label}</th>)}</tr></thead>\n      <tbody>{rows.map((row) => <tr className=\"h-7\" key={row.id}>{columns.map((column) => <td className={column.numeric ? 'tabular-nums' : undefined} key={String(column.key)}>{String(row[column.key])}</td>)}</tr>)}</tbody>\n    </table>\n  );\n}\n",
+      "type": "registry:component"
+    }
+  ],
+  "type": "registry:component"
+}

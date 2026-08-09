@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
-import type { GetMarketPriceHistoryResponse } from "../../api/generated/get-market-price-history-response";
-import type { MarketPriceDetailsDto } from "../../api/generated/market-price-details-dto";
-import type { UpsertMarketPriceRequest } from "../../api/generated/upsert-market-price-request";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { z } from 'zod';
+import type { GetMarketPriceHistoryResponse } from "../../api/generated/types.gen";
+import type { MarketPriceDetailsDto } from "../../api/generated/types.gen";
+import type { UpsertMarketPriceRequest } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
@@ -14,6 +15,7 @@ import {
 import { queryKeys } from '../../lib/query/queryKeys';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
+import { ValidatedForm } from '../ui/validated-form';
 
 interface ConflictState {
   id: string;
@@ -23,13 +25,22 @@ interface ConflictState {
 const today = () => new Date().toISOString().slice(0, 10);
 const initialCreate = (): UpsertMarketPriceRequest => ({
   priceDate: today(),
-  ttfEurMwh: 0,
+  ttfEurMwh: "0",
   version: 0,
 });
+const upsertMarketPriceSchema = z.custom<UpsertMarketPriceRequest>((candidate): candidate is UpsertMarketPriceRequest => {
+  const value = candidate as Partial<UpsertMarketPriceRequest>;
+  return (
+  typeof value.priceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.priceDate)
+  && typeof value.version === 'number' && Number.isSafeInteger(value.version) && value.version >= 0
+  && typeof value.ttfEurMwh === 'number' && Number.isFinite(value.ttfEurMwh)
+  && (value.eurUsd === null || value.eurUsd === undefined || (typeof value.eurUsd === 'number' && Number.isFinite(value.eurUsd) && value.eurUsd > 0))
+  );
+}, { error: 'Enter a valid market date and prices.' });
 
 function currentRequest(
   price: MarketPriceDetailsDto,
-  ttfEurMwh: number,
+  ttfEurMwh: string,
 ): UpsertMarketPriceRequest {
   return {
     priceDate: price.priceDate,
@@ -63,7 +74,7 @@ function MarketPriceEditor({
 }) {
   const [ttf, setTtf] = useState(price.ttfEurMwh?.toString() ?? "");
   return (
-    <div className="row-actions">
+    <div className="grid grid-cols-4 items-center gap-2 max-[800px]:grid-cols-2">
       <input
         aria-label={`TTF price for ${price.priceDate}`}
         type="number"
@@ -74,11 +85,11 @@ function MarketPriceEditor({
       <button
         type="button"
         disabled={ttf === ""}
-        onClick={() => onSave(price, currentRequest(price, Number(ttf)))}
+        onClick={() => onSave(price, currentRequest(price, ttf))}
       >
         Save
       </button>
-      <button type="button" className="danger" onClick={() => onDelete(price)}>
+      <button type="button" className="bg-red-700" onClick={() => onDelete(price)}>
         Delete
       </button>
     </div>
@@ -121,7 +132,7 @@ export function MarketPricesPage() {
       setError("");
       attempted.current = request;
       let version = price.version;
-      const before = currentRequest(price, price.ttfEurMwh ?? 0);
+      const before = currentRequest(price, price.ttfEurMwh ?? "0");
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Update market price ${price.priceDate}`,
@@ -151,7 +162,7 @@ export function MarketPricesPage() {
       const reason = "Deleted from Tradebook UI";
       attempted.current = { reason };
       let version = price.version;
-      const snapshot = currentRequest(price, price.ttfEurMwh ?? 0);
+      const snapshot = currentRequest(price, price.ttfEurMwh ?? "0");
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Delete market price ${price.priceDate}`,
@@ -210,8 +221,8 @@ export function MarketPricesPage() {
           <MarketPriceEditor
             key={row.original.version}
             price={row.original}
-            onSave={save}
-            onDelete={remove}
+            onSave={(price, request) => void save(price, request)}
+            onDelete={(price) => void remove(price)}
           />
         ),
       },
@@ -219,12 +230,11 @@ export function MarketPricesPage() {
     [remove, save],
   );
 
-  const submitCreate = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitCreate = async (validatedRequest: UpsertMarketPriceRequest) => {
     setError("");
-    attempted.current = createRequest;
+    attempted.current = validatedRequest;
     try {
-      const request = { ...createRequest, version: 0 };
+      const request = { ...validatedRequest, version: 0 };
       let version = 0;
       let created = false;
       const command: Command = {
@@ -260,9 +270,9 @@ export function MarketPricesPage() {
 
   return (
     <section>
-      <header className="page-header">
+      <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
         <div>
-          <p className="eyebrow">Market data</p>
+          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Market data</p>
           <h2>Market prices</h2>
           <p>
             {history.data
@@ -279,7 +289,7 @@ export function MarketPricesPage() {
         </button>
       </header>
       {error && (
-        <p role="alert" className="error-banner">
+        <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">
           {error}
         </p>
       )}
@@ -293,7 +303,7 @@ export function MarketPricesPage() {
         />
       )}
       {history.data && (
-        <nav className="toolbar" aria-label="Market-price history pages">
+        <nav className="flex flex-wrap items-center gap-2" aria-label="Market-price history pages">
           <button type="button" disabled={page === 1 || history.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
           <span>Page {page}</span>
           <button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
@@ -301,12 +311,12 @@ export function MarketPricesPage() {
       )}
       {showCreate && (
         <section
-          className="modal"
+          className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Add market price"
         >
-          <form onSubmit={(event) => void submitCreate(event)}>
+          <ValidatedForm schema={upsertMarketPriceSchema} values={createRequest} onValid={submitCreate}>
             <h3>Add daily market price</h3>
             <label>
               Date
@@ -333,9 +343,7 @@ export function MarketPricesPage() {
                   setCreateRequest((value) => ({
                     ...value,
                     ttfEurMwh:
-                      event.target.value === ""
-                        ? null
-                        : Number(event.target.value),
+                      event.target.value === "" ? null : event.target.value,
                   }))
                 }
               />
@@ -351,17 +359,15 @@ export function MarketPricesPage() {
                   setCreateRequest((value) => ({
                     ...value,
                     eurUsd:
-                      event.target.value === ""
-                        ? null
-                        : Number(event.target.value),
+                      event.target.value === "" ? null : event.target.value,
                   }))
                 }
               />
             </label>
-            <div className="toolbar">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="secondary"
+                className="bg-gray-200 text-gray-800"
                 onClick={() => setShowCreate(false)}
               >
                 Close
@@ -370,11 +376,11 @@ export function MarketPricesPage() {
                 Save
               </button>
             </div>
-          </form>
+          </ValidatedForm>
         </section>
       )}
       {conflict && (
-        <div className="modal">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <ConflictDialog
             entityId={conflict.id}
             serverState={conflict.serverState}

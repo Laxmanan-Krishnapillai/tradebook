@@ -8,10 +8,22 @@ public sealed class UpdatePhysicalDeliveryValidator : Validator<UpdatePhysicalDe
 {
     public UpdatePhysicalDeliveryValidator()
     {
-        RuleFor(request => request.DeliveryId).NotEmpty();
+        RuleFor(request => request.DeliveryId).Must(id => id.Value != Guid.Empty);
         RuleFor(request => request.Version).GreaterThan(0);
-        RuleFor(request => request.Status).Must(value => value is null or "Completed - Payment Received/Sent" or "In Progress - Invoice Received/Sent" or "Pending - No Invoice" or "Cancelled" or "Awaiting" or "Issue");
-        RuleFor(request => request.VolumeRealisedMwh).GreaterThanOrEqualTo(0).When(request => request.VolumeRealisedMwh.HasValue);
+        RuleFor(request => request.Status)
+            .Must(value =>
+                value
+                    is null
+                        or "Completed - Payment Received/Sent"
+                        or "In Progress - Invoice Received/Sent"
+                        or "Pending - No Invoice"
+                        or "Cancelled"
+                        or "Awaiting"
+                        or "Issue"
+            );
+        RuleFor(request => request.VolumeRealisedMwh)
+            .GreaterThanOrEqualTo(0)
+            .When(request => request.VolumeRealisedMwh.HasValue);
         RuleFor(request => request)
             .Must(request => request.VolumeRealisedMwh.HasValue || request.Status is not null)
             .WithMessage("At least one mutable field is required.");
