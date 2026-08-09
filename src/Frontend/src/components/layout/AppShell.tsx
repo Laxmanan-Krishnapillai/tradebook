@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import { endSession, type AuthenticatedRoutePath } from '../../lib/session/sessionController';
 import { CommandPalette } from "../ui/CommandPalette";
+import { DensityToggle } from '../ui/density-toggle';
 
 const navigation = [
   ["/deliveries", "Deliveries"],
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
+        <DensityToggle />
         <div className="toolbar">
           <button
             type="button"

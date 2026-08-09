@@ -1,0 +1,5 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/roboto-mono";
+
+html { font-feature-settings: "liga" 1, "calt" 1, "tnum" 1, "zero" 1, "lnum" 1; }
+code, kbd, samp { font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero lining-nums; }
