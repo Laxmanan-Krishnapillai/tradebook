@@ -24,6 +24,7 @@ export function createAppRouter(options: CreateAppRouterOptions = {}) {
     routeTree,
     history: options.history,
     context,
+    defaultViewTransition: true,
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
   });

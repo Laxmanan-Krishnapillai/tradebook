@@ -17,7 +17,7 @@ vi.mock('@tremor/react/dist/components/text-elements/Text/Text.js', () => ({ def
 import { EChartsAdapter } from '../../src/lib/charts/echartsAdapter';
 import { LightweightChartsAdapter } from '../../src/lib/charts/lightweightChartsAdapter';
 import { TableAdapter } from '../../src/lib/charts/tableAdapter';
-import { TremorKpiAdapter } from '../../src/lib/charts/tremorKpiAdapter';
+import { KpiAdapter } from '../../src/lib/charts/kpiAdapter';
 
 const spec: ChartSpec = { chartType: 'BAR', encodings: { xAxis: 'date', yAxis: ['value'] } };
 const data: SeriesData = { series: [{ name: 'value', x: [Date.parse('2026-01-01')], y: [2] }], ohlc: [{ time: Date.parse('2026-01-01'), open: 1, high: 3, low: 1, close: 2 }] };
@@ -40,6 +40,6 @@ describe('registered adapter implementations', () => {
 
   it('cleans up table DOM and the Tremor React root', () => {
     const tableHost = document.createElement('div'); const table = new TableAdapter(); table.mount(tableHost, { ...spec, chartType: 'TABLE' }); table.update(data); expect(engine.render).toHaveBeenCalledOnce(); table.destroy(); expect(engine.unmount).toHaveBeenCalledOnce();
-    const kpi = new TremorKpiAdapter(); kpi.mount(document.createElement('div'), { ...spec, chartType: 'KPI_CARD' }); kpi.update(data); kpi.destroy(); expect(engine.render).toHaveBeenCalledTimes(2); expect(engine.unmount).toHaveBeenCalledTimes(2);
+    const kpi = new KpiAdapter(); kpi.mount(document.createElement('div'), { ...spec, chartType: 'KPI_CARD' }); kpi.update(data); kpi.destroy(); expect(engine.render).toHaveBeenCalledTimes(2); expect(engine.unmount).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,0 +1,8 @@
+name: tradebook
+metadata:
+  template: tradebook-aspire@0.0.1
+services:
+  app:
+    project: src/Aspire/Tradebook.AppHost/Tradebook.AppHost.csproj
+    language: dotnet
+    host: containerapp

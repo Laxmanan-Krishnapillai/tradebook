@@ -15,8 +15,10 @@ using Tradebook.Infrastructure.Caching;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.DependencyInjection;
 using Tradebook.Infrastructure.Options;
+using Tradebook.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
 VogenTypeHandlers.RegisterAll();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {

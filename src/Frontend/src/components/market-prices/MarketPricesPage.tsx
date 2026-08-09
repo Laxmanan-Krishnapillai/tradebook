@@ -1,7 +1,7 @@
-import Decimal from "decimal.js";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { z } from 'zod';
 import type { GetMarketPriceHistoryResponse } from "../../api/generated/types.gen";
 import type { MarketPriceDetailsDto } from "../../api/generated/types.gen";
 import type { UpsertMarketPriceRequest } from "../../api/generated/types.gen";
@@ -15,6 +15,7 @@ import {
 import { queryKeys } from '../../lib/query/queryKeys';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
+import { ValidatedForm } from '../ui/validated-form';
 
 interface ConflictState {
   id: string;
@@ -27,6 +28,15 @@ const initialCreate = (): UpsertMarketPriceRequest => ({
   ttfEurMwh: "0",
   version: 0,
 });
+const upsertMarketPriceSchema = z.custom<UpsertMarketPriceRequest>((candidate): candidate is UpsertMarketPriceRequest => {
+  const value = candidate as Partial<UpsertMarketPriceRequest>;
+  return (
+  typeof value.priceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.priceDate)
+  && typeof value.version === 'number' && Number.isSafeInteger(value.version) && value.version >= 0
+  && typeof value.ttfEurMwh === 'number' && Number.isFinite(value.ttfEurMwh)
+  && (value.eurUsd === null || value.eurUsd === undefined || (typeof value.eurUsd === 'number' && Number.isFinite(value.eurUsd) && value.eurUsd > 0))
+  );
+}, { error: 'Enter a valid market date and prices.' });
 
 function currentRequest(
   price: MarketPriceDetailsDto,
@@ -34,7 +44,7 @@ function currentRequest(
 ): UpsertMarketPriceRequest {
   return {
     priceDate: price.priceDate,
-    ttfEurMwh: new Decimal(ttfEurMwh).toString(),
+    ttfEurMwh,
     egsiEtfEurMwh: price.egsiEtfEurMwh,
     theEurMwh: price.theEurMwh,
     bgoEurMwh: price.bgoEurMwh,
@@ -220,12 +230,11 @@ export function MarketPricesPage() {
     [remove, save],
   );
 
-  const submitCreate = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitCreate = async (validatedRequest: UpsertMarketPriceRequest) => {
     setError("");
-    attempted.current = createRequest;
+    attempted.current = validatedRequest;
     try {
-      const request = { ...createRequest, version: 0 };
+      const request = { ...validatedRequest, version: 0 };
       let version = 0;
       let created = false;
       const command: Command = {
@@ -307,7 +316,7 @@ export function MarketPricesPage() {
           aria-modal="true"
           aria-label="Add market price"
         >
-          <form onSubmit={(event) => void submitCreate(event)}>
+          <ValidatedForm schema={upsertMarketPriceSchema} values={createRequest} onValid={submitCreate}>
             <h3>Add daily market price</h3>
             <label>
               Date
@@ -334,9 +343,7 @@ export function MarketPricesPage() {
                   setCreateRequest((value) => ({
                     ...value,
                     ttfEurMwh:
-                      event.target.value === ""
-                        ? null
-                        : event.target.value,
+                      event.target.value === "" ? null : event.target.value,
                   }))
                 }
               />
@@ -352,9 +359,7 @@ export function MarketPricesPage() {
                   setCreateRequest((value) => ({
                     ...value,
                     eurUsd:
-                      event.target.value === ""
-                        ? null
-                        : event.target.value,
+                      event.target.value === "" ? null : event.target.value,
                   }))
                 }
               />
@@ -371,7 +376,7 @@ export function MarketPricesPage() {
                 Save
               </button>
             </div>
-          </form>
+          </ValidatedForm>
         </section>
       )}
       {conflict && (

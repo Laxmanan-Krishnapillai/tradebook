@@ -40,7 +40,7 @@ describe('API URL resolution', () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(new URL('/api/v1/test', globalThis.location.href).toString());
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer access-token');
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fake-test-access-token');
   });
 
   it('allows MSW to intercept a resolved relative request', async () => {

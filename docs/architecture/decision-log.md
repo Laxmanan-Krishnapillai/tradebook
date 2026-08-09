@@ -243,3 +243,12 @@ This supersedes D12/D13's TypeGen ownership statements and Task 08's types-only 
 TypeGen is removed because assembly reflection produced no runtime validation, client, or
 query integration and made C# rather than the cross-stack contract authoritative. Money is
 represented as a decimal-formatted JSON string and enums use string wire values.
+
+## D21 — Aspire development orchestration and deployment artifacts (2026-08-09)
+
+.NET Aspire 13.4.6 is the local application orchestrator for PostgreSQL 17, the API,
+worker host, and Vite frontend, and provides their shared OpenTelemetry dashboard.
+Aspire.Hosting.Testing owns full-graph smoke coverage; Testcontainers and Respawn remain
+the isolated database-test mechanism. Aspire and `azd` may generate Azure Container Apps
+deployment artifacts, but the Task 07 Terraform remains the production infrastructure
+source of truth for Container Apps, PostgreSQL Flexible Server 17, and Key Vault.

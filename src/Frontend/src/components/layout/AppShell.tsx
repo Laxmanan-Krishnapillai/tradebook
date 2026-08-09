@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import { endSession, type AuthenticatedRoutePath } from '../../lib/session/sessionController';
 import { CommandPalette } from "../ui/CommandPalette";
+import { DensityToggle } from '../ui/density-toggle';
 
 const navigation = [
   ["/deliveries", "Deliveries"],
@@ -21,10 +22,10 @@ const navigation = [
 export function AppShell({ children }: { children: ReactNode }) {
   const commands = useCommandStack();
   return (
-    <div className="grid min-h-screen grid-cols-4 max-[800px]:grid-cols-1">
+    <div className="app-shell">
       <aside>
         <div>
-          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">BioGem</p>
+          <p className="eyebrow">BioGem</p>
           <h1>Tradebook</h1>
         </div>
         <nav aria-label="Primary">
@@ -34,10 +35,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="flex flex-wrap items-center gap-2">
+        <DensityToggle />
+        <div className="toolbar">
           <button
             type="button"
-            className="bg-gray-200 text-gray-800"
+            className="secondary"
             disabled={!commands.canUndo}
             onClick={() => void commands.undo()}
           >
@@ -45,18 +47,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <button
             type="button"
-            className="bg-gray-200 text-gray-800"
+            className="secondary"
             disabled={!commands.canRedo}
             onClick={() => void commands.redo().catch(() => undefined)}
           >
             Redo
           </button>
         </div>
-        <button type="button" className="bg-gray-200 text-gray-800" onClick={() => void endSession('logout')}>
+        <button type="button" className="secondary" onClick={() => void endSession('logout')}>
           Sign out
         </button>
       </aside>
-      <main className="col-span-3 min-w-0 p-8 max-[800px]:col-span-1 max-[800px]:p-4">{children}</main>
+      <main className="workspace">{children}</main>
       <CommandPalette />
     </div>
   );

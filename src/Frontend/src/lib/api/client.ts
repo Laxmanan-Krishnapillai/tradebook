@@ -28,3 +28,15 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
+
+export function problemFieldErrors(problem: unknown): Record<string, string[]> {
+  const errors = (problem as { errors?: unknown } | null | undefined)?.errors;
+  if (typeof errors !== 'object' || errors === null) return {};
+  const mapped: Record<string, string[]> = {};
+  for (const [field, value] of Object.entries(errors)) {
+    if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+      mapped[field] = value;
+    }
+  }
+  return mapped;
+}
