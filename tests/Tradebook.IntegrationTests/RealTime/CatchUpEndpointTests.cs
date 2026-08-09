@@ -110,14 +110,17 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
     }
 
     private WebApplicationFactory<Program> CreateFactory() => new WebApplicationFactory<Program>()
-        .WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Database:ConnectionString"] = Postgres.ConnectionString,
-                ["Jwt:Issuer"] = "Tradebook",
-                ["Jwt:Audience"] = "Tradebook",
-                ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-            })));
+        .WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = Postgres.ConnectionString,
+                    ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                    ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222"
+                }));
+        });
 
     private async Task ResetOutboxAsync()
     {
