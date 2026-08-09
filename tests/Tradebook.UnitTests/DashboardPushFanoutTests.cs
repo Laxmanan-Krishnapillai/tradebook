@@ -9,7 +9,7 @@ public sealed class DashboardPushFanoutTests
     [InlineData("{}")]
     [InlineData("{\"actorId\":\"not-a-guid\"}")]
     [InlineData("{not-json")]
-    public async Task Invalid_private_dashboard_routing_metadata_fails_fanout(string payload)
+    public async Task InvalidPrivateDashboardRoutingMetadataFailsFanout(string payload)
     {
         var fanout = new DashboardPushFanout(null!);
 
@@ -21,10 +21,13 @@ public sealed class DashboardPushFanoutTests
                 Guid.NewGuid().ToString(),
                 "Updated",
                 payload,
-                default));
+                default
+            )
+        );
 
         Assert.Equal(
             "WorkspaceDashboard outbox payload must contain a UUID actorId.",
-            exception.Message);
+            exception.Message
+        );
     }
 }

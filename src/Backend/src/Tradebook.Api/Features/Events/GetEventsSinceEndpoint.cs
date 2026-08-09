@@ -1,27 +1,10 @@
 using FastEndpoints;
 using FluentValidation;
+using Tradebook.Api.Security;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
-using Tradebook.Api.Security;
 
 namespace Tradebook.Api.Features.Events;
-
-public sealed class GetEventsSinceRequest
-{
-    public long AfterSequence { get; init; }
-    public int Limit { get; init; } = 500;
-}
-
-public sealed class GetEventsSinceValidator : Validator<GetEventsSinceRequest>
-{
-    public GetEventsSinceValidator()
-    {
-        RuleFor(request => request.AfterSequence)
-            .GreaterThanOrEqualTo(0);
-        RuleFor(request => request.Limit)
-            .InclusiveBetween(1, 500);
-    }
-}
 
 public sealed class GetEventsSinceEndpoint(IOutboxEventReader events)
     : Endpoint<GetEventsSinceRequest, GetEventsSinceResponse>
@@ -32,15 +15,11 @@ public sealed class GetEventsSinceEndpoint(IOutboxEventReader events)
         Policies("ReadPolicy");
     }
 
-    public override async Task HandleAsync(
-        GetEventsSinceRequest request,
-        CancellationToken cancellationToken)
+    public override async Task HandleAsync(GetEventsSinceRequest req, CancellationToken ct)
     {
-        var response = await events.GetSinceAsync(
-            request.AfterSequence,
-            request.Limit,
-            ActorId.From(User),
-            cancellationToken);
-        await Send.OkAsync(response, cancellation: cancellationToken);
+        var response = await (
+            events.GetSinceAsync(req.AfterSequence, req.Limit, ActorId.From(User), ct)
+        ).ConfigureAwait(false);
+        await (Send.OkAsync(response, cancellation: ct)).ConfigureAwait(false);
     }
 }

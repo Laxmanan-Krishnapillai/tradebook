@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
   <ItemGroup>
     <ProjectReference Include="..\Tradebook.Core\Tradebook.Core.csproj" />
     <ProjectReference Include="..\Tradebook.Infrastructure\Tradebook.Infrastructure.csproj" />
@@ -17,10 +16,10 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Microsoft.Identity.Web" />
+    <PackageReference Include="Riok.Mapperly" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Tradebook.UnitTests" />
   </ItemGroup>
-
 </Project>

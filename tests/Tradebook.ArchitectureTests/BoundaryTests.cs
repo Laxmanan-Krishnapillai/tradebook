@@ -9,9 +9,12 @@ namespace Tradebook.ArchitectureTests;
 public sealed class BoundaryTests
 {
     private const string FeatureNamespacePrefix = "Tradebook.Api.Features.";
-    private static readonly string[] FeatureSlices = typeof(Program).Assembly.GetTypes()
+    private static readonly string[] FeatureSlices = typeof(Program)
+        .Assembly.GetTypes()
         .Select(type => type.Namespace)
-        .Where(@namespace => @namespace?.StartsWith(FeatureNamespacePrefix, StringComparison.Ordinal) == true)
+        .Where(@namespace =>
+            @namespace?.StartsWith(FeatureNamespacePrefix, StringComparison.Ordinal) == true
+        )
         .Select(@namespace => @namespace![FeatureNamespacePrefix.Length..].Split('.')[0])
         .Distinct(StringComparer.Ordinal)
         .Order(StringComparer.Ordinal)
@@ -21,20 +24,28 @@ public sealed class BoundaryTests
         .LoadAssemblies(
             typeof(Program).Assembly,
             typeof(Tradebook.Core.DTOs.CreatePhysicalDeliveryRequest).Assembly,
-            typeof(Tradebook.Infrastructure.Data.DeliveryRepository).Assembly)
+            typeof(Tradebook.Infrastructure.Data.DeliveryRepository).Assembly
+        )
         .Build();
 
     [Fact]
-    public void Core_depends_on_neither_api_nor_infrastructure() =>
-        Types().That().ResideInNamespace("Tradebook.Core", true)
-            .Should().NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api", true))
-            .AndShould().NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Infrastructure", true))
+    public void CoreDependsOnNeitherApiNorInfrastructure() =>
+        Types()
+            .That()
+            .ResideInNamespace("Tradebook.Core", true)
+            .Should()
+            .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api", true))
+            .AndShould()
+            .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Infrastructure", true))
             .Check(Architecture);
 
     [Fact]
-    public void Api_endpoints_do_not_reference_npgsql() =>
-        Classes().That().ResideInNamespace("Tradebook.Api.Features", true)
-            .Should().NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
+    public void ApiEndpointsDoNotReferenceNpgsql() =>
+        Classes()
+            .That()
+            .ResideInNamespace("Tradebook.Api.Features", true)
+            .Should()
+            .NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
             .Check(Architecture);
 
     public static IEnumerable<object[]> SiblingFeaturePairs() =>
@@ -45,8 +56,13 @@ public sealed class BoundaryTests
 
     [Theory]
     [MemberData(nameof(SiblingFeaturePairs))]
-    public void Feature_slices_do_not_reference_siblings(string source, string target) =>
-        Types().That().ResideInNamespace($"Tradebook.Api.Features.{source}", true)
-            .Should().NotDependOnAny(Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true))
+    public void FeatureSlicesDoNotReferenceSiblings(string source, string target) =>
+        Types()
+            .That()
+            .ResideInNamespace($"Tradebook.Api.Features.{source}", true)
+            .Should()
+            .NotDependOnAny(
+                Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true)
+            )
             .Check(Architecture);
 }

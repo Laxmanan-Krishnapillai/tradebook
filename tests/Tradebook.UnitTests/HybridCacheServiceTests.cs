@@ -8,17 +8,33 @@ namespace Tradebook.UnitTests;
 public sealed class HybridCacheServiceTests
 {
     [Fact]
-    public async Task Repeated_reads_execute_the_factory_once()
+    public async Task RepeatedReadsExecuteTheFactoryOnce()
     {
         var services = new ServiceCollection();
         services.AddHybridCache();
         await using var provider = services.BuildServiceProvider();
         var cache = new HybridCacheService(provider.GetRequiredService<HybridCache>());
         var calls = 0;
-        ValueTask<int> Factory(CancellationToken _) => new(Interlocked.Increment(ref calls));
+        ValueTask<int> FactoryAsync(CancellationToken _) => new(Interlocked.Increment(ref calls));
 
-        Assert.Equal(1, await cache.GetOrCreateAsync("delivery:test", Factory, TimeSpan.FromMinutes(5), CancellationToken.None));
-        Assert.Equal(1, await cache.GetOrCreateAsync("delivery:test", Factory, TimeSpan.FromMinutes(5), CancellationToken.None));
+        Assert.Equal(
+            1,
+            await cache.GetOrCreateAsync(
+                "delivery:test",
+                FactoryAsync,
+                TimeSpan.FromMinutes(5),
+                CancellationToken.None
+            )
+        );
+        Assert.Equal(
+            1,
+            await cache.GetOrCreateAsync(
+                "delivery:test",
+                FactoryAsync,
+                TimeSpan.FromMinutes(5),
+                CancellationToken.None
+            )
+        );
         Assert.Equal(1, calls);
     }
 }

@@ -5,14 +5,16 @@ using Tradebook.Core.Interfaces;
 
 namespace Tradebook.UnitTests;
 
-public sealed class HandlerGroupBTaxTariffEndpointTests
+public sealed class HandlerGroupBTaxTariffEndpointTests : IDisposable
 {
     private static readonly Guid ActorId = Guid.NewGuid();
-    private static readonly CancellationTokenSource TokenSource = new();
-    private static CancellationToken Token => TokenSource.Token;
+    private readonly CancellationTokenSource tokenSource = new();
+    private CancellationToken Token => tokenSource.Token;
+
+    public void Dispose() => tokenSource.Dispose();
 
     [Fact]
-    public async Task Create_returns_201_and_forwards_the_exact_request_actor_and_token()
+    public async Task CreateReturns201AndForwardsTheExactRequestActorAndToken()
     {
         var expected = HandlerGroupBTestData.TaxTariff(version: 1);
         var repository = new RecordingTaxTariffRepository { CreateResult = expected };
@@ -31,7 +33,7 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task GetById_returns_200_with_the_repository_result_and_exact_call()
+    public async Task GetByIdReturns200WithTheRepositoryResultAndExactCall()
     {
         var tariffId = Guid.NewGuid();
         var expected = HandlerGroupBTestData.TaxTariff(tariffId);
@@ -46,7 +48,7 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task GetById_returns_404_when_the_repository_has_no_row()
+    public async Task GetByIdReturns404WhenTheRepositoryHasNoRow()
     {
         var tariffId = Guid.NewGuid();
         var repository = new RecordingTaxTariffRepository { GetByIdResult = null };
@@ -59,13 +61,23 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task History_returns_200_and_forwards_the_exact_request_and_token()
+    public async Task HistoryReturns200AndForwardsTheExactRequestAndToken()
     {
         var expected = new GetTaxTariffHistoryResponse(
-            [HandlerGroupBTestData.TaxTariff()], 12, 2, 25, true);
+            [HandlerGroupBTestData.TaxTariff()],
+            12,
+            2,
+            25,
+            true
+        );
         var repository = new RecordingTaxTariffRepository { HistoryResult = expected };
         var endpoint = Create<GetTaxTariffHistoryEndpoint>(repository);
-        var request = new GetTaxTariffHistoryRequest(Guid.NewGuid(), new DateOnly(2026, 6, 1), 2, 25);
+        var request = new GetTaxTariffHistoryRequest(
+            Guid.NewGuid(),
+            new DateOnly(2026, 6, 1),
+            2,
+            25
+        );
 
         await endpoint.HandleAsync(request, Token);
 
@@ -77,7 +89,7 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task Update_returns_200_and_does_not_issue_a_conflict_lookup()
+    public async Task UpdateReturns200AndDoesNotIssueAConflictLookup()
     {
         var tariffId = Guid.NewGuid();
         var expected = HandlerGroupBTestData.TaxTariff(tariffId, version: 4);
@@ -94,10 +106,14 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task Update_returns_404_after_a_failed_update_and_missing_lookup()
+    public async Task UpdateReturns404AfterAFailedUpdateAndMissingLookup()
     {
         var tariffId = Guid.NewGuid();
-        var repository = new RecordingTaxTariffRepository { UpdateResult = null, GetByIdResult = null };
+        var repository = new RecordingTaxTariffRepository
+        {
+            UpdateResult = null,
+            GetByIdResult = null,
+        };
         var endpoint = Create<UpdateTaxTariffEndpoint>(repository);
         var request = UpdateRequest(tariffId, version: 3);
 
@@ -109,11 +125,15 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task Update_returns_409_with_current_state_after_a_failed_update()
+    public async Task UpdateReturns409WithCurrentStateAfterAFailedUpdate()
     {
         var tariffId = Guid.NewGuid();
         var current = HandlerGroupBTestData.TaxTariff(tariffId, version: 8);
-        var repository = new RecordingTaxTariffRepository { UpdateResult = null, GetByIdResult = current };
+        var repository = new RecordingTaxTariffRepository
+        {
+            UpdateResult = null,
+            GetByIdResult = current,
+        };
         var endpoint = Create<UpdateTaxTariffEndpoint>(repository);
         var request = UpdateRequest(tariffId, version: 3);
 
@@ -126,35 +146,50 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
     }
 
     [Fact]
-    public async Task Delete_returns_204_and_forwards_every_repository_argument()
+    public async Task DeleteReturns204AndForwardsEveryRepositoryArgument()
     {
         var tariffId = Guid.NewGuid();
         var repository = new RecordingTaxTariffRepository { DeleteResult = null };
         var endpoint = Create<DeleteTaxTariffEndpoint>(repository);
 
-        await endpoint.HandleAsync(new DeleteTaxTariffRequest(tariffId, "superseded tariff", 6), Token);
+        await endpoint.HandleAsync(
+            new DeleteTaxTariffRequest(tariffId, "superseded tariff", 6),
+            Token
+        );
 
         Assert.Equal(204, endpoint.HttpContext.Response.StatusCode);
-        Assert.Equal((tariffId, 6L, "superseded tariff", ActorId, Token), Assert.Single(repository.DeleteCalls));
+        Assert.Equal(
+            (tariffId, 6L, "superseded tariff", ActorId, Token),
+            Assert.Single(repository.DeleteCalls)
+        );
         Assert.Empty(repository.GetByIdCalls);
     }
 
     [Fact]
-    public async Task Delete_returns_404_without_loading_current_state_for_not_found()
+    public async Task DeleteReturns404WithoutLoadingCurrentStateForNotFound()
     {
         var tariffId = Guid.NewGuid();
-        var repository = new RecordingTaxTariffRepository { DeleteResult = MutationOutcome.NotFound };
+        var repository = new RecordingTaxTariffRepository
+        {
+            DeleteResult = MutationOutcome.NotFound,
+        };
         var endpoint = Create<DeleteTaxTariffEndpoint>(repository);
 
-        await endpoint.HandleAsync(new DeleteTaxTariffRequest(tariffId, "superseded tariff", 6), Token);
+        await endpoint.HandleAsync(
+            new DeleteTaxTariffRequest(tariffId, "superseded tariff", 6),
+            Token
+        );
 
         Assert.Equal(404, endpoint.HttpContext.Response.StatusCode);
-        Assert.Equal((tariffId, 6L, "superseded tariff", ActorId, Token), Assert.Single(repository.DeleteCalls));
+        Assert.Equal(
+            (tariffId, 6L, "superseded tariff", ActorId, Token),
+            Assert.Single(repository.DeleteCalls)
+        );
         Assert.Empty(repository.GetByIdCalls);
     }
 
     [Fact]
-    public async Task Delete_returns_409_with_current_state_for_version_conflict()
+    public async Task DeleteReturns409WithCurrentStateForVersionConflict()
     {
         var tariffId = Guid.NewGuid();
         var current = HandlerGroupBTestData.TaxTariff(tariffId, version: 9);
@@ -165,46 +200,49 @@ public sealed class HandlerGroupBTaxTariffEndpointTests
         };
         var endpoint = Create<DeleteTaxTariffEndpoint>(repository);
 
-        await endpoint.HandleAsync(new DeleteTaxTariffRequest(tariffId, "superseded tariff", 6), Token);
+        await endpoint.HandleAsync(
+            new DeleteTaxTariffRequest(tariffId, "superseded tariff", 6),
+            Token
+        );
 
         Assert.Equal(409, endpoint.HttpContext.Response.StatusCode);
         Assert.Same(current, endpoint.Response);
-        Assert.Equal((tariffId, 6L, "superseded tariff", ActorId, Token), Assert.Single(repository.DeleteCalls));
+        Assert.Equal(
+            (tariffId, 6L, "superseded tariff", ActorId, Token),
+            Assert.Single(repository.DeleteCalls)
+        );
         Assert.Equal((tariffId, Token), Assert.Single(repository.GetByIdCalls));
     }
 
-    private static CreateTaxTariffRequest CreateRequest() => new(
-        Guid.NewGuid(),
-        Guid.NewGuid(),
-        new DateOnly(2026, 1, 1),
-        new DateOnly(2026, 12, 31),
-        1.1m,
-        2.2m,
-        3.3m,
-        4.4m,
-        5.5m,
-        6.6m,
-        "DKK");
+    private static CreateTaxTariffRequest CreateRequest() =>
+        new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 12, 31),
+            1.1m,
+            2.2m,
+            3.3m,
+            4.4m,
+            5.5m,
+            6.6m,
+            "DKK"
+        );
 
-    private static UpdateTaxTariffRequest UpdateRequest(Guid tariffId, long version) => new(
-        tariffId,
-        1.2m,
-        null,
-        null,
-        null,
-        null,
-        null,
-        "DKK",
-        version);
+    private static UpdateTaxTariffRequest UpdateRequest(Guid tariffId, long version) =>
+        new(tariffId, 1.2m, null, null, null, null, null, "DKK", version);
 
     private static TEndpoint Create<TEndpoint>(RecordingTaxTariffRepository repository)
         where TEndpoint : BaseEndpoint =>
         Factory.Create<TEndpoint>(
-            context => context.User = HandlerGroupBTestData.Principal(ActorId), repository);
+            context => context.User = HandlerGroupBTestData.Principal(ActorId),
+            repository
+        );
 
-    private static void AssertUpdateCall(
+    private void AssertUpdateCall(
         RecordingTaxTariffRepository repository,
-        UpdateTaxTariffRequest request)
+        UpdateTaxTariffRequest request
+    )
     {
         var call = Assert.Single(repository.UpdateCalls);
         Assert.Same(request, call.Request);

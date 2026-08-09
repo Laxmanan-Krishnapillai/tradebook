@@ -1,0 +1,21 @@
+# Clocks - force injected TimeProvider for deterministic, testable wall-clock reads.
+P:System.DateTime.Now;Use injected TimeProvider.GetLocalNow(); wall-clock reads must be deterministic
+P:System.DateTime.UtcNow;Use injected TimeProvider.GetUtcNow(); wall-clock reads must be deterministic
+P:System.DateTimeOffset.Now;Use injected TimeProvider.GetLocalNow(); wall-clock reads must be deterministic
+P:System.DateTimeOffset.UtcNow;Use injected TimeProvider.GetUtcNow(); wall-clock reads must be deterministic
+
+# Money - never cross the decimal/binary-floating-point boundary for price or quantity.
+M:System.Decimal.op_Explicit(System.Double)~System.Decimal;Never build money from double
+M:System.Decimal.op_Explicit(System.Decimal)~System.Double;Never widen money to double
+
+# Culture - money parsing must name its culture explicitly.
+M:System.Decimal.Parse(System.String);Pass CultureInfo.InvariantCulture explicitly
+M:System.Decimal.Parse(System.String,System.Globalization.NumberStyles);Pass CultureInfo.InvariantCulture explicitly
+M:System.Decimal.TryParse(System.String,System.Decimal@);Pass CultureInfo.InvariantCulture explicitly
+M:System.Decimal.TryParse(System.ReadOnlySpan{System.Char},System.Decimal@);Pass CultureInfo.InvariantCulture explicitly
+M:System.Decimal.TryParse(System.ReadOnlySpan{System.Byte},System.Decimal@);Pass CultureInfo.InvariantCulture explicitly
+M:System.Double.Parse(System.String);Pass CultureInfo.InvariantCulture explicitly
+M:System.Double.Parse(System.String,System.Globalization.NumberStyles);Pass CultureInfo.InvariantCulture explicitly
+M:System.Double.TryParse(System.String,System.Double@);Pass CultureInfo.InvariantCulture explicitly
+M:System.Double.TryParse(System.ReadOnlySpan{System.Char},System.Double@);Pass CultureInfo.InvariantCulture explicitly
+M:System.Double.TryParse(System.ReadOnlySpan{System.Byte},System.Double@);Pass CultureInfo.InvariantCulture explicitly

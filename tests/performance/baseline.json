@@ -1,0 +1,15 @@
+{
+  "_comment": "Numbers are recorded on the D10 reference machine; placeholders must never be replaced with invented measurements.",
+  "referenceMachine": {
+    "cpu": "RECORD_ON_REFERENCE_MACHINE",
+    "ram": "RECORD_ON_REFERENCE_MACHINE",
+    "os": "RECORD_ON_REFERENCE_MACHINE",
+    "dockerVersion": "RECORD_ON_REFERENCE_MACHINE",
+    "commitSha": "RECORD_ON_REFERENCE_MACHINE",
+    "recordedAtUtc": "RECORD_ON_REFERENCE_MACHINE"
+  },
+  "scenarios": {
+    "api-delivery-ingestion": { "throughputReqPerSec": null, "p99Ms": null },
+    "deliveries-read": { "throughputReqPerSec": null, "p99Ms": null }
+  }
+}

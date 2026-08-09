@@ -1,14 +1,10 @@
+using System.Globalization;
+using Dapper;
 using Microsoft.Extensions.Options;
 using Npgsql;
-using Dapper;
 using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.Infrastructure.Data;
-
-public interface INpgsqlConnectionFactory
-{
-    ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken);
-}
 
 public sealed class NpgsqlConnectionFactory : INpgsqlConnectionFactory, IAsyncDisposable
 {
@@ -28,12 +24,13 @@ public sealed class NpgsqlConnectionFactory : INpgsqlConnectionFactory, IAsyncDi
 
     private sealed class DateOnlyTypeHandler : SqlMapper.TypeHandler<DateOnly>
     {
-        public override DateOnly Parse(object value) => value switch
-        {
-            DateOnly date => date,
-            DateTime timestamp => DateOnly.FromDateTime(timestamp),
-            _ => DateOnly.Parse(value.ToString()!)
-        };
+        public override DateOnly Parse(object value) =>
+            value switch
+            {
+                DateOnly date => date,
+                DateTime timestamp => DateOnly.FromDateTime(timestamp),
+                _ => DateOnly.Parse(value.ToString()!, CultureInfo.InvariantCulture),
+            };
 
         public override void SetValue(System.Data.IDbDataParameter parameter, DateOnly value)
         {

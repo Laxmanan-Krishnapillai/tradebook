@@ -5,15 +5,17 @@ using Tradebook.Core.Interfaces;
 
 namespace Tradebook.UnitTests;
 
-public sealed class HandlerGroupBMarketPriceEndpointTests
+public sealed class HandlerGroupBMarketPriceEndpointTests : IDisposable
 {
     private static readonly Guid ActorId = Guid.NewGuid();
-    private static readonly CancellationTokenSource TokenSource = new();
     private static readonly DateOnly PriceDate = new(2026, 2, 3);
-    private static CancellationToken Token => TokenSource.Token;
+    private readonly CancellationTokenSource tokenSource = new();
+    private CancellationToken Token => tokenSource.Token;
+
+    public void Dispose() => tokenSource.Dispose();
 
     [Fact]
-    public async Task Upsert_returns_200_and_forwards_the_exact_request_actor_and_token()
+    public async Task UpsertReturns200AndForwardsTheExactRequestActorAndToken()
     {
         var expected = HandlerGroupBTestData.MarketPrice(PriceDate, version: 1);
         var repository = new RecordingMarketPriceRepository { UpsertResult = expected };
@@ -29,9 +31,13 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
     }
 
     [Fact]
-    public async Task Upsert_returns_404_after_a_failed_write_and_missing_lookup()
+    public async Task UpsertReturns404AfterAFailedWriteAndMissingLookup()
     {
-        var repository = new RecordingMarketPriceRepository { UpsertResult = null, GetByDateResult = null };
+        var repository = new RecordingMarketPriceRepository
+        {
+            UpsertResult = null,
+            GetByDateResult = null,
+        };
         var endpoint = Create<UpsertMarketPriceEndpoint>(repository);
         var request = Upsert(version: 4);
 
@@ -43,7 +49,7 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
     }
 
     [Fact]
-    public async Task Upsert_returns_409_with_current_state_after_a_failed_write()
+    public async Task UpsertReturns409WithCurrentStateAfterAFailedWrite()
     {
         var current = HandlerGroupBTestData.MarketPrice(PriceDate, version: 8);
         var repository = new RecordingMarketPriceRepository
@@ -63,7 +69,7 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
     }
 
     [Fact]
-    public async Task GetByDate_returns_200_with_the_repository_result_and_exact_call()
+    public async Task GetByDateReturns200WithTheRepositoryResultAndExactCall()
     {
         var expected = HandlerGroupBTestData.MarketPrice(PriceDate);
         var repository = new RecordingMarketPriceRepository { GetByDateResult = expected };
@@ -77,7 +83,7 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
     }
 
     [Fact]
-    public async Task GetByDate_returns_404_when_the_repository_has_no_row()
+    public async Task GetByDateReturns404WhenTheRepositoryHasNoRow()
     {
         var repository = new RecordingMarketPriceRepository { GetByDateResult = null };
         var endpoint = Create<GetMarketPriceByDateEndpoint>(repository);
@@ -89,14 +95,23 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
     }
 
     [Fact]
-    public async Task History_returns_200_and_forwards_the_exact_request_and_token()
+    public async Task HistoryReturns200AndForwardsTheExactRequestAndToken()
     {
         var expected = new GetMarketPriceHistoryResponse(
-            [HandlerGroupBTestData.MarketPrice(PriceDate)], 9, 3, 40, true);
+            [HandlerGroupBTestData.MarketPrice(PriceDate)],
+            9,
+            3,
+            40,
+            true
+        );
         var repository = new RecordingMarketPriceRepository { HistoryResult = expected };
         var endpoint = Create<GetMarketPriceHistoryEndpoint>(repository);
         var request = new GetMarketPriceHistoryRequest(
-            new DateOnly(2026, 1, 1), new DateOnly(2026, 3, 31), 3, 40);
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 3, 31),
+            3,
+            40
+        );
 
         await endpoint.HandleAsync(request, Token);
 
@@ -108,7 +123,7 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
     }
 
     [Fact]
-    public async Task Delete_returns_204_and_forwards_every_repository_argument()
+    public async Task DeleteReturns204AndForwardsEveryRepositoryArgument()
     {
         var repository = new RecordingMarketPriceRepository { DeleteResult = null };
         var endpoint = Create<DeleteMarketPriceEndpoint>(repository);
@@ -117,25 +132,37 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
         await endpoint.HandleAsync(request, Token);
 
         Assert.Equal(204, endpoint.HttpContext.Response.StatusCode);
-        Assert.Equal((PriceDate, 6L, "bad source data", ActorId, Token), Assert.Single(repository.DeleteCalls));
+        Assert.Equal(
+            (PriceDate, 6L, "bad source data", ActorId, Token),
+            Assert.Single(repository.DeleteCalls)
+        );
         Assert.Empty(repository.GetByDateCalls);
     }
 
     [Fact]
-    public async Task Delete_returns_404_without_loading_current_state_for_not_found()
+    public async Task DeleteReturns404WithoutLoadingCurrentStateForNotFound()
     {
-        var repository = new RecordingMarketPriceRepository { DeleteResult = MutationOutcome.NotFound };
+        var repository = new RecordingMarketPriceRepository
+        {
+            DeleteResult = MutationOutcome.NotFound,
+        };
         var endpoint = Create<DeleteMarketPriceEndpoint>(repository);
 
-        await endpoint.HandleAsync(new DeleteMarketPriceRequest(PriceDate, "bad source data", 6), Token);
+        await endpoint.HandleAsync(
+            new DeleteMarketPriceRequest(PriceDate, "bad source data", 6),
+            Token
+        );
 
         Assert.Equal(404, endpoint.HttpContext.Response.StatusCode);
-        Assert.Equal((PriceDate, 6L, "bad source data", ActorId, Token), Assert.Single(repository.DeleteCalls));
+        Assert.Equal(
+            (PriceDate, 6L, "bad source data", ActorId, Token),
+            Assert.Single(repository.DeleteCalls)
+        );
         Assert.Empty(repository.GetByDateCalls);
     }
 
     [Fact]
-    public async Task Delete_returns_409_with_current_state_for_version_conflict()
+    public async Task DeleteReturns409WithCurrentStateForVersionConflict()
     {
         var current = HandlerGroupBTestData.MarketPrice(PriceDate, version: 9);
         var repository = new RecordingMarketPriceRepository
@@ -145,38 +172,49 @@ public sealed class HandlerGroupBMarketPriceEndpointTests
         };
         var endpoint = Create<DeleteMarketPriceEndpoint>(repository);
 
-        await endpoint.HandleAsync(new DeleteMarketPriceRequest(PriceDate, "bad source data", 6), Token);
+        await endpoint.HandleAsync(
+            new DeleteMarketPriceRequest(PriceDate, "bad source data", 6),
+            Token
+        );
 
         Assert.Equal(409, endpoint.HttpContext.Response.StatusCode);
         Assert.Same(current, endpoint.Response);
-        Assert.Equal((PriceDate, 6L, "bad source data", ActorId, Token), Assert.Single(repository.DeleteCalls));
+        Assert.Equal(
+            (PriceDate, 6L, "bad source data", ActorId, Token),
+            Assert.Single(repository.DeleteCalls)
+        );
         Assert.Equal((PriceDate, Token), Assert.Single(repository.GetByDateCalls));
     }
 
-    private static UpsertMarketPriceRequest Upsert(long version) => new(
-        PriceDate,
-        31.75m,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        version);
+    private static UpsertMarketPriceRequest Upsert(long version) =>
+        new(
+            PriceDate,
+            31.75m,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            version
+        );
 
     private static TEndpoint Create<TEndpoint>(RecordingMarketPriceRepository repository)
         where TEndpoint : BaseEndpoint =>
         Factory.Create<TEndpoint>(
-            context => context.User = HandlerGroupBTestData.Principal(ActorId), repository);
+            context => context.User = HandlerGroupBTestData.Principal(ActorId),
+            repository
+        );
 
-    private static void AssertUpsertCall(
+    private void AssertUpsertCall(
         RecordingMarketPriceRepository repository,
-        UpsertMarketPriceRequest request)
+        UpsertMarketPriceRequest request
+    )
     {
         var call = Assert.Single(repository.UpsertCalls);
         Assert.Same(request, call.Request);

@@ -13,7 +13,7 @@ namespace Tradebook.Infrastructure.Outbox;
 /// the transactional outbox to SignalR. PostgreSQL remains the source of truth, so a
 /// capacity-one wake channel is sufficient and applies bounded backpressure.
 /// </summary>
-public sealed class OutboxDispatcher : BackgroundService
+public sealed partial class OutboxDispatcher : BackgroundService
 {
     private readonly INpgsqlConnectionFactory _connections;
     private readonly IOutboxEventFanout _fanout;
@@ -25,15 +25,17 @@ public sealed class OutboxDispatcher : BackgroundService
         {
             FullMode = BoundedChannelFullMode.DropWrite,
             SingleReader = true,
-            SingleWriter = false
-        });
+            SingleWriter = false,
+        }
+    );
 
     public OutboxDispatcher(
         INpgsqlConnectionFactory connections,
         IOutboxEventFanout fanout,
         IOptions<OutboxOptions> options,
         ILogger<OutboxDispatcher> logger,
-        IOutboxDispatchObserver? observer = null)
+        IOutboxDispatchObserver? observer = null
+    )
     {
         _connections = connections;
         _fanout = fanout;
@@ -46,7 +48,7 @@ public sealed class OutboxDispatcher : BackgroundService
     {
         var listener = ListenForWakeupsAsync(stoppingToken);
         var dispatcher = ConsumeWakeupsAsync(stoppingToken);
-        await Task.WhenAll(listener, dispatcher);
+        await Task.WhenAll(listener, dispatcher).ConfigureAwait(false);
     }
 
     private async Task ListenForWakeupsAsync(CancellationToken cancellationToken)
@@ -55,20 +57,29 @@ public sealed class OutboxDispatcher : BackgroundService
         {
             try
             {
-                await using var listenConnection = await _connections.OpenConnectionAsync(cancellationToken);
-                await using (var listen = new NpgsqlCommand("LISTEN outbox_new_event", listenConnection))
+                var listenConnection = await _connections
+                    .OpenConnectionAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                await using (listenConnection.ConfigureAwait(false))
                 {
-                    await listen.ExecuteNonQueryAsync(cancellationToken);
-                }
+                    var listen = new NpgsqlCommand("LISTEN outbox_new_event", listenConnection);
+                    await using (listen.ConfigureAwait(false))
+                    {
+                        await listen.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    }
 
-                SignalWakeup();
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    // A timeout provides the correctness fallback when a NOTIFY is lost.
-                    await listenConnection.WaitAsync(
-                        TimeSpan.FromSeconds(_options.FallbackPollSeconds),
-                        cancellationToken);
                     SignalWakeup();
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        // A timeout provides the correctness fallback when a NOTIFY is lost.
+                        await listenConnection
+                            .WaitAsync(
+                                TimeSpan.FromSeconds(_options.FallbackPollSeconds),
+                                cancellationToken
+                            )
+                            .ConfigureAwait(false);
+                        SignalWakeup();
+                    }
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -77,11 +88,8 @@ public sealed class OutboxDispatcher : BackgroundService
             }
             catch (Exception exception)
             {
-                _logger.LogError(
-                    exception,
-                    "Outbox LISTEN connection failed; backing off {BackoffSeconds}s before reconnecting.",
-                    _options.ErrorBackoffSeconds);
-                await BackoffAsync(cancellationToken);
+                LogListenFailure(_logger, exception, _options.ErrorBackoffSeconds);
+                await BackoffAsync(cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -90,17 +98,19 @@ public sealed class OutboxDispatcher : BackgroundService
     {
         try
         {
-            while (await _wakeups.Reader.WaitToReadAsync(cancellationToken))
+            while (await _wakeups.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                while (_wakeups.Reader.TryRead(out _))
-                {
-                    // Coalesce all pending wake signals before draining the source table.
-                }
+                // Capacity is one, so consuming a single item drains every coalesced wake signal.
+                _wakeups.Reader.TryRead(out _);
 
                 try
                 {
-                    while (await DispatchBatchAsync(cancellationToken) > 0)
+                    var dispatchedCount = await DispatchBatchAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    while (dispatchedCount > 0)
                     {
+                        dispatchedCount = await DispatchBatchAsync(cancellationToken)
+                            .ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -109,17 +119,15 @@ public sealed class OutboxDispatcher : BackgroundService
                 }
                 catch (Exception exception)
                 {
-                    _logger.LogError(
-                        exception,
-                        "Outbox dispatch failed; backing off {BackoffSeconds}s before retrying.",
-                        _options.ErrorBackoffSeconds);
-                    await BackoffAsync(cancellationToken);
+                    LogDispatchFailure(_logger, exception, _options.ErrorBackoffSeconds);
+                    await BackoffAsync(cancellationToken).ConfigureAwait(false);
                     SignalWakeup();
                 }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            LogCancellation(_logger);
         }
     }
 
@@ -127,76 +135,167 @@ public sealed class OutboxDispatcher : BackgroundService
 
     private async Task BackoffAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            await Task.Delay(TimeSpan.FromSeconds(_options.ErrorBackoffSeconds), cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        await Task.Delay(TimeSpan.FromSeconds(_options.ErrorBackoffSeconds), cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<int> DispatchBatchAsync(CancellationToken cancellationToken)
     {
-        await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var connection = await _connections
+            .OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                var batch = await ClaimBatchAsync(
+                        connection,
+                        transaction,
+                        _options.BatchSize,
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
 
+                if (batch.Count == 0)
+                {
+                    return 0;
+                }
+
+                await PublishBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+
+                await MarkProcessedAsync(connection, transaction, batch, cancellationToken)
+                    .ConfigureAwait(false);
+
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                return batch.Count;
+            }
+        }
+    }
+
+    private static async Task<IReadOnlyList<OutboxEventRecord>> ClaimBatchAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        int batchSize,
+        CancellationToken cancellationToken
+    )
+    {
         var batch = new List<OutboxEventRecord>();
-        await using (var claim = new NpgsqlCommand("""
+        var claim = new NpgsqlCommand(
+            """
             SELECT event_id, sequence_id, aggregate_type, aggregate_id, event_type, payload::text
             FROM outbox_events
             WHERE processed_at IS NULL
             ORDER BY sequence_id
             LIMIT @batchSize
             FOR UPDATE SKIP LOCKED
-            """, connection, transaction))
+            """,
+            connection,
+            transaction
+        );
+        await using (claim.ConfigureAwait(false))
         {
-            claim.Parameters.AddWithValue("batchSize", _options.BatchSize);
-            await using var reader = await claim.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            claim.Parameters.AddWithValue("batchSize", batchSize);
+            var reader = await claim.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using (reader.ConfigureAwait(false))
             {
-                batch.Add(new OutboxEventRecord(
-                    reader.GetGuid(0),
-                    reader.GetInt64(1),
-                    reader.GetString(2),
-                    reader.GetString(3),
-                    reader.GetString(4),
-                    reader.GetString(5)));
+                while (await (reader.ReadAsync(cancellationToken)).ConfigureAwait(false))
+                {
+                    batch.Add(
+                        new OutboxEventRecord(
+                            reader.GetGuid(0),
+                            reader.GetInt64(1),
+                            reader.GetString(2),
+                            reader.GetString(3),
+                            reader.GetString(4),
+                            reader.GetString(5)
+                        )
+                    );
+                }
             }
         }
 
-        if (batch.Count == 0)
-        {
-            return 0;
-        }
+        return batch;
+    }
 
+    private async Task PublishBatchAsync(
+        IReadOnlyList<OutboxEventRecord> batch,
+        CancellationToken cancellationToken
+    )
+    {
         foreach (var record in batch)
         {
-            await _fanout.PublishEntityChangedAsync(
-                record.EventId,
-                record.SequenceId,
-                record.AggregateType,
-                record.AggregateId,
-                record.EventType,
-                record.Payload,
-                cancellationToken);
+            await _fanout
+                .PublishEntityChangedAsync(
+                    record.EventId,
+                    record.SequenceId,
+                    record.AggregateType,
+                    record.AggregateId,
+                    record.EventType,
+                    record.Payload,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
         }
 
         if (_observer is not null)
         {
-            await _observer.BeforeMarkProcessedAsync(batch, cancellationToken);
+            await _observer
+                .BeforeMarkProcessedAsync(batch, cancellationToken)
+                .ConfigureAwait(false);
         }
+    }
 
-        await using (var mark = new NpgsqlCommand(
+    private static async Task MarkProcessedAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        IReadOnlyCollection<OutboxEventRecord> batch,
+        CancellationToken cancellationToken
+    )
+    {
+        var mark = new NpgsqlCommand(
             "UPDATE outbox_events SET processed_at = clock_timestamp() WHERE event_id = ANY(@ids)",
             connection,
-            transaction))
+            transaction
+        );
+        await using (mark.ConfigureAwait(false))
         {
-            mark.Parameters.AddWithValue("ids", batch.Select(static record => record.EventId).ToArray());
-            await mark.ExecuteNonQueryAsync(cancellationToken);
+            mark.Parameters.AddWithValue(
+                "ids",
+                batch.Select(static record => record.EventId).ToArray()
+            );
+            await mark.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
-
-        await transaction.CommitAsync(cancellationToken);
-        return batch.Count;
     }
+
+    [LoggerMessage(
+        EventId = 1,
+        Level = LogLevel.Error,
+        Message = "Outbox LISTEN connection failed; backing off {BackoffSeconds}s before reconnecting."
+    )]
+    private static partial void LogListenFailure(
+        ILogger logger,
+        Exception exception,
+        int backoffSeconds
+    );
+
+    [LoggerMessage(
+        EventId = 2,
+        Level = LogLevel.Error,
+        Message = "Outbox dispatch failed; backing off {BackoffSeconds}s before retrying."
+    )]
+    private static partial void LogDispatchFailure(
+        ILogger logger,
+        Exception exception,
+        int backoffSeconds
+    );
+
+    [LoggerMessage(
+        EventId = 3,
+        Level = LogLevel.Debug,
+        Message = "Outbox dispatcher stopped because cancellation was requested."
+    )]
+    private static partial void LogCancellation(ILogger logger);
 }

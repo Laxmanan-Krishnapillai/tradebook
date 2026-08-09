@@ -1,0 +1,27 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,targets,xml,yml,yaml,json}]
+indent_size = 2
+
+[*.{cs,csx}]
+# Banned APIs are errors at source; all other analyzer packages retain their authored
+# warning severities, which TreatWarningsAsErrors promotes to build failures.
+dotnet_diagnostic.RS0030.severity = error
+
+# Semantic code-style choices that CSharpier intentionally does not own.
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
+dotnet_style_readonly_field = true:suggestion
+csharp_using_directive_placement = outside_namespace:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_prefer_braces = true:suggestion
+csharp_style_prefer_readonly_struct = true:suggestion

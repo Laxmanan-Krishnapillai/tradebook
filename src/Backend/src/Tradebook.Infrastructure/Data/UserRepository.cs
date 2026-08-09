@@ -6,7 +6,10 @@ namespace Tradebook.Infrastructure.Data;
 
 public sealed class UserRepository(INpgsqlConnectionFactory connectionFactory) : IUserRepository
 {
-    public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken)
+    public async Task<User?> GetByUsernameAsync(
+        string username,
+        CancellationToken cancellationToken
+    )
     {
         const string sql = """
             SELECT id AS Id, username AS Username, password_hash AS PasswordHash,
@@ -15,8 +18,20 @@ public sealed class UserRepository(INpgsqlConnectionFactory connectionFactory) :
             WHERE username = @Username;
             """;
 
-        await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-        return await connection.QuerySingleOrDefaultAsync<User>(
-            new CommandDefinition(sql, new { Username = username }, cancellationToken: cancellationToken));
+        var connection = await connectionFactory
+            .OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            return await (
+                connection.QuerySingleOrDefaultAsync<User>(
+                    new CommandDefinition(
+                        sql,
+                        new { Username = username },
+                        cancellationToken: cancellationToken
+                    )
+                )
+            ).ConfigureAwait(false);
+        }
     }
 }
