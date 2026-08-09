@@ -87,7 +87,7 @@ public sealed class ToolingConfigurationTests
         var repositoryRoot = FindRepositoryRoot();
         var projectFiles = FindProjectFiles(repositoryRoot);
 
-        Assert.Equal(6, projectFiles.Length);
+        Assert.Equal(7, projectFiles.Length);
         foreach (var projectFile in projectFiles)
         {
             var project = XDocument.Load(projectFile);
@@ -671,6 +671,18 @@ public sealed class ToolingConfigurationTests
             Assert.True(
                 versions.TryAdd(package.Key, package.Value),
                 $"Task 14 package '{package.Key}' duplicates a Task 13 central pin."
+            );
+        }
+
+        var task20Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["dbup-postgresql"] = "7.0.1",
+        };
+        foreach (var package in task20Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"{package.Key} is pinned by more than one task"
             );
         }
 
