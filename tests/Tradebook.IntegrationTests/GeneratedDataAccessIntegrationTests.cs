@@ -17,11 +17,11 @@ public sealed class GeneratedDataAccessIntegrationTests(PostgresTestFixture post
         var counterpartyId = Guid.NewGuid();
         var contractId = ContractId.New();
         await connection.ExecuteAsync("""
-            INSERT INTO counterparties (id, name) VALUES (@CounterpartyId, 'sqlc counterparty');
+            INSERT INTO counterparties (id, shorthand, name) VALUES (@CounterpartyId, 'SQLC', 'sqlc counterparty');
             INSERT INTO contracts (
                 id, contract_name, counterparty_id, product_type, action,
                 fixed_price_gas_eur_mwh)
-            VALUES (@ContractId, 'sqlc contract', @CounterpartyId, 'Gas', 'Purchase', 42.125);
+            VALUES (@ContractId, 'sqlc contract', @CounterpartyId, 'Gas', 'Buy', 42.125);
             """, new { CounterpartyId = counterpartyId, ContractId = contractId.Value });
 
         using var queries = new ContractsSql(Postgres.ConnectionString);

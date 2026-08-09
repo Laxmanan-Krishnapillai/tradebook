@@ -48,6 +48,13 @@ public sealed class PostgresTestFixture : IAsyncLifetime
 public abstract class PostgresDatabaseTestBase(PostgresTestFixture fixture)
     : IClassFixture<PostgresTestFixture>, IAsyncLifetime
 {
+    static PostgresDatabaseTestBase()
+    {
+        // Deterministic Dapper handler registration for every derived test class;
+        // production registers the same set in NpgsqlConnectionFactory.
+        Tradebook.Infrastructure.Data.VogenTypeHandlers.RegisterAll();
+    }
+
     protected PostgresTestFixture Postgres { get; } = fixture;
 
     protected virtual bool ResetDatabaseBeforeEachTest => true;
