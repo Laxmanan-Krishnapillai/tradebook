@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
@@ -9,7 +8,7 @@ using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests;
 
-public sealed class PostgresTestFixture : IAsyncLifetime
+public sealed class PostgresTestFixture : IAsyncLifetime, IDisposable
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:17")
@@ -19,53 +18,41 @@ public sealed class PostgresTestFixture : IAsyncLifetime
         .Build();
 
     private NpgsqlConnection _connection = null!;
+    private Respawner _respawner = null!;
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public Task PauseAsync() => _container.PauseAsync();
-
-    public Task UnpauseAsync() => _container.UnpauseAsync();
-
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync();
-        await using var connections = new NpgsqlConnectionFactory(Options.Create(
-            new DatabaseOptions { ConnectionString = ConnectionString }));
-        await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance).MigrateAsync();
+        await _container.StartAsync().ConfigureAwait(false);
+        MigrationRunner.Run(ConnectionString);
 
         _connection = new NpgsqlConnection(ConnectionString);
-        await _connection.OpenAsync();
+        await _connection.OpenAsync().ConfigureAwait(false);
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_journal"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
-    public async Task ResetDatabaseAsync()
+    public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
+
+    public async ValueTask DisposeAsync()
     {
-        var respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public", "wolverine"],
-            TablesToIgnore = ["schema_migrations"]
-        });
-        await respawner.ResetAsync(_connection);
+        await _connection.DisposeAsync().ConfigureAwait(false);
+        await _container.DisposeAsync().ConfigureAwait(false);
     }
 
-    public async Task DisposeAsync()
+    public void Dispose()
     {
-        await _connection.DisposeAsync();
-        await _container.DisposeAsync();
+        _connection?.Dispose();
+        GC.SuppressFinalize(this);
     }
-
-}
-
-public abstract class PostgresDatabaseTestBase(PostgresTestFixture fixture)
-    : IClassFixture<PostgresTestFixture>, IAsyncLifetime
-{
-    protected PostgresTestFixture Postgres { get; } = fixture;
-
-    protected virtual bool ResetDatabaseBeforeEachTest => true;
-
-    public virtual Task InitializeAsync() =>
-        ResetDatabaseBeforeEachTest ? Postgres.ResetDatabaseAsync() : Task.CompletedTask;
-
-    public virtual Task DisposeAsync() => Task.CompletedTask;
-
 }

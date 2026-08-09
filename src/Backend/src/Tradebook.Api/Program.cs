@@ -2,82 +2,107 @@ using System.Text.Json.Serialization;
 using FastEndpoints;
 using JasperFx;
 using JasperFx.Resources;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using Tradebook_Core;
 using Tradebook.Api;
+using Tradebook.Api.ErrorHandling;
+using Tradebook.Api.Features.Health;
 using Tradebook.Api.Messaging;
+using Tradebook.Api.RealTime;
 using Tradebook.Api.Security;
+using Tradebook.Api.Serialization;
+using Tradebook.Core.Analytics;
 using Tradebook.Core.Interfaces;
 using Tradebook.Core.Messaging;
 using Tradebook.Infrastructure.Caching;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.DependencyInjection;
 using Tradebook.Infrastructure.Options;
-using Tradebook.Api.RealTime;
-using Tradebook.Core.Analytics;
-using Tradebook.Api.Features.Health;
-using Tradebook.Api.ErrorHandling;
+using Tradebook.Infrastructure.RealTime;
+using Tradebook.ServiceDefaults;
 using Wolverine;
 using Wolverine.Configuration;
 using Wolverine.ErrorHandling;
 using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Host.ApplyJasperFxExtensions();
-var connectionString = builder.Configuration["Database:ConnectionString"]
-    ?? throw new InvalidOperationException("Database:ConnectionString is required.");
-builder.Host.UseWolverine(options =>
+builder.AddServiceDefaults();
+VogenTypeHandlers.RegisterAll();
+builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.PersistMessagesWithPostgresql(connectionString, "wolverine");
-    options.Policies.UseDurableLocalQueues();
-    options.LocalQueueFor<EntityChangedDomainEvent>().Sequential();
-    options.Policies.AutoApplyTransactions();
-    options.Policies.OnException<NpgsqlException>().OrInner<NpgsqlException>()
-        .RetryWithCooldown(
-            TimeSpan.FromMilliseconds(50),
-            TimeSpan.FromMilliseconds(100),
-            TimeSpan.FromMilliseconds(250));
+    options.SerializerOptions.Converters.Add(new VogenTypesFactory());
+    options.SerializerOptions.Converters.Add(new MoneyJsonConverter());
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
 });
-builder.Services.AddResourceSetupOnStartup();
-builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolver = AppJsonSerializerContext.Default);
-builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateDataAnnotations().ValidateOnStart();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
+);
+builder.Services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateOnStart();
 builder.Services.AddTradebookPersistence();
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton<ICacheService, HybridCacheService>();
-builder.Services.AddScoped<ITransactionalEventPublisher, WolverineTransactionalEventPublisher>();
 var semanticModels = new SemanticModelLoader();
 builder.Services.AddSingleton(semanticModels);
 builder.Services.AddSingleton<SemanticQueryCompiler>();
-builder.Services.AddTradebookAuthentication(builder.Configuration);
+builder.Services.AddTradebookAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddTradebookHealthChecks();
 builder.Services.AddFastEndpoints();
+builder.Services.AddOpenApi();
 builder.Services.AddDashboardPush();
 builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services.AddHostedService<Tradebook.Infrastructure.Migrations.MigrationHostedService>();
+
+var wolverineConnectionString =
+    builder.Configuration["Database:ConnectionString"]
+    ?? throw new InvalidOperationException("Database:ConnectionString is required.");
+builder.Host.UseWolverine(options =>
+{
+    options.PersistMessagesWithPostgresql(wolverineConnectionString, "wolverine");
+    options.Policies.UseDurableLocalQueues();
+    options.LocalQueueFor<EntityChangedDomainEvent>().Sequential();
+    options.Policies.AutoApplyTransactions();
+    options
+        .Policies.OnException<NpgsqlException>()
+        .OrInner<NpgsqlException>()
+        .RetryWithCooldown(
+            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(250)
+        );
+});
+builder.Services.AddScoped<ITransactionalEventPublisher, WolverineTransactionalEventPublisher>();
+builder.Services.AddScoped<IRealtimeEventReader, PostgresRealtimeEventReader>();
+
+builder.Services.AddResourceSetupOnStartup();
 
 var app = builder.Build();
-
 try
 {
-    await using var connection = await app.Services
-        .GetRequiredService<INpgsqlConnectionFactory>()
-        .OpenConnectionAsync(CancellationToken.None);
-    await semanticModels.ValidateDatabaseSchemaAsync(connection);
+    var connection = await app
+        .Services.GetRequiredService<INpgsqlConnectionFactory>()
+        .OpenConnectionAsync(CancellationToken.None)
+        .ConfigureAwait(false);
+    await using var _ = connection.ConfigureAwait(false);
+    await semanticModels.ValidateDatabaseSchemaAsync(connection).ConfigureAwait(false);
 }
 catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
 {
     // Keep liveness independent from PostgreSQL availability. Readiness repeats the
     // validation and stays unhealthy until the database can be reached, while a
     // reachable database with semantic-model drift still fails startup above.
-    app.Logger.LogWarning(
-        exception,
-        "Semantic schema startup validation was deferred because PostgreSQL is unavailable.");
+    ProgramLog.SchemaValidationDeferred(app.Logger, exception);
 }
 
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseFastEndpoints(config => config.Serializer.Options.TypeInfoResolver = AppJsonSerializerContext.Default);
+app.UseFastEndpoints(config =>
+    config.Serializer.Options.TypeInfoResolver = AppJsonSerializerContext.Default
+);
+app.MapOpenApi().RequireAuthorization();
 app.MapTradebookHealthEndpoints();
 app.MapDashboardPushHub();
 
@@ -87,13 +112,9 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapFallbackToFile("{*path:regex(^(?!api|hubs)(.*)$)}", "index.html");
 
-if (args.FirstOrDefault() is { } firstArgument &&
-    !firstArgument.StartsWith("--", StringComparison.Ordinal))
+await app.RunAsync().ConfigureAwait(false);
+
+public partial class Program
 {
-    return await app.RunJasperFxCommands(args);
+    protected Program() { }
 }
-
-await app.RunAsync();
-return 0;
-
-public partial class Program;

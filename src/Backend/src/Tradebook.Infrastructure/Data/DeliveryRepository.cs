@@ -1,12 +1,17 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : IDeliveryRepository
+public sealed class DeliveryRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher
+) : IDeliveryRepository
 {
     private const string DetailsProjection = """
         id AS DeliveryId, contract_id AS ContractId, contract_instance_id AS ContractInstanceId,
@@ -105,6 +110,11 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "MA0051:Method is too long",
+        Justification = "Wolverine enlistment expanded the transaction body; decomposition post-merge."
+    )]
     public async Task<PhysicalDeliveryDetailsDto> CreateAtomicAsync(
         CreatePhysicalDeliveryRequest request,
         Guid actorId,
@@ -154,18 +164,20 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
                     )
                 ).ConfigureAwait(false)
             );
-            await (
-                RepositoryMutation.WriteOutboxAsync(
-                    connection,
-                    transaction,
-                    OutboxAggregateTypes.PhysicalDelivery,
-                    deliveryId.ToString(),
-                    "Created",
-                    details.Version,
-                    null,
-                    cancellationToken
+            await publisher
+                .EnlistAsync((DbTransaction)transaction, cancellationToken)
+                .ConfigureAwait(false);
+            await publisher
+                .PublishAsync(
+                    EntityChangedDomainEvent.Create(
+                        RealtimeAggregateTypes.PhysicalDelivery,
+                        deliveryId.ToString(),
+                        "Created",
+                        details.Version
+                    )
                 )
-            ).ConfigureAwait(false);
+                .ConfigureAwait(false);
+            await publisher.FlushAsync().ConfigureAwait(false);
             await (transaction.CommitAsync(cancellationToken)).ConfigureAwait(false);
             return details;
         }
@@ -213,23 +225,30 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
                 return null;
             }
             var details = DeliveryMapper.ToDto(row);
-            await (
-                RepositoryMutation.WriteOutboxAsync(
-                    connection,
-                    transaction,
-                    OutboxAggregateTypes.PhysicalDelivery,
-                    request.DeliveryId.Value.ToString(),
-                    "Updated",
-                    details.Version,
-                    null,
-                    cancellationToken
+            await publisher
+                .EnlistAsync((DbTransaction)transaction, cancellationToken)
+                .ConfigureAwait(false);
+            await publisher
+                .PublishAsync(
+                    EntityChangedDomainEvent.Create(
+                        RealtimeAggregateTypes.PhysicalDelivery,
+                        request.DeliveryId.Value.ToString(),
+                        "Updated",
+                        details.Version
+                    )
                 )
-            ).ConfigureAwait(false);
+                .ConfigureAwait(false);
+            await publisher.FlushAsync().ConfigureAwait(false);
             await (transaction.CommitAsync(cancellationToken)).ConfigureAwait(false);
             return details;
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "MA0051:Method is too long",
+        Justification = "Wolverine enlistment expanded the transaction body; decomposition post-merge."
+    )]
     public async Task<MutationOutcome?> CancelAtomicAsync(
         Guid deliveryId,
         long expectedVersion,
@@ -268,18 +287,21 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
             ).ConfigureAwait(false);
             if (row is not null)
             {
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.PhysicalDelivery,
-                        deliveryId.ToString(),
-                        "Cancelled",
-                        row.Version,
-                        reason,
-                        cancellationToken
+                await publisher
+                    .EnlistAsync((DbTransaction)transaction, cancellationToken)
+                    .ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.PhysicalDelivery,
+                            deliveryId.ToString(),
+                            "Cancelled",
+                            row.Version,
+                            reason
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 await (transaction.CommitAsync(cancellationToken)).ConfigureAwait(false);
                 return null;
             }

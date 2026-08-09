@@ -1,12 +1,17 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : IBioticketRepository
+public sealed class BioticketRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher
+) : IBioticketRepository
 {
     private const string Projection = """
         id AS BioticketId, contract_id AS ContractId, contract_instance_id AS ContractInstanceId,
@@ -115,18 +120,18 @@ public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : 
                         )
                     )
                 ).ConfigureAwait(false);
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.BioticketDelivery,
-                        created.BioticketId.Value.ToString(),
-                        "Created",
-                        created.Version,
-                        null,
-                        ct
+                await publisher.EnlistAsync((DbTransaction)transaction, ct).ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.BioticketDelivery,
+                            created.BioticketId.Value.ToString(),
+                            "Created",
+                            created.Version
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
                 return created;
             }
@@ -178,18 +183,18 @@ public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : 
                     await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
                     return null;
                 }
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.BioticketDelivery,
-                        updated.BioticketId.Value.ToString(),
-                        "Updated",
-                        updated.Version,
-                        null,
-                        ct
+                await publisher.EnlistAsync((DbTransaction)transaction, ct).ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.BioticketDelivery,
+                            updated.BioticketId.Value.ToString(),
+                            "Updated",
+                            updated.Version
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
                 return updated;
             }
@@ -230,18 +235,21 @@ public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : 
                 ).ConfigureAwait(false);
                 if (newVersion is not null)
                 {
-                    await (
-                        RepositoryMutation.WriteOutboxAsync(
-                            connection,
-                            transaction,
-                            OutboxAggregateTypes.BioticketDelivery,
-                            id.ToString(),
-                            "Cancelled",
-                            newVersion.Value,
-                            reason,
-                            ct
+                    await publisher
+                        .EnlistAsync((DbTransaction)transaction, ct)
+                        .ConfigureAwait(false);
+                    await publisher
+                        .PublishAsync(
+                            EntityChangedDomainEvent.Create(
+                                RealtimeAggregateTypes.BioticketDelivery,
+                                id.ToString(),
+                                "Cancelled",
+                                newVersion.Value,
+                                reason
+                            )
                         )
-                    ).ConfigureAwait(false);
+                        .ConfigureAwait(false);
+                    await publisher.FlushAsync().ConfigureAwait(false);
                     await (transaction.CommitAsync(ct)).ConfigureAwait(false);
                     return null;
                 }

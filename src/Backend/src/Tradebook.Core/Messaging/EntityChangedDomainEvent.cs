@@ -9,7 +9,8 @@ public sealed record EntityChangedDomainEvent(
     string AggregateType,
     string AggregateId,
     string EventType,
-    string PayloadJson)
+    string PayloadJson
+)
 {
     private static readonly JsonSerializerOptions PayloadOptions = new()
     {
@@ -22,27 +23,57 @@ public sealed record EntityChangedDomainEvent(
         string eventType,
         long version,
         string? reason = null,
-        Guid? actorId = null)
+        Guid? actorId = null
+    )
     {
         if (!RealtimeAggregateTypes.IsKnown(aggregateType))
         {
             throw new ArgumentOutOfRangeException(
-                nameof(aggregateType), aggregateType, "Unknown realtime aggregate type.");
+                nameof(aggregateType),
+                aggregateType,
+                "Unknown realtime aggregate type."
+            );
         }
 
-        var isWorkspaceDashboard = aggregateType == RealtimeAggregateTypes.WorkspaceDashboard;
+        var isWorkspaceDashboard = string.Equals(
+            aggregateType,
+            RealtimeAggregateTypes.WorkspaceDashboard,
+            StringComparison.Ordinal
+        );
         if (isWorkspaceDashboard != actorId.HasValue)
         {
             throw new ArgumentException(
-                "actorId is required only for WorkspaceDashboard events.", nameof(actorId));
+                "actorId is required only for WorkspaceDashboard events.",
+                nameof(actorId)
+            );
         }
 
         var payloadJson = isWorkspaceDashboard
             ? JsonSerializer.Serialize(
-                new { dashboardId = aggregateId, actorId = actorId!.Value, version }, PayloadOptions)
-            : JsonSerializer.Serialize(new { aggregateId, version, reason }, PayloadOptions);
+                new
+                {
+                    dashboardId = aggregateId,
+                    actorId = actorId!.Value,
+                    version,
+                },
+                PayloadOptions
+            )
+            : JsonSerializer.Serialize(
+                new
+                {
+                    aggregateId,
+                    version,
+                    reason,
+                },
+                PayloadOptions
+            );
 
         return new EntityChangedDomainEvent(
-            Guid.NewGuid(), aggregateType, aggregateId, eventType, payloadJson);
+            Guid.NewGuid(),
+            aggregateType,
+            aggregateId,
+            eventType,
+            payloadJson
+        );
     }
 }

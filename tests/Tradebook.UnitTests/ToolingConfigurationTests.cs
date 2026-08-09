@@ -679,6 +679,8 @@ public sealed class ToolingConfigurationTests
         }
 
         AddTask21Versions(versions);
+        versions.TryAdd("WolverineFx", "5.40.1");
+        versions.TryAdd("WolverineFx.Postgresql", "5.40.1");
 
         return versions;
     }

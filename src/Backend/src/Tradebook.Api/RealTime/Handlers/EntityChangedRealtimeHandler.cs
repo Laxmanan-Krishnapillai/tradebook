@@ -8,19 +8,39 @@ namespace Tradebook.Api.RealTime.Handlers;
 
 public sealed class EntityChangedRealtimeHandler(
     IHubContext<DashboardPushHub, IDashboardPushClient> hub,
-    INpgsqlConnectionFactory connections)
+    INpgsqlConnectionFactory connections
+)
 {
-    public async Task Handle(
-        EntityChangedDomainEvent message,
-        CancellationToken cancellationToken)
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Style",
+        "VSTHRD200:Use Async suffix",
+        Justification = "SignalR client contract / Wolverine handler naming convention."
+    )]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "MA0051:Method is too long",
+        Justification = "Single transactional dedupe-persist-push unit; decomposition post-merge."
+    )]
+    public async Task Handle(EntityChangedDomainEvent message, CancellationToken cancellationToken)
     {
-        var group = message.AggregateType == RealtimeAggregateTypes.WorkspaceDashboard
+        var group = string.Equals(
+            message.AggregateType,
+            RealtimeAggregateTypes.WorkspaceDashboard,
+            StringComparison.Ordinal
+        )
             ? WorkspaceGroup(message.PayloadJson)
             : $"entity:{message.AggregateType}";
 
-        await using var connection = await connections.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
+        var connection = await connections
+            .OpenConnectionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        var transaction = await connection
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var configuredTransaction = transaction.ConfigureAwait(false);
+        var command = connection.CreateCommand();
+        await using var configuredCommand = command.ConfigureAwait(false);
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO realtime_event_log (
@@ -47,21 +67,27 @@ public sealed class EntityChangedRealtimeHandler(
         command.Parameters.AddWithValue("eventType", message.EventType);
         command.Parameters.AddWithValue("payloadJson", message.PayloadJson);
 
-        var insertedSequence = await command.ExecuteScalarAsync(cancellationToken);
+        var insertedSequence = await command
+            .ExecuteScalarAsync(cancellationToken)
+            .ConfigureAwait(false);
         if (insertedSequence is not long sequenceId)
         {
-            await transaction.CommitAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        await hub.Clients.Group(group).EntityChanged(
-            message.EventId,
-            sequenceId,
-            message.AggregateType,
-            message.AggregateId,
-            message.EventType,
-            message.PayloadJson);
-        await transaction.CommitAsync(cancellationToken);
+        await hub
+            .Clients.Group(group)
+            .EntityChanged(
+                message.EventId,
+                sequenceId,
+                message.AggregateType,
+                message.AggregateId,
+                message.EventType,
+                message.PayloadJson
+            )
+            .ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static string WorkspaceGroup(string payloadJson)
@@ -69,9 +95,10 @@ public sealed class EntityChangedRealtimeHandler(
         try
         {
             using var payload = JsonDocument.Parse(payloadJson);
-            return payload.RootElement.TryGetProperty("actorId", out var actor) &&
-                   actor.ValueKind == JsonValueKind.String &&
-                   Guid.TryParse(actor.GetString(), out var actorId)
+            return
+                payload.RootElement.TryGetProperty("actorId", out var actor)
+                && actor.ValueKind == JsonValueKind.String
+                && Guid.TryParse(actor.GetString(), out var actorId)
                 ? $"dashboard:{actorId}"
                 : throw InvalidWorkspacePayload();
         }
@@ -82,7 +109,5 @@ public sealed class EntityChangedRealtimeHandler(
     }
 
     private static InvalidOperationException InvalidWorkspacePayload(Exception? inner = null) =>
-        new(
-            "WorkspaceDashboard domain event payload must contain a UUID actorId.",
-            inner);
+        new("WorkspaceDashboard domain event payload must contain a UUID actorId.", inner);
 }

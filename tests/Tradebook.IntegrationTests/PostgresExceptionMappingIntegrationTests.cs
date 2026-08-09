@@ -24,11 +24,7 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
         var contractId = await SeedContractAsync();
         await using var factory = CreateFactory();
         using var client = AuthenticatedClient(factory);
-        var request = new
-        {
-            contractId,
-            supplyMonth = "2026-01-01"
-        };
+        var request = new { contractId, supplyMonth = "2026-01-01" };
 
         using var created = await client.PostAsJsonAsync("/api/v1/capacity-bookings", request);
         using var duplicate = await client.PostAsJsonAsync("/api/v1/capacity-bookings", request);
@@ -47,13 +43,16 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
         var contractId = await SeedContractAsync();
         await using var factory = CreateFactory();
         using var client = AuthenticatedClient(factory);
-        using var created = await client.PostAsJsonAsync("/api/v1/capacity-bookings", new
-        {
-            contractId,
-            supplyMonth = "2026-02-01",
-            startDay = "2026-02-10",
-            endDay = "2026-02-20"
-        });
+        using var created = await client.PostAsJsonAsync(
+            "/api/v1/capacity-bookings",
+            new
+            {
+                contractId,
+                supplyMonth = "2026-02-01",
+                startDay = "2026-02-10",
+                endDay = "2026-02-20",
+            }
+        );
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         using var createdBody = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
         var capacityBookingId = createdBody.RootElement.GetProperty("capacityBookingId").GetGuid();
@@ -65,44 +64,60 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             {
                 capacityBookingId,
                 endDay = "2026-02-05",
-                version
-            });
+                version,
+            }
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, invalidUpdate.StatusCode);
-        Assert.Equal("application/problem+json", invalidUpdate.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            "application/problem+json",
+            invalidUpdate.Content.Headers.ContentType?.MediaType
+        );
         var errorBody = await invalidUpdate.Content.ReadAsStringAsync();
-        Assert.DoesNotContain("ck_capacity_delivery_dates", errorBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "ck_capacity_delivery_dates",
+            errorBody,
+            StringComparison.OrdinalIgnoreCase
+        );
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         var persisted = await connection.QuerySingleAsync<(DateOnly EndDay, long Version)>(
             "SELECT end_day AS EndDay, version AS Version FROM capacity_bookings WHERE id = @Id",
-            new { Id = capacityBookingId });
+            new { Id = capacityBookingId }
+        );
         Assert.Equal(new DateOnly(2026, 2, 20), persisted.EndDay);
         Assert.Equal(version, persisted.Version);
-        Assert.Equal(1, await WaitForRealtimeEventCountAsync(
-            connection,
-            capacityBookingId.ToString()));
+        Assert.Equal(
+            1,
+            await WaitForRealtimeEventCountAsync(connection, capacityBookingId.ToString())
+        );
     }
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
-            builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = Postgres.ConnectionString,
-                    ["Jwt:Issuer"] = "Tradebook",
-                    ["Jwt:Audience"] = "Tradebook",
-                    ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                }));
+            builder.ConfigureAppConfiguration(
+                (_, configuration) =>
+                    configuration.AddInMemoryCollection(
+                        new Dictionary<string, string?>
+                        {
+                            ["Database:ConnectionString"] = Postgres.ConnectionString,
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        }
+                    )
+            );
         });
 
     private static HttpClient AuthenticatedClient(WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", Token(Guid.NewGuid()));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            Token(Guid.NewGuid())
+        );
         return client;
     }
 
@@ -114,12 +129,15 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             Audience = "Tradebook",
             Subject = new ClaimsIdentity([
                 new Claim("sub", actorId.ToString()),
-                new Claim("role", "Trader")
+                new Claim("role", "Trader"),
             ]),
             Expires = DateTime.UtcNow.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)),
-                SecurityAlgorithms.HmacSha256)
+                new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)
+                ),
+                SecurityAlgorithms.HmacSha256
+            ),
         };
         var handler = new JwtSecurityTokenHandler();
         return handler.WriteToken(handler.CreateToken(descriptor));
@@ -135,8 +153,9 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             {
                 Id = counterpartyId,
                 Name = $"Constraint Counterparty {counterpartyId:N}",
-                Shorthand = $"CE{counterpartyId:N}"[..20]
-            });
+                Shorthand = $"CE{counterpartyId:N}"[..20],
+            }
+        );
         var contractId = Guid.NewGuid();
         await connection.ExecuteAsync(
             """
@@ -149,14 +168,16 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             {
                 Id = contractId,
                 Name = $"ERR45.SG.{contractId:N}.NOQS",
-                CounterpartyId = counterpartyId
-            });
+                CounterpartyId = counterpartyId,
+            }
+        );
         return contractId;
     }
 
     private static async Task<int> WaitForRealtimeEventCountAsync(
         NpgsqlConnection connection,
-        string aggregateId)
+        string aggregateId
+    )
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         while (DateTime.UtcNow < deadline)
@@ -167,7 +188,8 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
                 FROM realtime_event_log
                 WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @AggregateId
                 """,
-                new { AggregateId = aggregateId });
+                new { AggregateId = aggregateId }
+            );
             if (count > 0)
             {
                 return count;

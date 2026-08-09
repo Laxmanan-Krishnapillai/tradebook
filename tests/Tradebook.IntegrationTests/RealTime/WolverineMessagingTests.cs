@@ -19,12 +19,12 @@ using Npgsql;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Messaging;
-using Tradebook.IntegrationTests.Fixtures;
 using Tradebook.Infrastructure.Data;
+using Tradebook.IntegrationTests.Fixtures;
 using Wolverine;
 using Wolverine.Runtime;
-using Wolverine.Transports;
 using Wolverine.Tracking;
+using Wolverine.Transports;
 
 namespace Tradebook.IntegrationTests.RealTime;
 
@@ -32,8 +32,7 @@ namespace Tradebook.IntegrationTests.RealTime;
 public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
-    private static readonly Guid TestActorId =
-        Guid.Parse("3c7280d0-ab9e-48d1-87e9-848244111320");
+    private static readonly Guid TestActorId = Guid.Parse("3c7280d0-ab9e-48d1-87e9-848244111320");
 
     private sealed record PushedEvent(
         Guid EventId,
@@ -41,7 +40,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         string AggregateType,
         string AggregateId,
         string EventType,
-        string PayloadJson);
+        string PayloadJson
+    );
 
     private sealed record DispatchLatencyBaseline(
         int SampleCount,
@@ -51,7 +51,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         string OperatingSystem,
         string Processor,
         string DockerVersion,
-        IReadOnlyList<double> SamplesMilliseconds);
+        IReadOnlyList<double> SamplesMilliseconds
+    );
 
     [Fact]
     public async Task Rolled_back_command_persists_no_row_audit_outgoing_message_or_realtime_effect()
@@ -65,29 +66,45 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         {
             await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.MarketPrice}");
 
-            await ExecuteMarketPriceCommandAsync(
-                factory,
-                priceDate,
-                TestActorId,
-                commit: false);
+            await ExecuteMarketPriceCommandAsync(factory, priceDate, TestActorId, commit: false);
             await Task.Delay(250);
             Assert.DoesNotContain(events, item => item.AggregateId == aggregateId);
         }
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
-            new { PriceDate = priceDate }));
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM audit_log WHERE entity_name = 'market_prices' AND entity_id = @EntityId",
-            new { EntityId = priceDate.ToString("yyyy-MM-dd") }));
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM wolverine.wolverine_outgoing_envelopes"));
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes"));
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
-            new { AggregateId = aggregateId }));
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
+                new { PriceDate = priceDate }
+            )
+        );
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_name = 'market_prices' AND entity_id = @EntityId",
+                new { EntityId = priceDate.ToString("yyyy-MM-dd") }
+            )
+        );
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM wolverine.wolverine_outgoing_envelopes"
+            )
+        );
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes"
+            )
+        );
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
+                new { AggregateId = aggregateId }
+            )
+        );
     }
 
     [Fact]
@@ -98,47 +115,54 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         var committedDate = new DateOnly(2081, 2, 17);
         var rolledBackDate = new DateOnly(2081, 2, 18);
 
-        await ExecuteMarketPriceCommandAsync(
-            factory,
-            committedDate,
-            TestActorId,
-            commit: true);
+        await ExecuteMarketPriceCommandAsync(factory, committedDate, TestActorId, commit: true);
         await WaitForRealtimeLogAsync(committedDate.ToString("yyyy-MM-dd"));
-        await ExecuteMarketPriceCommandAsync(
-            factory,
-            rolledBackDate,
-            TestActorId,
-            commit: false);
+        await ExecuteMarketPriceCommandAsync(factory, rolledBackDate, TestActorId, commit: false);
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        var auditRows = (await connection.QueryAsync<(string EntityId, Guid ActorId)>(
-            """
-            SELECT entity_id AS EntityId, actor_id AS ActorId
-            FROM audit_log
-            WHERE entity_name = 'market_prices'
-              AND entity_id = ANY(@EntityIds)
-            """,
-            new
-            {
-                EntityIds = new[]
+        var auditRows = (
+            await connection.QueryAsync<(string EntityId, Guid ActorId)>(
+                """
+                SELECT entity_id AS EntityId, actor_id AS ActorId
+                FROM audit_log
+                WHERE entity_name = 'market_prices'
+                  AND entity_id = ANY(@EntityIds)
+                """,
+                new
                 {
-                    committedDate.ToString("yyyy-MM-dd"),
-                    rolledBackDate.ToString("yyyy-MM-dd"),
-                },
-            })).ToList();
+                    EntityIds = new[]
+                    {
+                        committedDate.ToString("yyyy-MM-dd"),
+                        rolledBackDate.ToString("yyyy-MM-dd"),
+                    },
+                }
+            )
+        ).ToList();
 
         var audit = Assert.Single(auditRows);
         Assert.Equal(committedDate.ToString("yyyy-MM-dd"), audit.EntityId);
         Assert.Equal(TestActorId, audit.ActorId);
-        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
-            new { PriceDate = committedDate }));
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
-            new { PriceDate = rolledBackDate }));
-        Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
-            new { AggregateId = rolledBackDate.ToString("yyyy-MM-dd") }));
+        Assert.Equal(
+            1,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
+                new { PriceDate = committedDate }
+            )
+        );
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
+                new { PriceDate = rolledBackDate }
+            )
+        );
+        Assert.Equal(
+            0,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
+                new { AggregateId = rolledBackDate.ToString("yyyy-MM-dd") }
+            )
+        );
     }
 
     [Fact]
@@ -151,7 +175,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             RealtimeAggregateTypes.PhysicalDelivery,
             aggregateId,
             "Created",
-            version: 1);
+            version: 1
+        );
         var envelopeId = Guid.Empty;
         var (hub, events) = await ConnectAsync(factory, CreateToken());
         await using (hub)
@@ -160,18 +185,22 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
 
             var firstDispatch = await factory.Services.SendMessageAndWaitAsync(
                 message,
-                timeoutInMilliseconds: 15_000);
-            var sentEnvelope = firstDispatch.Executed
-                .SingleEnvelope<EntityChangedDomainEvent>();
+                timeoutInMilliseconds: 15_000
+            );
+            var sentEnvelope = firstDispatch.Executed.SingleEnvelope<EntityChangedDomainEvent>();
             envelopeId = sentEnvelope.Id;
-            Assert.Equal(message.EventId,
-                Assert.IsType<EntityChangedDomainEvent>(sentEnvelope.Message).EventId);
+            Assert.Equal(
+                message.EventId,
+                Assert.IsType<EntityChangedDomainEvent>(sentEnvelope.Message).EventId
+            );
             await WaitForAsync(events, item => item.EventId == message.EventId);
 
             var runtime = factory.Services.GetRequiredService<IWolverineRuntime>();
-            var destination = sentEnvelope.Destination
+            var destination =
+                sentEnvelope.Destination
                 ?? throw new InvalidOperationException("Tracked envelope has no destination.");
-            var data = sentEnvelope.Data
+            var data =
+                sentEnvelope.Data
                 ?? throw new InvalidOperationException("Tracked envelope has no payload.");
             var duplicateEnvelope = new Envelope(message)
             {
@@ -194,8 +223,9 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             var receiver = Assert.IsAssignableFrom<IReceiver>(agent);
             var duplicateListener = new DuplicateDeliveryListener(destination);
             await receiver.ReceivedAsync(duplicateListener, duplicateEnvelope);
-            var completed = await duplicateListener.Completed.Task
-                .WaitAsync(TimeSpan.FromSeconds(10));
+            var completed = await duplicateListener.Completed.Task.WaitAsync(
+                TimeSpan.FromSeconds(10)
+            );
 
             Assert.Same(duplicateEnvelope, completed);
             Assert.False(duplicateEnvelope.WasPersistedInInbox);
@@ -205,15 +235,27 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         }
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM realtime_event_log WHERE event_id = @EventId",
-            new { message.EventId }));
-        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
-            new { EnvelopeId = envelopeId }));
-        Assert.Equal("Handled", await connection.QuerySingleAsync<string>(
-            "SELECT status FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
-            new { EnvelopeId = envelopeId }));
+        Assert.Equal(
+            1,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM realtime_event_log WHERE event_id = @EventId",
+                new { message.EventId }
+            )
+        );
+        Assert.Equal(
+            1,
+            await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
+                new { EnvelopeId = envelopeId }
+            )
+        );
+        Assert.Equal(
+            "Handled",
+            await connection.QuerySingleAsync<string>(
+                "SELECT status FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
+                new { EnvelopeId = envelopeId }
+            )
+        );
     }
 
     [Fact]
@@ -235,13 +277,16 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             firstDeliveryId = first.DeliveryId;
             var pushed = await WaitForAsync(
                 events,
-                item => item.AggregateId == first.DeliveryId.ToString());
+                item => item.AggregateId == first.DeliveryId.ToString()
+            );
             Assert.Equal(RealtimeAggregateTypes.PhysicalDelivery, pushed.AggregateType);
             Assert.Equal("Created", pushed.EventType);
             using (var payload = JsonDocument.Parse(pushed.PayloadJson))
             {
-                Assert.Equal(first.DeliveryId.ToString(),
-                    payload.RootElement.GetProperty("aggregateId").GetString());
+                Assert.Equal(
+                    first.DeliveryId.ToString(),
+                    payload.RootElement.GetProperty("aggregateId").GetString()
+                );
                 Assert.Equal(first.Version, payload.RootElement.GetProperty("version").GetInt64());
             }
 
@@ -252,24 +297,30 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         var second = await CreateDeliveryAsync(
             reconnectingClient,
             contractId,
-            new DateOnly(2082, 2, 1));
+            new DateOnly(2082, 2, 1)
+        );
         await WaitForRealtimeLogAsync(second.DeliveryId.ToString());
         var (reconnectedHub, _) = await ConnectAsync(factory, token);
         await using (reconnectedHub)
         {
             await reconnectedHub.InvokeAsync(
                 "Subscribe",
-                $"entity:{RealtimeAggregateTypes.PhysicalDelivery}");
+                $"entity:{RealtimeAggregateTypes.PhysicalDelivery}"
+            );
             var catchUp = await reconnectingClient.GetFromJsonAsync<GetEventsSinceResponse>(
-                $"/api/v1/events?afterSequence={lastSeenSequence}&limit=500");
+                $"/api/v1/events?afterSequence={lastSeenSequence}&limit=500"
+            );
 
             Assert.NotNull(catchUp);
             var replayed = Assert.Single(
                 catchUp.Events,
-                item => item.AggregateId == second.DeliveryId.ToString());
+                item => item.AggregateId == second.DeliveryId.ToString()
+            );
             Assert.True(replayed.SequenceId > lastSeenSequence);
-            Assert.DoesNotContain(catchUp.Events,
-                item => item.AggregateId == firstDeliveryId.ToString());
+            Assert.DoesNotContain(
+                catchUp.Events,
+                item => item.AggregateId == firstDeliveryId.ToString()
+            );
             Assert.True(catchUp.LatestSequence >= replayed.SequenceId);
         }
     }
@@ -293,7 +344,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         await using (hub)
         {
             await Assert.ThrowsAsync<HubException>(() =>
-                hub.InvokeAsync("Subscribe", "entity:Nope"));
+                hub.InvokeAsync("Subscribe", "entity:Nope")
+            );
         }
     }
 
@@ -305,7 +357,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         await using (hub)
         {
             await Assert.ThrowsAsync<HubException>(() =>
-                hub.InvokeAsync("Subscribe", $"dashboard:{Guid.NewGuid()}"));
+                hub.InvokeAsync("Subscribe", $"dashboard:{Guid.NewGuid()}")
+            );
         }
     }
 
@@ -315,7 +368,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         var recordBaseline = string.Equals(
             Environment.GetEnvironmentVariable("TRADEBOOK_RECORD_DISPATCH_BASELINE"),
             "1",
-            StringComparison.Ordinal);
+            StringComparison.Ordinal
+        );
         var baseline = recordBaseline ? null : await ReadDispatchLatencyBaselineAsync();
         var sampleCount = baseline?.SampleCount ?? 20;
 
@@ -332,7 +386,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                 await UpsertMarketPriceAndWaitAsync(
                     client,
                     events,
-                    new DateOnly(2083, 1, 1).AddDays(index));
+                    new DateOnly(2083, 1, 1).AddDays(index)
+                );
             }
 
             var samples = new List<double>(sampleCount);
@@ -349,38 +404,46 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             if (recordBaseline)
             {
                 Console.WriteLine(
-                    "TASK17_DISPATCH_BASELINE=" + JsonSerializer.Serialize(new
-                    {
-                        sampleCount,
-                        p99Milliseconds = measuredP99,
-                        samplesMilliseconds = samples,
-                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+                    "TASK17_DISPATCH_BASELINE="
+                        + JsonSerializer.Serialize(
+                            new
+                            {
+                                sampleCount,
+                                p99Milliseconds = measuredP99,
+                                samplesMilliseconds = samples,
+                            },
+                            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                        )
+                );
                 Assert.Fail(
-                    "Captured the Task 17 dispatch baseline. Commit the emitted measured " +
-                    "samples and provenance before running the regression gate.");
+                    "Captured the Task 17 dispatch baseline. Commit the emitted measured "
+                        + "samples and provenance before running the regression gate."
+                );
                 return;
             }
 
             Assert.NotNull(baseline);
             var regressionLimit = baseline.P99Milliseconds * 1.20;
             Console.WriteLine(
-                $"Task 17 dispatch latency: measured p99={measuredP99:F2} ms; " +
-                $"baseline={baseline.P99Milliseconds:F2} ms; 20% limit={regressionLimit:F2} ms; " +
-                $"samples=[{string.Join(", ", samples.Select(value => value.ToString("F2")))}]");
+                $"Task 17 dispatch latency: measured p99={measuredP99:F2} ms; "
+                    + $"baseline={baseline.P99Milliseconds:F2} ms; 20% limit={regressionLimit:F2} ms; "
+                    + $"samples=[{string.Join(", ", samples.Select(value => value.ToString("F2")))}]"
+            );
             Assert.True(
                 measuredP99 <= regressionLimit,
-                $"Dispatch p99 {measuredP99:F2} ms regressed more than 20% from " +
-                $"the measured {baseline.P99Milliseconds:F2} ms baseline.");
+                $"Dispatch p99 {measuredP99:F2} ms regressed more than 20% from "
+                    + $"the measured {baseline.P99Milliseconds:F2} ms baseline."
+            );
         }
     }
 
     private static async Task<DispatchLatencyBaseline> ReadDispatchLatencyBaselineAsync()
     {
-        var baselinePath = FindRepositoryFile(
-            "docs/baselines/task-17-dispatch-latency.json");
+        var baselinePath = FindRepositoryFile("docs/baselines/task-17-dispatch-latency.json");
         var baseline = JsonSerializer.Deserialize<DispatchLatencyBaseline>(
             await File.ReadAllTextAsync(baselinePath),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        );
         Assert.NotNull(baseline);
         Assert.True(baseline.P99Milliseconds > 0);
         Assert.Equal(baseline.SampleCount, baseline.SamplesMilliseconds.Count);
@@ -397,35 +460,43 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         WebApplicationFactory<Program> factory,
         DateOnly priceDate,
         Guid actorId,
-        bool commit)
+        bool commit
+    )
     {
         await using var scope = factory.Services.CreateAsyncScope();
-        var connections = scope.ServiceProvider
-            .GetRequiredService<INpgsqlConnectionFactory>();
-        var publisher = scope.ServiceProvider
-            .GetRequiredService<ITransactionalEventPublisher>();
+        var connections = scope.ServiceProvider.GetRequiredService<INpgsqlConnectionFactory>();
+        var publisher = scope.ServiceProvider.GetRequiredService<ITransactionalEventPublisher>();
         await using var connection = await connections.OpenConnectionAsync(default);
         await using var transaction = await connection.BeginTransactionAsync();
         try
         {
-            await connection.ExecuteAsync(new CommandDefinition(
-                "SELECT set_config('app.actor_id', @ActorId, true)",
-                new { ActorId = actorId.ToString() },
-                transaction));
-            var version = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-                """
-                INSERT INTO market_prices (price_date, ttf_eur_mwh)
-                VALUES (@PriceDate, 31.5)
-                RETURNING version
-                """,
-                new { PriceDate = priceDate },
-                transaction));
+            await connection.ExecuteAsync(
+                new CommandDefinition(
+                    "SELECT set_config('app.actor_id', @ActorId, true)",
+                    new { ActorId = actorId.ToString() },
+                    transaction
+                )
+            );
+            var version = await connection.ExecuteScalarAsync<long>(
+                new CommandDefinition(
+                    """
+                    INSERT INTO market_prices (price_date, ttf_eur_mwh)
+                    VALUES (@PriceDate, 31.5)
+                    RETURNING version
+                    """,
+                    new { PriceDate = priceDate },
+                    transaction
+                )
+            );
             await publisher.EnlistAsync(transaction, default);
-            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
-                RealtimeAggregateTypes.MarketPrice,
-                priceDate.ToString("yyyy-MM-dd"),
-                "Created",
-                version));
+            await publisher.PublishAsync(
+                EntityChangedDomainEvent.Create(
+                    RealtimeAggregateTypes.MarketPrice,
+                    priceDate.ToString("yyyy-MM-dd"),
+                    "Created",
+                    version
+                )
+            );
 
             if (!commit)
             {
@@ -447,9 +518,12 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         while (DateTime.UtcNow < deadline)
         {
-            if (await connection.ExecuteScalarAsync<bool>(
+            if (
+                await connection.ExecuteScalarAsync<bool>(
                     "SELECT EXISTS(SELECT 1 FROM realtime_event_log WHERE aggregate_id = @AggregateId)",
-                    new { AggregateId = aggregateId }))
+                    new { AggregateId = aggregateId }
+                )
+            )
             {
                 return;
             }
@@ -458,7 +532,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         }
 
         throw new TimeoutException(
-            $"No realtime event for aggregate '{aggregateId}' arrived within 15 seconds.");
+            $"No realtime event for aggregate '{aggregateId}' arrived within 15 seconds."
+        );
     }
 
     private async Task<Guid> SeedContractAsync()
@@ -472,7 +547,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                 Id = counterpartyId,
                 Name = $"Counterparty-{counterpartyId}",
                 Shorthand = $"CP{counterpartyId:N}"[..20],
-            });
+            }
+        );
         var contractId = Guid.NewGuid();
         await connection.ExecuteAsync(
             """
@@ -484,24 +560,29 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                 Id = contractId,
                 Name = $"TEST45.SG.{contractId:N}"[..40],
                 CounterpartyId = counterpartyId,
-            });
+            }
+        );
         return contractId;
     }
 
     private static async Task<CreatePhysicalDeliveryResponse> CreateDeliveryAsync(
         HttpClient client,
         Guid contractId,
-        DateOnly supplyMonth)
+        DateOnly supplyMonth
+    )
     {
-        using var response = await client.PostAsJsonAsync("/api/v1/deliveries", new
-        {
-            contractId,
-            bookType = "Sales",
-            supplyMonth = supplyMonth.ToString("yyyy-MM-dd"),
-            volumeNominatedMwh = 10m,
-            volumeRealisedMwh = 9m,
-            priceMechanism = "TTF",
-        });
+        using var response = await client.PostAsJsonAsync(
+            "/api/v1/deliveries",
+            new
+            {
+                contractId,
+                bookType = "Sales",
+                supplyMonth = supplyMonth.ToString("yyyy-MM-dd"),
+                volumeNominatedMwh = 10m,
+                volumeRealisedMwh = 9m,
+                priceMechanism = "TTF",
+            }
+        );
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CreatePhysicalDeliveryResponse>())!;
     }
@@ -509,12 +590,19 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     private static async Task UpsertMarketPriceAndWaitAsync(
         HttpClient client,
         ConcurrentQueue<PushedEvent> events,
-        DateOnly priceDate)
+        DateOnly priceDate
+    )
     {
         var aggregateId = priceDate.ToString("yyyy-MM-dd");
         using var response = await client.PutAsJsonAsync(
             $"/api/v1/market-prices/{aggregateId}",
-            new { priceDate = aggregateId, ttfEurMwh = 31.5m, version = 0 });
+            new
+            {
+                priceDate = aggregateId,
+                ttfEurMwh = 31.5m,
+                version = 0,
+            }
+        );
         response.EnsureSuccessStatusCode();
         await WaitForAsync(events, item => item.AggregateId == aggregateId);
     }
@@ -533,18 +621,21 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
-            builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = Postgres.ConnectionString,
-                    ["Jwt:Issuer"] = "Tradebook",
-                    ["Jwt:Audience"] = "Tradebook",
-                    ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
-                }));
+            builder.ConfigureAppConfiguration(
+                (_, configuration) =>
+                    configuration.AddInMemoryCollection(
+                        new Dictionary<string, string?>
+                        {
+                            ["Database:ConnectionString"] = Postgres.ConnectionString,
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        }
+                    )
+            );
         });
 
-    private static async Task ResetWolverineAsync(
-        WebApplicationFactory<Program> factory)
+    private static async Task ResetWolverineAsync(WebApplicationFactory<Program> factory)
     {
         var runtime = factory.Services.GetRequiredService<IWolverineRuntime>();
         await runtime.Storage.Admin.ClearAllAsync();
@@ -552,48 +643,58 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
 
     private static HttpClient AuthenticatedClient(
         WebApplicationFactory<Program> factory,
-        string token)
+        string token
+    )
     {
         var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 
     private static HubConnection BuildHubConnection(
         WebApplicationFactory<Program> factory,
         string? token,
-        out ConcurrentQueue<PushedEvent> events)
+        out ConcurrentQueue<PushedEvent> events
+    )
     {
         events = new ConcurrentQueue<PushedEvent>();
         var sink = events;
         var hub = new HubConnectionBuilder()
-            .WithUrl(new Uri(factory.Server.BaseAddress, "hubs/dashboard"), options =>
-            {
-                options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
-                options.Transports = HttpTransportType.LongPolling;
-                if (token is not null)
+            .WithUrl(
+                new Uri(factory.Server.BaseAddress, "hubs/dashboard"),
+                options =>
                 {
-                    options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                    options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
+                    options.Transports = HttpTransportType.LongPolling;
+                    if (token is not null)
+                    {
+                        options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                    }
                 }
-            })
+            )
             .AddMessagePackProtocol()
             .Build();
         hub.On<Guid, long, string, string, string, string>(
             "EntityChanged",
             (eventId, sequenceId, aggregateType, aggregateId, eventType, payloadJson) =>
-                sink.Enqueue(new PushedEvent(
-                    eventId,
-                    sequenceId,
-                    aggregateType,
-                    aggregateId,
-                    eventType,
-                    payloadJson)));
+                sink.Enqueue(
+                    new PushedEvent(
+                        eventId,
+                        sequenceId,
+                        aggregateType,
+                        aggregateId,
+                        eventType,
+                        payloadJson
+                    )
+                )
+        );
         return hub;
     }
 
-    private static async Task<(HubConnection Hub, ConcurrentQueue<PushedEvent> Events)>
-        ConnectAsync(WebApplicationFactory<Program> factory, string token)
+    private static async Task<(
+        HubConnection Hub,
+        ConcurrentQueue<PushedEvent> Events
+    )> ConnectAsync(WebApplicationFactory<Program> factory, string token)
     {
         var hub = BuildHubConnection(factory, token, out var events);
         await hub.StartAsync();
@@ -602,7 +703,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
 
     private static async Task<PushedEvent> WaitForAsync(
         ConcurrentQueue<PushedEvent> events,
-        Func<PushedEvent, bool> predicate)
+        Func<PushedEvent, bool> predicate
+    )
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
         while (DateTime.UtcNow < deadline)
@@ -617,13 +719,15 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         }
 
         throw new TimeoutException(
-            $"No matching SignalR event arrived within 15 seconds ({events.Count} received).");
+            $"No matching SignalR event arrived within 15 seconds ({events.Count} received)."
+        );
     }
 
     private static string CreateToken()
     {
         var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey));
+            Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)
+        );
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = "Tradebook",
@@ -641,13 +745,16 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
 
     private static string FindRepositoryFile(string relativePath)
     {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
-             directory is not null;
-             directory = directory.Parent)
+        for (
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            directory is not null;
+            directory = directory.Parent
+        )
         {
             var candidate = Path.Combine(
                 directory.FullName,
-                relativePath.Replace('/', Path.DirectorySeparatorChar));
+                relativePath.Replace('/', Path.DirectorySeparatorChar)
+            );
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -656,7 +763,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
 
         throw new FileNotFoundException(
             $"Could not locate repository file '{relativePath}'.",
-            relativePath);
+            relativePath
+        );
     }
 
     private sealed class InjectedCommandFailureException : Exception;
@@ -685,6 +793,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         }
 
         public ValueTask StopAsync() => ValueTask.CompletedTask;
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

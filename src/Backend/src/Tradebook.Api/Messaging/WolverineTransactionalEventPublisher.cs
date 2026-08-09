@@ -14,8 +14,7 @@ public sealed class WolverineTransactionalEventPublisher(IWolverineRuntime runti
     {
         cancellationToken.ThrowIfCancellationRequested();
         var database = (IMessageDatabase)_context.Storage;
-        return _context.EnlistInOutboxAsync(
-            new DatabaseEnvelopeTransaction(database, transaction));
+        return _context.EnlistInOutboxAsync(new DatabaseEnvelopeTransaction(database, transaction));
     }
 
     public ValueTask PublishAsync(EntityChangedDomainEvent domainEvent) =>

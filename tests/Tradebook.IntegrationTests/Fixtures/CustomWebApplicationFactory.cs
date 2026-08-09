@@ -1,14 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.Migrations;
-using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests.Fixtures;
 
@@ -24,61 +21,53 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         .Build();
 
     private NpgsqlConnection _connection = null!;
+    private Respawner _respawner = null!;
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        await _container.StartAsync();
+        await _container.StartAsync().ConfigureAwait(false);
         _connection = new NpgsqlConnection(ConnectionString);
-        await _connection.OpenAsync();
+        await _connection.OpenAsync().ConfigureAwait(false);
 
-        await using var connections = new NpgsqlConnectionFactory(Options.Create(
-            new DatabaseOptions { ConnectionString = ConnectionString }));
-        await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance).MigrateAsync();
+        MigrationRunner.Run(ConnectionString);
 
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_journal"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
-    public async Task ResetDatabaseAsync()
-    {
-        var respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public", "wolverine"],
-            TablesToIgnore =
-            [
-                "schema_migrations",
-                "wolverine_nodes",
-                "wolverine_node_assignments",
-                "wolverine_control_queue",
-                "wolverine_node_records",
-                "wolverine_agent_restrictions"
-            ]
-        });
-        await respawner.ResetAsync(_connection);
-    }
+    public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("Database:ConnectionString", ConnectionString);
-        builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Database:ConnectionString"] = ConnectionString,
-                ["Jwt:Issuer"] = "Tradebook",
-                ["Jwt:Audience"] = "Tradebook",
-                ["Jwt:SigningKey"] = JwtSigningKey
-            }));
+        builder.ConfigureAppConfiguration(
+            (_, configuration) =>
+                configuration.AddInMemoryCollection(
+                    new Dictionary<string, string?>(StringComparer.Ordinal)
+                    {
+                        ["Database:ConnectionString"] = ConnectionString,
+                        ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                        ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                    }
+                )
+        );
     }
 
     public override async ValueTask DisposeAsync()
     {
-        await _connection.DisposeAsync();
-        await _container.DisposeAsync();
-        await base.DisposeAsync();
+        await _connection.DisposeAsync().ConfigureAwait(false);
+        await _container.DisposeAsync().ConfigureAwait(false);
+        await base.DisposeAsync().ConfigureAwait(false);
     }
-
-    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
-
 }

@@ -41,14 +41,18 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
-            builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = Postgres.ConnectionString,
-                    ["Jwt:Issuer"] = "Tradebook",
-                    ["Jwt:Audience"] = "Tradebook",
-                    ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                }));
+            builder.ConfigureAppConfiguration(
+                (_, configuration) =>
+                    configuration.AddInMemoryCollection(
+                        new Dictionary<string, string?>
+                        {
+                            ["Database:ConnectionString"] = Postgres.ConnectionString,
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        }
+                    )
+            );
         });
 
     private async Task RenameVolumeColumnAsync(string from, string to)
@@ -59,7 +63,10 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
                 "ALTER TABLE physical_deliveries RENAME COLUMN volume_mwh TO volume_mwh_drifted",
             ("volume_mwh_drifted", "volume_mwh") =>
                 "ALTER TABLE physical_deliveries RENAME COLUMN volume_mwh_drifted TO volume_mwh",
-            _ => throw new ArgumentOutOfRangeException(nameof(from), "Unrecognized test column rename.")
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(from),
+                "Unrecognized test column rename."
+            ),
         };
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
