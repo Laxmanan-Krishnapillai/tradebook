@@ -28,7 +28,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync().ConfigureAwait(false);
         _connection = new NpgsqlConnection(ConnectionString);
@@ -82,6 +82,4 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         await _container.DisposeAsync().ConfigureAwait(false);
         await base.DisposeAsync().ConfigureAwait(false);
     }
-
-    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
 }

@@ -1,6 +1,5 @@
 using ArchUnitNET.Domain;
 using ArchUnitNET.Loader;
-using ArchUnitNET.xUnit;
 using Xunit;
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
 
@@ -30,23 +29,27 @@ public sealed class BoundaryTests
 
     [Fact]
     public void CoreDependsOnNeitherApiNorInfrastructure() =>
-        Types()
-            .That()
-            .ResideInNamespace("Tradebook.Core", true)
-            .Should()
-            .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api", true))
-            .AndShould()
-            .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Infrastructure", true))
-            .Check(Architecture);
+        Assert.True(
+            Types()
+                .That()
+                .ResideInNamespace("Tradebook.Core", true)
+                .Should()
+                .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api", true))
+                .AndShould()
+                .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Infrastructure", true))
+                .HasNoViolations(Architecture)
+        );
 
     [Fact]
     public void ApiEndpointsDoNotReferenceNpgsql() =>
-        Classes()
-            .That()
-            .ResideInNamespace("Tradebook.Api.Features", true)
-            .Should()
-            .NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
-            .Check(Architecture);
+        Assert.True(
+            Classes()
+                .That()
+                .ResideInNamespace("Tradebook.Api.Features", true)
+                .Should()
+                .NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
+                .HasNoViolations(Architecture)
+        );
 
     public static IEnumerable<object[]> SiblingFeaturePairs() =>
         from source in FeatureSlices
@@ -57,12 +60,14 @@ public sealed class BoundaryTests
     [Theory]
     [MemberData(nameof(SiblingFeaturePairs))]
     public void FeatureSlicesDoNotReferenceSiblings(string source, string target) =>
-        Types()
-            .That()
-            .ResideInNamespace($"Tradebook.Api.Features.{source}", true)
-            .Should()
-            .NotDependOnAny(
-                Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true)
-            )
-            .Check(Architecture);
+        Assert.True(
+            Types()
+                .That()
+                .ResideInNamespace($"Tradebook.Api.Features.{source}", true)
+                .Should()
+                .NotDependOnAny(
+                    Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true)
+                )
+                .HasNoViolations(Architecture)
+        );
 }
