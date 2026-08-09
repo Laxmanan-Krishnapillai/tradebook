@@ -9,6 +9,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props ./
 COPY src/Backend/ ./src/Backend/
+COPY src/Database/ ./src/Database/
 COPY tests/ ./tests/
 RUN dotnet restore src/Backend/Tradebook.sln
 RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj -c Release -o /app/publish --no-restore

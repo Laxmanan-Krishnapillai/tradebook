@@ -12,7 +12,6 @@ public static class MigrationRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        EnsureDatabase.For.PostgresqlDatabase(connectionString);
         var upgrader = DeployChanges.To
             .PostgresqlDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(
@@ -24,6 +23,13 @@ public static class MigrationRunner
             .LogToConsole()
             .Build();
 
+        if (upgrader.GetDiscoveredScripts().Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No embedded migration scripts were discovered; the build is missing src/Database/Migrations.");
+        }
+
+        EnsureDatabase.For.PostgresqlDatabase(connectionString);
         var result = upgrader.PerformUpgrade();
         if (!result.Successful)
         {
