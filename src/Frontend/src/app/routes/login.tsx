@@ -1,18 +1,17 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { LoginForm } from '../../components/auth/LoginForm';
+import { z } from 'zod';
 import {
   isSessionCurrent,
   validateInternalReturnPath,
 } from '../../lib/session/sessionController';
 
-interface LoginSearch {
-  redirect?: string;
-}
+import { internalPath } from '../../lib/validation/return-url';
+
+export const loginSearchSchema = z.object({ redirect: internalPath.optional().catch(undefined) });
 
 export const Route = createFileRoute('/login')({
-  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
-    redirect: validateInternalReturnPath(search.redirect),
-  }),
+  validateSearch: loginSearchSchema,
   beforeLoad: ({ context, search }) => {
     if (isSessionCurrent(Date.now(), context.session.get())) {
       throw redirect({
