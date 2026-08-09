@@ -16,6 +16,7 @@ public sealed class NpgsqlConnectionFactory : INpgsqlConnectionFactory, IAsyncDi
 
     public NpgsqlConnectionFactory(IOptions<DatabaseOptions> options)
     {
+        VogenTypeHandlers.RegisterAll();
         SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
         _dataSource = NpgsqlDataSource.Create(options.Value.ConnectionString);
     }

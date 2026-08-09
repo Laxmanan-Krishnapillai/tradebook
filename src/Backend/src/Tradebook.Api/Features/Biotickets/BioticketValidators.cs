@@ -9,7 +9,7 @@ public sealed class CreateBioticketValidator : Validator<CreateBioticketRequest>
 {
     public CreateBioticketValidator()
     {
-        RuleFor(x => x.ContractId).NotEmpty();
+        RuleFor(x => x.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.BookType).Must(x => x is "Sourcing" or "Sales");
         RuleFor(x => x.ContractMonth).Must(x => x != default && x.Day == 1);
         RuleFor(x => x.EndDay).GreaterThanOrEqualTo(x => x.StartDay).When(x => x.StartDay.HasValue && x.EndDay.HasValue);
@@ -24,7 +24,7 @@ public sealed class UpdateBioticketValidator : Validator<UpdateBioticketRequest>
 {
     public UpdateBioticketValidator()
     {
-        RuleFor(x => x.BioticketId).NotEmpty();
+        RuleFor(x => x.BioticketId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
         RuleFor(x => x.VolumeRealisedTon).GreaterThanOrEqualTo(0).When(x => x.VolumeRealisedTon.HasValue);
         RuleFor(x => x.VolumeTon).GreaterThanOrEqualTo(0).When(x => x.VolumeTon.HasValue);
@@ -42,7 +42,7 @@ public sealed class CancelBioticketValidator : Validator<CancelBioticketRequest>
 {
     public CancelBioticketValidator()
     {
-        RuleFor(x => x.BioticketId).NotEmpty();
+        RuleFor(x => x.BioticketId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Version).GreaterThan(0);
     }

@@ -24,7 +24,7 @@ public sealed class UpdateGooCertificateValidator : Validator<UpdateGooCertifica
 {
     public UpdateGooCertificateValidator()
     {
-        RuleFor(x => x.GooCertificateTransactionId).NotEmpty();
+        RuleFor(x => x.GooCertificateTransactionId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
         RuleFor(x => x.Status).Must(GooValidation.Status);
         RuleFor(x => x)
@@ -41,7 +41,7 @@ public sealed class RequestGooBatchExportValidator : Validator<RequestGooBatchEx
 {
     public RequestGooBatchExportValidator()
     {
-        RuleFor(x => x.GooCertificateTransactionId).NotEmpty();
+        RuleFor(x => x.GooCertificateTransactionId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
     }
 }
@@ -50,7 +50,7 @@ public sealed class DeleteGooCertificateValidator : Validator<DeleteGooCertifica
 {
     public DeleteGooCertificateValidator()
     {
-        RuleFor(x => x.GooCertificateTransactionId).NotEmpty();
+        RuleFor(x => x.GooCertificateTransactionId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Version).GreaterThan(0);
     }

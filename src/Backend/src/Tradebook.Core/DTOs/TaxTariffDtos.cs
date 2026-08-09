@@ -1,49 +1,51 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
 [ExportTsInterface]
 public sealed record CreateTaxTariffRequest(
-    Guid ContractId,
-    [property: TsOptional] Guid? CounterpartyId,
+    ContractId ContractId,
+    [property: TsOptional] CounterpartyId? CounterpartyId,
     DateOnly PeriodStart,
     DateOnly PeriodEnd,
-    [property: TsOptional] decimal? TaxLocalCurMwh,
-    [property: TsOptional] decimal? TsoLocalCurMwh,
-    [property: TsOptional] decimal? DsoLocalCurMwh,
-    [property: TsOptional] decimal? DsoTariffLocalCurDay,
-    [property: TsOptional] decimal? AdmFeeLocalCurMwh,
-    [property: TsOptional] decimal? BalFeeLocalCurMwh,
+    [property: TsOptional] Amount? TaxLocalCurMwh,
+    [property: TsOptional] Amount? TsoLocalCurMwh,
+    [property: TsOptional] Amount? DsoLocalCurMwh,
+    [property: TsOptional] Amount? DsoTariffLocalCurDay,
+    [property: TsOptional] Amount? AdmFeeLocalCurMwh,
+    [property: TsOptional] Amount? BalFeeLocalCurMwh,
     string Currency);
 
 [ExportTsInterface]
 public sealed record UpdateTaxTariffRequest(
-    Guid TaxTariffId,
-    [property: TsOptional] decimal? TaxLocalCurMwh,
-    [property: TsOptional] decimal? TsoLocalCurMwh,
-    [property: TsOptional] decimal? DsoLocalCurMwh,
-    [property: TsOptional] decimal? DsoTariffLocalCurDay,
-    [property: TsOptional] decimal? AdmFeeLocalCurMwh,
-    [property: TsOptional] decimal? BalFeeLocalCurMwh,
+    TaxTariffId TaxTariffId,
+    [property: TsOptional] Amount? TaxLocalCurMwh,
+    [property: TsOptional] Amount? TsoLocalCurMwh,
+    [property: TsOptional] Amount? DsoLocalCurMwh,
+    [property: TsOptional] Amount? DsoTariffLocalCurDay,
+    [property: TsOptional] Amount? AdmFeeLocalCurMwh,
+    [property: TsOptional] Amount? BalFeeLocalCurMwh,
     string Currency,
     long Version);
 
 [ExportTsInterface]
 public sealed record TaxTariffDetailsDto(
-    Guid TaxTariffId, Guid ContractId,
-    [property: TsOptional] Guid? CounterpartyId,
+    TaxTariffId TaxTariffId, ContractId ContractId,
+    [property: TsOptional] CounterpartyId? CounterpartyId,
     DateOnly PeriodStart, DateOnly PeriodEnd,
-    [property: TsOptional] decimal? TaxLocalCurMwh,
-    [property: TsOptional] decimal? TsoLocalCurMwh,
-    [property: TsOptional] decimal? DsoLocalCurMwh,
-    [property: TsOptional] decimal? DsoTariffLocalCurDay,
-    [property: TsOptional] decimal? AdmFeeLocalCurMwh,
-    [property: TsOptional] decimal? BalFeeLocalCurMwh,
+    [property: TsOptional] Amount? TaxLocalCurMwh,
+    [property: TsOptional] Amount? TsoLocalCurMwh,
+    [property: TsOptional] Amount? DsoLocalCurMwh,
+    [property: TsOptional] Amount? DsoTariffLocalCurDay,
+    [property: TsOptional] Amount? AdmFeeLocalCurMwh,
+    [property: TsOptional] Amount? BalFeeLocalCurMwh,
     string Currency, long Version, DateTime CreatedAt, DateTime UpdatedAt);
 
 [ExportTsInterface]
 public sealed record GetTaxTariffHistoryRequest(
-    [property: TsOptional] Guid? ContractId,
+    [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] DateOnly? EffectiveOn,
     int Page = 1,
     int PageSize = 50);
@@ -53,4 +55,4 @@ public sealed record GetTaxTariffHistoryResponse(
     IReadOnlyList<TaxTariffDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
 
 [ExportTsInterface]
-public sealed record DeleteTaxTariffRequest(Guid TaxTariffId, string Reason, long Version);
+public sealed record DeleteTaxTariffRequest(TaxTariffId TaxTariffId, string Reason, long Version);

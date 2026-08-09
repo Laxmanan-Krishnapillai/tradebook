@@ -109,8 +109,8 @@ public sealed class DomainRepositoryIntegrationTests(PostgresTestFixture postgre
             "SELECT COUNT(*) FROM audit_log WHERE actor_id = @ActorId", new { ActorId = actorId });
         Assert.True(auditedActors >= 9);
 
-        Assert.NotEqual(Guid.Empty, goo.GooCertificateTransactionId);
-        Assert.NotEqual(Guid.Empty, tax.TaxTariffId);
+        Assert.NotEqual(Guid.Empty, goo.GooCertificateTransactionId.Value);
+        Assert.NotEqual(Guid.Empty, tax.TaxTariffId.Value);
     }
 
     [Fact]

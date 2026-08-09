@@ -8,7 +8,7 @@ public sealed class CreateCapacityBookingValidator : Validator<CreateCapacityBoo
 {
     public CreateCapacityBookingValidator()
     {
-        RuleFor(x => x.ContractId).NotEmpty();
+        RuleFor(x => x.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.SupplyMonth).Must(x => x != default && x.Day == 1);
         RuleFor(x => x.ContractInstanceId).MaximumLength(120).When(x => x.ContractInstanceId is not null);
         RuleFor(x => x.PriceMechanism).Must(x => x is null or "GTF/THE - Yearly" or "GTF/THE - Monthly" or "THE/GTF - Yearly" or "THE/GTF - Monthly");
@@ -21,7 +21,7 @@ public sealed class UpdateCapacityBookingValidator : Validator<UpdateCapacityBoo
 {
     public UpdateCapacityBookingValidator()
     {
-        RuleFor(x => x.CapacityBookingId).NotEmpty();
+        RuleFor(x => x.CapacityBookingId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Version).GreaterThan(0);
         RuleFor(x => x.PriceMechanism).Must(x => x is null or "GTF/THE - Yearly" or "GTF/THE - Monthly" or "THE/GTF - Yearly" or "THE/GTF - Monthly");
         RuleFor(x => x.EndDay).GreaterThanOrEqualTo(x => x.StartDay).When(x => x.StartDay.HasValue && x.EndDay.HasValue);
@@ -40,7 +40,7 @@ public sealed class DeleteCapacityBookingValidator : Validator<DeleteCapacityBoo
 {
     public DeleteCapacityBookingValidator()
     {
-        RuleFor(x => x.CapacityBookingId).NotEmpty();
+        RuleFor(x => x.CapacityBookingId).Must(id => id.Value != Guid.Empty);
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Version).GreaterThan(0);
     }

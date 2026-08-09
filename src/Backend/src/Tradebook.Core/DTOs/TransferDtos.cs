@@ -1,64 +1,66 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
 [ExportTsInterface]
 public sealed record CreateTransferRequest(
-    Guid ContractId,
+    ContractId ContractId,
     DateOnly SupplyMonth,
     [property: TsOptional] string? ContractInstanceId,
-    [property: TsOptional] Guid? CounterpartyId,
+    [property: TsOptional] CounterpartyId? CounterpartyId,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? TradingArea,
-    [property: TsOptional] decimal? CapacityMw,
-    [property: TsOptional] decimal? BookedCapacityMw,
-    [property: TsOptional] decimal? VolumeMwh,
-    [property: TsOptional] decimal? BalancingEffectMwh,
+    [property: TsOptional] Quantity? CapacityMw,
+    [property: TsOptional] Quantity? BookedCapacityMw,
+    [property: TsOptional] Quantity? VolumeMwh,
+    [property: TsOptional] Quantity? BalancingEffectMwh,
     [property: TsOptional] DateOnly? StartDay,
     [property: TsOptional] DateOnly? EndDay,
     [property: TsOptional] string? PriceMechanism,
-    [property: TsOptional] decimal? TransportCostEurMwh,
-    [property: TsOptional] decimal? CapacityCostEurMwh,
+    [property: TsOptional] Amount? TransportCostEurMwh,
+    [property: TsOptional] Quantity? CapacityCostEurMwh,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comments);
 
 [ExportTsInterface]
 public sealed record UpdateTransferRequest(
-    Guid TransferId,
+    TransferId TransferId,
     [property: TsOptional] string? TradingArea,
-    [property: TsOptional] decimal? CapacityMw,
-    [property: TsOptional] decimal? BookedCapacityMw,
-    [property: TsOptional] decimal? VolumeMwh,
-    [property: TsOptional] decimal? BalancingEffectMwh,
+    [property: TsOptional] Quantity? CapacityMw,
+    [property: TsOptional] Quantity? BookedCapacityMw,
+    [property: TsOptional] Quantity? VolumeMwh,
+    [property: TsOptional] Quantity? BalancingEffectMwh,
     [property: TsOptional] string? PriceMechanism,
-    [property: TsOptional] decimal? TransportCostEurMwh,
-    [property: TsOptional] decimal? CapacityCostEurMwh,
+    [property: TsOptional] Amount? TransportCostEurMwh,
+    [property: TsOptional] Quantity? CapacityCostEurMwh,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comments,
     long Version);
 
 [ExportTsInterface]
 public sealed record TransferDetailsDto(
-    Guid TransferId, Guid ContractId, string ContractInstanceId, DateOnly SupplyMonth,
-    [property: TsOptional] Guid? CounterpartyId,
+    TransferId TransferId, ContractId ContractId, string ContractInstanceId, DateOnly SupplyMonth,
+    [property: TsOptional] CounterpartyId? CounterpartyId,
     [property: TsOptional] string? BalancingGroup,
     [property: TsOptional] string? TradingArea,
-    [property: TsOptional] decimal? CapacityMw,
-    [property: TsOptional] decimal? BookedCapacityMw,
-    [property: TsOptional] decimal? VolumeMwh,
-    [property: TsOptional] decimal? BalancingEffectMwh,
+    [property: TsOptional] Quantity? CapacityMw,
+    [property: TsOptional] Quantity? BookedCapacityMw,
+    [property: TsOptional] Quantity? VolumeMwh,
+    [property: TsOptional] Quantity? BalancingEffectMwh,
     [property: TsOptional] DateOnly? StartDay,
     [property: TsOptional] DateOnly? EndDay,
     [property: TsOptional] string? PriceMechanism,
-    [property: TsOptional] decimal? TransportCostEurMwh,
-    [property: TsOptional] decimal? CapacityCostEurMwh,
+    [property: TsOptional] Amount? TransportCostEurMwh,
+    [property: TsOptional] Quantity? CapacityCostEurMwh,
     [property: TsOptional] string? Status,
     [property: TsOptional] string? Comments,
     long Version, DateTime CreatedAt, DateTime UpdatedAt);
 
 [ExportTsInterface]
 public sealed record GetTransferHistoryRequest(
-    [property: TsOptional] Guid? ContractId,
+    [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] string? Status,
     [property: TsOptional] DateOnly? FromMonth,
     [property: TsOptional] DateOnly? ToMonth,
@@ -70,4 +72,4 @@ public sealed record GetTransferHistoryResponse(
     IReadOnlyList<TransferDetailsDto> Items, int TotalCount, int Page, int PageSize, bool HasNextPage);
 
 [ExportTsInterface]
-public sealed record CancelTransferRequest(Guid TransferId, string Reason, long Version);
+public sealed record CancelTransferRequest(TransferId TransferId, string Reason, long Version);
