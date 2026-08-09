@@ -33,8 +33,14 @@ jobs:
               - 'tests/Tradebook.ArchitectureTests/**'
               - 'Directory.Build.*'
               - 'Directory.Packages.props'
+              - '.editorconfig'
+              - 'BannedSymbols.txt'
               - 'global.json'
               - '.config/dotnet-tools.json'
+              - 'bin/check-banned-api.sh'
+              - 'bin/verify.sh'
+              - 'docs/architecture/decision-log.md'
+              - 'docs/tasks/task-13-platform-currency-and-central-package-management.md'
               - 'tgconfig.json'
               - 'stryker-config.json'
               - '.github/workflows/ci.yml'
@@ -126,6 +132,8 @@ jobs:
       - run: dotnet tool restore
       - run: dotnet restore src/Backend/Tradebook.sln
       - run: dotnet restore tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj
+      - run: dotnet tool run csharpier check .
+      - run: bash bin/check-banned-api.sh
       - run: dotnet build src/Backend/Tradebook.sln -c Debug --no-restore -warnaserror
       - run: dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj --no-restore
       - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --no-restore

@@ -10,8 +10,11 @@ using Tradebook.Core.Interfaces;
 
 namespace Tradebook.Api.Features.Auth.Login;
 
-public sealed class LoginEndpoint(IUserRepository users, IOptions<JwtOptions> options)
-    : Endpoint<LoginRequest, LoginResponse>
+public sealed class LoginEndpoint(
+    IUserRepository users,
+    IOptions<JwtOptions> options,
+    TimeProvider timeProvider
+) : Endpoint<LoginRequest, LoginResponse>
 {
     private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(8);
 
@@ -21,22 +24,22 @@ public sealed class LoginEndpoint(IUserRepository users, IOptions<JwtOptions> op
         AllowAnonymous(); // sole anonymous API route (Task 02 §3.8, D11)
     }
 
-    public override async Task HandleAsync(LoginRequest request, CancellationToken cancellationToken)
+    public override async Task HandleAsync(LoginRequest req, CancellationToken ct)
     {
-        var user = await users.GetByUsernameAsync(request.Username, cancellationToken);
+        var user = await (users.GetByUsernameAsync(req.Username, ct)).ConfigureAwait(false);
 
         // 401 with no detail on which factor failed (§3.8). Verify against a dummy hash on
         // unknown usernames to keep the response time independent of user existence.
         var passwordOk = user is not null
-            ? PasswordHasher.Verify(request.Password, user.PasswordHash)
-            : PasswordHasher.Verify(request.Password, UnknownUserHash);
+            ? PasswordHasher.Verify(req.Password, user.PasswordHash)
+            : PasswordHasher.Verify(req.Password, UnknownUserHash);
         if (user is null || !user.IsActive || !passwordOk)
         {
-            await Send.UnauthorizedAsync(cancellationToken);
+            await (Send.UnauthorizedAsync(ct)).ConfigureAwait(false);
             return;
         }
 
-        var expiresAt = DateTimeOffset.UtcNow.Add(TokenLifetime);
+        var expiresAt = timeProvider.GetUtcNow().Add(TokenLifetime);
         var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, user.Id.ToString()) };
         claims.AddRange(user.Roles.Select(role => new Claim("role", role)));
 
@@ -47,9 +50,13 @@ public sealed class LoginEndpoint(IUserRepository users, IOptions<JwtOptions> op
             audience: jwt.Audience,
             claims: claims,
             expires: expiresAt.UtcDateTime,
-            signingCredentials: new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256));
+            signingCredentials: new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256)
+        );
 
-        await Send.OkAsync(new LoginResponse(new JwtSecurityTokenHandler().WriteToken(token), expiresAt, user.Id), cancellation: cancellationToken);
+        var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+        await (
+            Send.OkAsync(LoginMapper.ToResponse(user, accessToken, expiresAt), cancellation: ct)
+        ).ConfigureAwait(false);
     }
 
     private static readonly string UnknownUserHash = PasswordHasher.Hash(Guid.NewGuid().ToString());

@@ -8,5 +8,6 @@ public interface IOutboxEventReader
         long afterSequence,
         int limit,
         Guid actorId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken
+    );
 }

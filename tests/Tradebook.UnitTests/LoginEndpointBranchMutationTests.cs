@@ -16,7 +16,7 @@ public sealed class LoginEndpointBranchMutationTests
     private const string SigningKey = "branch-test-signing-key-with-enough-entropy-123456";
 
     [Fact]
-    public async Task Active_user_without_roles_returns_its_actor_id_and_a_subject_only_token()
+    public async Task ActiveUserWithoutRolesReturnsItsActorIdAndASubjectOnlyToken()
     {
         const string username = "roleless-user";
         const string password = "S3cure!passphrase";
@@ -30,7 +30,12 @@ public sealed class LoginEndpointBranchMutationTests
         Assert.Equal(200, endpoint.HttpContext.Response.StatusCode);
         Assert.Equal(user.Id, endpoint.Response.ActorId);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(endpoint.Response.AccessToken);
-        Assert.Equal(user.Id.ToString(), token.Claims.Single(claim => claim.Type == "sub").Value);
+        Assert.Equal(
+            user.Id.ToString(),
+            token
+                .Claims.Single(claim => string.Equals(claim.Type, "sub", StringComparison.Ordinal))
+                .Value
+        );
         Assert.DoesNotContain(token.Claims, claim => claim.Type is "role" or ClaimTypes.Role);
         Assert.Equal(1, users.Calls);
         Assert.Equal(username, users.Username);
@@ -42,7 +47,7 @@ public sealed class LoginEndpointBranchMutationTests
     [InlineData("inactive-user")]
     [InlineData("wrong-password")]
     [InlineData("malformed-hash")]
-    public async Task Each_invalid_credential_branch_independently_returns_401(string scenario)
+    public async Task EachInvalidCredentialBranchIndependentlyReturns401(string scenario)
     {
         const string username = "trader";
         const string correctPassword = "S3cure!passphrase";
@@ -54,27 +59,33 @@ public sealed class LoginEndpointBranchMutationTests
                 username,
                 PasswordHasher.Hash(correctPassword),
                 isActive: false,
-                roles: ["Trader"]),
+                roles: ["Trader"]
+            ),
             "wrong-password" => User(
                 username,
                 PasswordHasher.Hash(correctPassword),
                 isActive: true,
-                roles: ["Trader"]),
+                roles: ["Trader"]
+            ),
             "malformed-hash" => User(
                 username,
                 "pbkdf2-sha256.209999.c2FsdA==.aGFzaA==",
                 isActive: true,
-                roles: ["Trader"]),
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+                roles: ["Trader"]
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
-        if (scenario == "wrong-password")
+        if (string.Equals(scenario, "wrong-password", StringComparison.Ordinal))
             requestedPassword = "definitely-wrong";
 
         var users = new RecordingUserRepository(user);
         using var cancellation = new CancellationTokenSource();
         var endpoint = CreateEndpoint(users);
 
-        await endpoint.HandleAsync(new LoginRequest(username, requestedPassword), cancellation.Token);
+        await endpoint.HandleAsync(
+            new LoginRequest(username, requestedPassword),
+            cancellation.Token
+        );
 
         Assert.Equal(401, endpoint.HttpContext.Response.StatusCode);
         Assert.Equal(1, users.Calls);
@@ -86,24 +97,25 @@ public sealed class LoginEndpointBranchMutationTests
         Factory.Create<LoginEndpoint>(
             context => context.AddTestServices(services => services.AddHttpContextAccessor()),
             users,
-            Microsoft.Extensions.Options.Options.Create(new JwtOptions
-            {
-                SigningKey = SigningKey,
-                Issuer = "BranchTestIssuer",
-                Audience = "BranchTestAudience"
-            }));
+            Microsoft.Extensions.Options.Options.Create(
+                new JwtOptions
+                {
+                    SigningKey = SigningKey,
+                    Issuer = "BranchTestIssuer",
+                    Audience = "BranchTestAudience",
+                }
+            ),
+            TimeProvider.System
+        );
 
-    private static User User(
-        string username,
-        string passwordHash,
-        bool isActive,
-        string[] roles) => new()
+    private static User User(string username, string passwordHash, bool isActive, string[] roles) =>
+        new()
         {
             Id = Guid.NewGuid(),
             Username = username,
             PasswordHash = passwordHash,
             IsActive = isActive,
-            Roles = roles
+            Roles = roles,
         };
 
     private sealed class RecordingUserRepository(User? result) : IUserRepository

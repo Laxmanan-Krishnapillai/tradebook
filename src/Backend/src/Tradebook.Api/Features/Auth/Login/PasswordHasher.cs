@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 
 namespace Tradebook.Api.Features.Auth.Login;
@@ -16,17 +17,30 @@ public static class PasswordHasher
     public static string Hash(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, HashSize);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(
+            password,
+            salt,
+            Iterations,
+            HashAlgorithmName.SHA256,
+            HashSize
+        );
         return $"{Prefix}.{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
     }
 
     public static bool Verify(string password, string encodedHash)
     {
         var parts = encodedHash.Split('.');
-        if (parts.Length != 4
-            || parts[0] != Prefix
-            || !int.TryParse(parts[1], out var iterations)
-            || iterations < Iterations)
+        if (
+            parts.Length != 4
+            || !string.Equals(parts[0], Prefix, StringComparison.Ordinal)
+            || !int.TryParse(
+                parts[1],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var iterations
+            )
+            || iterations < Iterations
+        )
         {
             return false;
         }
@@ -48,7 +62,13 @@ public static class PasswordHasher
             return false;
         }
 
-        var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, expected.Length);
+        var actual = Rfc2898DeriveBytes.Pbkdf2(
+            password,
+            salt,
+            iterations,
+            HashAlgorithmName.SHA256,
+            expected.Length
+        );
         return CryptographicOperations.FixedTimeEquals(actual, expected);
     }
 }

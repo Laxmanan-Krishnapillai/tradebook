@@ -142,5 +142,26 @@ NuGet Central Package Management is the sole package-version source. Root
 `CentralPackageTransitivePinningEnabled`; project files keep versionless
 `PackageReference` entries. Transitive pinning makes security-response upgrades explicit
 and reviewable in one manifest instead of relying on whichever transitive version restore
-selects. `GlobalPackageReference` is deliberately documented but unused here; Task 14 owns
-the repo-wide analyzer entries.
+selects. D15 reserves `GlobalPackageReference` for Task 14; D16 activates it for the
+repo-wide analyzer entries.
+
+## D16 — Backend compile-time safety toolchain (2026-08-09)
+
+Analyzer findings are build failures on every .NET project. The repository enables the
+SDK analyzers plus Meziantou.Analyzer 3.0.139, SonarAnalyzer.CSharp 10.30.0.144632,
+Microsoft.CodeAnalysis.BannedApiAnalyzers 5.6.0, and
+Microsoft.VisualStudio.Threading.Analyzers 18.7.23 as `GlobalPackageReference` entries
+with `PrivateAssets="all"`. `BannedSymbols.txt` makes direct wall-clock reads, lossy
+decimal/double money conversions, and culture-implicit numeric parsing compile-time
+errors. Test projects additionally reference xunit.analyzers 1.27.0.
+
+CSharpier 1.3.0 is the sole backend formatter. The matching `CSharpier.MsBuild` global
+package checks formatting during builds, while the pinned local-tool manifest drives the
+same whole-repository `csharpier check` command in local verification and CI. Keeping the
+CLI and MSBuild package at one version makes formatting deterministic across editors,
+developer machines, and CI.
+
+DTO/domain mapping uses Riok.Mapperly 4.3.1 source-generated partial mappers. Options use
+Microsoft.Extensions.Options 10.0.10 source-generated `[OptionsValidator]` validators and
+startup `.ValidateOnStart()` checks. These choices keep mapping and configuration
+validation compile-time generated, with no reflection-based mapping or validation path.

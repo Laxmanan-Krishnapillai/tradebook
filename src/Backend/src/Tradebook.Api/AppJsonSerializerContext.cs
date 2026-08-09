@@ -1,11 +1,14 @@
 using System.Text.Json.Serialization;
-using Tradebook.Core.DTOs;
-using Tradebook.Core.Analytics;
 using Tradebook.Api.Features.Analytics;
+using Tradebook.Core.Analytics;
+using Tradebook.Core.DTOs;
 
 namespace Tradebook.Api;
 
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+)]
 [JsonSerializable(typeof(CreatePhysicalDeliveryRequest))]
 [JsonSerializable(typeof(CreatePhysicalDeliveryResponse))]
 [JsonSerializable(typeof(PhysicalDeliveryDetailsDto))]

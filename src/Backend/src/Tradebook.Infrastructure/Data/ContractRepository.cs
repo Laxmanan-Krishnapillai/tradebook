@@ -22,68 +22,8 @@ public sealed class ContractRepository(INpgsqlConnectionFactory connections) : I
         version AS Version, created_at AS CreatedAt, updated_at AS UpdatedAt
         """;
 
-    public async Task<ContractDetailsDto?> GetByIdAsync(Guid contractId, CancellationToken ct)
-    {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        return await connection.QuerySingleOrDefaultAsync<ContractDetailsDto>(new CommandDefinition(
-            $"SELECT {Projection} FROM contracts WHERE id = @ContractId",
-            new { ContractId = contractId }, cancellationToken: ct));
-    }
-
-    public async Task<GetContractHistoryResponse> GetHistoryAsync(GetContractHistoryRequest request, CancellationToken ct)
-    {
-        var (page, size, offset) = RepositoryMutation.Page(request.Page, request.PageSize);
-        var filters = new List<string>();
-        var parameters = new DynamicParameters(new { Limit = size, Offset = offset });
-        if (request.CounterpartyId is { } counterpartyId) { filters.Add("counterparty_id = @CounterpartyId"); parameters.Add("CounterpartyId", counterpartyId); }
-        if (!string.IsNullOrWhiteSpace(request.ProductType)) { filters.Add("product_type::text = @ProductType"); parameters.Add("ProductType", request.ProductType); }
-        if (!string.IsNullOrWhiteSpace(request.Action)) { filters.Add("action::text = @Action"); parameters.Add("Action", request.Action); }
-        if (request.IsActive is { } isActive) { filters.Add("is_active = @IsActive"); parameters.Add("IsActive", isActive); }
-        var where = filters.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", filters);
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        var items = (await connection.QueryAsync<ContractDetailsDto>(new CommandDefinition(
-            $"SELECT {Projection} FROM contracts{where} ORDER BY contract_name LIMIT @Limit OFFSET @Offset",
-            parameters, cancellationToken: ct))).AsList();
-        var total = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            $"SELECT COUNT(*) FROM contracts{where}", parameters, cancellationToken: ct));
-        return new(items.AsReadOnly(), total, page, size, offset + items.Count < total);
-    }
-
-    public async Task<ContractDetailsDto> CreateAtomicAsync(CreateContractRequest request, Guid actorId, CancellationToken ct)
-    {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct);
-        const string insert = """
-            INSERT INTO contracts (
-                contract_name, counterparty_id, product_type, action, company_shorthand,
-                country_code, country_dial_code, contract_number, year_of_contract,
-                sourcing_center, sales_center, balancing_group, goo_quality, subsidy_status,
-                price_mechanism_gas, fixed_price_gas_eur_mwh, contract_type, comment)
-            VALUES (
-                @ContractName, @CounterpartyId, CAST(@ProductType AS product_type_enum),
-                CAST(@Action AS action_enum), @CompanyShorthand, @CountryCode,
-                @CountryDialCode, @ContractNumber, @YearOfContract, @SourcingCenter,
-                @SalesCenter, @BalancingGroup, CAST(@GooQuality AS goo_quality_enum),
-                CAST(@SubsidyStatus AS subsidy_status_enum),
-                CAST(@PriceMechanismGas AS gas_price_mech_enum), @FixedPriceGasEurMwh,
-                CAST(COALESCE(@ContractType, 'External') AS contract_type_enum), @Comment)
-            RETURNING
-            """ + " " + Projection;
-        var created = await connection.QuerySingleAsync<ContractDetailsDto>(new CommandDefinition(
-            insert, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Contract,
-            created.ContractId.ToString(), "Created", created.Version, null, ct);
-        await transaction.CommitAsync(ct);
-        return created;
-    }
-
-    public async Task<ContractDetailsDto?> UpdateAtomicAsync(UpdateContractRequest request, Guid actorId, CancellationToken ct)
-    {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct);
-        var updated = await connection.QuerySingleOrDefaultAsync<ContractDetailsDto>(new CommandDefinition("""
+    private const string UpdateSql =
+        """
             UPDATE contracts SET
                 contract_name = @ContractName, counterparty_id = @CounterpartyId,
                 product_type = CAST(@ProductType AS product_type_enum),
@@ -99,33 +39,237 @@ public sealed class ContractRepository(INpgsqlConnectionFactory connections) : I
                 updated_at = clock_timestamp(), version = version + 1
             WHERE id = @ContractId AND version = @Version
             RETURNING
-            """ + " " + Projection, request, transaction, cancellationToken: ct));
-        if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Contract,
-            updated.ContractId.ToString(), "Updated", updated.Version, null, ct);
-        await transaction.CommitAsync(ct);
-        return updated;
+            """
+        + " "
+        + Projection;
+
+    public async Task<ContractDetailsDto?> GetByIdAsync(Guid contractId, CancellationToken ct)
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            return await (
+                connection.QuerySingleOrDefaultAsync<ContractDetailsDto>(
+                    new CommandDefinition(
+                        $"SELECT {Projection} FROM contracts WHERE id = @ContractId",
+                        new { ContractId = contractId },
+                        cancellationToken: ct
+                    )
+                )
+            ).ConfigureAwait(false);
+        }
     }
 
-    public async Task<MutationOutcome?> DeactivateAtomicAsync(Guid contractId, long version, string reason, Guid actorId, CancellationToken ct)
+    public async Task<GetContractHistoryResponse> GetHistoryAsync(
+        GetContractHistoryRequest request,
+        CancellationToken ct
+    )
     {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct);
-        var newVersion = await connection.ExecuteScalarAsync<long?>(new CommandDefinition("""
-            UPDATE contracts SET is_active = FALSE, updated_at = clock_timestamp(), version = version + 1
-            WHERE id = @ContractId AND version = @Version RETURNING version
-            """, new { ContractId = contractId, Version = version }, transaction, cancellationToken: ct));
-        if (newVersion is not null)
+        var (page, size, offset) = RepositoryMutation.Page(request.Page, request.PageSize);
+        var parameters = new
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Contract,
-                contractId.ToString(), "Deactivated", newVersion.Value, reason, ct);
-            await transaction.CommitAsync(ct);
-            return null;
+            Limit = size,
+            Offset = offset,
+            request.CounterpartyId,
+            ProductType = string.IsNullOrWhiteSpace(request.ProductType)
+                ? null
+                : request.ProductType,
+            Action = string.IsNullOrWhiteSpace(request.Action) ? null : request.Action,
+            request.IsActive,
+        };
+        const string rowsSql =
+            $"SELECT {Projection} FROM contracts WHERE (@CounterpartyId IS NULL OR counterparty_id = @CounterpartyId) AND (@ProductType IS NULL OR product_type::text = @ProductType) AND (@Action IS NULL OR action::text = @Action) AND (@IsActive IS NULL OR is_active = @IsActive) ORDER BY contract_name LIMIT @Limit OFFSET @Offset";
+        const string countSql =
+            "SELECT COUNT(*) FROM contracts WHERE (@CounterpartyId IS NULL OR counterparty_id = @CounterpartyId) AND (@ProductType IS NULL OR product_type::text = @ProductType) AND (@Action IS NULL OR action::text = @Action) AND (@IsActive IS NULL OR is_active = @IsActive)";
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var items = (
+                await (
+                    connection.QueryAsync<ContractDetailsDto>(
+                        new CommandDefinition(rowsSql, parameters, cancellationToken: ct)
+                    )
+                ).ConfigureAwait(false)
+            ).AsList();
+            var total = await (
+                connection.ExecuteScalarAsync<int>(
+                    new CommandDefinition(countSql, parameters, cancellationToken: ct)
+                )
+            ).ConfigureAwait(false);
+            return new(items.AsReadOnly(), total, page, size, offset + items.Count < total);
         }
-        await transaction.RollbackAsync(ct);
-        var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
-            "SELECT EXISTS(SELECT 1 FROM contracts WHERE id = @Id)", new { Id = contractId }, cancellationToken: ct));
-        return exists ? MutationOutcome.VersionConflict : MutationOutcome.NotFound;
+    }
+
+    public async Task<ContractDetailsDto> CreateAtomicAsync(
+        CreateContractRequest request,
+        Guid actorId,
+        CancellationToken ct
+    )
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                await (
+                    RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct)
+                ).ConfigureAwait(false);
+                const string insert =
+                    """
+                        INSERT INTO contracts (
+                            contract_name, counterparty_id, product_type, action, company_shorthand,
+                            country_code, country_dial_code, contract_number, year_of_contract,
+                            sourcing_center, sales_center, balancing_group, goo_quality, subsidy_status,
+                            price_mechanism_gas, fixed_price_gas_eur_mwh, contract_type, comment)
+                        VALUES (
+                            @ContractName, @CounterpartyId, CAST(@ProductType AS product_type_enum),
+                            CAST(@Action AS action_enum), @CompanyShorthand, @CountryCode,
+                            @CountryDialCode, @ContractNumber, @YearOfContract, @SourcingCenter,
+                            @SalesCenter, @BalancingGroup, CAST(@GooQuality AS goo_quality_enum),
+                            CAST(@SubsidyStatus AS subsidy_status_enum),
+                            CAST(@PriceMechanismGas AS gas_price_mech_enum), @FixedPriceGasEurMwh,
+                            CAST(COALESCE(@ContractType, 'External') AS contract_type_enum), @Comment)
+                        RETURNING
+                        """
+                    + " "
+                    + Projection;
+                var created = await (
+                    connection.QuerySingleAsync<ContractDetailsDto>(
+                        new CommandDefinition(insert, request, transaction, cancellationToken: ct)
+                    )
+                ).ConfigureAwait(false);
+                await (
+                    RepositoryMutation.WriteOutboxAsync(
+                        connection,
+                        transaction,
+                        OutboxAggregateTypes.Contract,
+                        created.ContractId.ToString(),
+                        "Created",
+                        created.Version,
+                        null,
+                        ct
+                    )
+                ).ConfigureAwait(false);
+                await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                return created;
+            }
+        }
+    }
+
+    public async Task<ContractDetailsDto?> UpdateAtomicAsync(
+        UpdateContractRequest request,
+        Guid actorId,
+        CancellationToken ct
+    )
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                await (
+                    RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct)
+                ).ConfigureAwait(false);
+                var updated = await (
+                    connection.QuerySingleOrDefaultAsync<ContractDetailsDto>(
+                        new CommandDefinition(
+                            UpdateSql,
+                            request,
+                            transaction,
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                if (updated is null)
+                {
+                    await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
+                    return null;
+                }
+                await (
+                    RepositoryMutation.WriteOutboxAsync(
+                        connection,
+                        transaction,
+                        OutboxAggregateTypes.Contract,
+                        updated.ContractId.ToString(),
+                        "Updated",
+                        updated.Version,
+                        null,
+                        ct
+                    )
+                ).ConfigureAwait(false);
+                await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                return updated;
+            }
+        }
+    }
+
+    public async Task<MutationOutcome?> DeactivateAtomicAsync(
+        Guid contractId,
+        long version,
+        string reason,
+        Guid actorId,
+        CancellationToken ct
+    )
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                await (
+                    RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct)
+                ).ConfigureAwait(false);
+                var newVersion = await (
+                    connection.ExecuteScalarAsync<long?>(
+                        new CommandDefinition(
+                            """
+                            UPDATE contracts SET is_active = FALSE, updated_at = clock_timestamp(), version = version + 1
+                            WHERE id = @ContractId AND version = @Version RETURNING version
+                            """,
+                            new { ContractId = contractId, Version = version },
+                            transaction,
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                if (newVersion is not null)
+                {
+                    await (
+                        RepositoryMutation.WriteOutboxAsync(
+                            connection,
+                            transaction,
+                            OutboxAggregateTypes.Contract,
+                            contractId.ToString(),
+                            "Deactivated",
+                            newVersion.Value,
+                            reason,
+                            ct
+                        )
+                    ).ConfigureAwait(false);
+                    await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                    return null;
+                }
+                await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
+                var exists = await (
+                    connection.ExecuteScalarAsync<bool>(
+                        new CommandDefinition(
+                            "SELECT EXISTS(SELECT 1 FROM contracts WHERE id = @Id)",
+                            new { Id = contractId },
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                return exists ? MutationOutcome.VersionConflict : MutationOutcome.NotFound;
+            }
+        }
     }
 }
