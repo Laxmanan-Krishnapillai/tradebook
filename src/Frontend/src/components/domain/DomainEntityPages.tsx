@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
-import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { z } from 'zod';
 import type { BioticketDetailsDto } from '../../api/generated/types.gen';
 import type { CapacityBookingDetailsDto } from '../../api/generated/types.gen';
 import type { CreateBioticketRequest } from '../../api/generated/types.gen';
@@ -50,6 +51,7 @@ import {
 import { listQueryKey } from '../../lib/query/queryKeys';
 import { VirtualizedDataTable } from '../grid/VirtualizedDataTable';
 import { ConflictDialog } from '../ui/ConflictDialog';
+import { ValidatedForm } from '../ui/validated-form';
 
 type Versioned = { version: number };
 type InputKind = 'text' | 'number' | 'date';
@@ -132,6 +134,15 @@ function DomainCrudPage<T extends Versioned, TCreate extends object, TChanges ex
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [createRequest, setCreateRequest] = useState<TCreate>(props.initialCreate);
+  const createSchema = useMemo(() => z.custom<TCreate>((candidate) => {
+    if (typeof candidate !== 'object' || candidate === null) return false;
+    const record = candidate as Record<string, unknown>;
+    return props.createFields.every((field) => {
+      const value = record[field.key];
+      if (field.required && (value === undefined || value === null || value === '')) return false;
+      return field.kind !== 'number' || value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value));
+    });
+  }, { error: 'Complete the required fields with valid values.' }), [props.createFields]);
   const commandStack = useCommandStack();
   const history = useQuery({
     queryKey: listQueryKey(props.queryKey, { page, pageSize: 100 }),
@@ -190,10 +201,9 @@ function DomainCrudPage<T extends Versioned, TCreate extends object, TChanges ex
     { id: 'actions', header: 'Actions', cell: ({ row }) => <EntityEditor<TChanges> key={row.original.version} initialChanges={props.changesFromEntity(row.original)} fields={props.editFields} onSave={(changes) => void save(row.original, changes)} onDelete={() => void remove(row.original)} deleteLabel={props.cancelInsteadOfDelete ? 'Cancel' : 'Delete'} extraAction={props.extraAction ? { label: props.extraAction.label, disabled: props.extraAction.disabled?.(row.original), run: () => void runExtraAction(row.original) } : undefined} /> }
   ], [props, remove, runExtraAction, save]);
 
-  const submitCreate = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitCreate = async (validatedRequest: TCreate) => {
     props.feedback.setError('');
-    const request = { ...createRequest };
+    const request = { ...validatedRequest };
     const validationError = props.validateCreate?.(request);
     if (validationError) { props.feedback.setError(validationError); return; }
     let current: T | undefined;
@@ -218,7 +228,7 @@ function DomainCrudPage<T extends Versioned, TCreate extends object, TChanges ex
     try { await commandStack.execute(command); setCreateRequest(props.initialCreate()); setShowCreate(false); } catch { /* mutation callbacks own user-visible failures */ }
   };
 
-  return <section><header className="page-header"><div><p className="eyebrow">{props.eyebrow}</p><h2>{props.title}</h2><p>{history.data ? `${history.data.totalCount} records` : `Loading ${props.title.toLowerCase()}…`}</p></div><button type="button" onClick={() => setShowCreate(true)}>Create</button></header>{props.feedback.error && <p role="alert" className="error-banner">{props.feedback.error}</p>}{history.isError && <p role="alert">Unable to load {props.title.toLowerCase()}.</p>}{!history.isError && <VirtualizedDataTable data={history.data?.items ?? []} columns={columns} getRowId={props.idOf} />}{history.data && <nav className="toolbar" aria-label={`${props.title} pages`}><button type="button" disabled={page === 1 || history.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><span>Page {page}</span><button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button></nav>}{showCreate && <section className="modal" role="dialog" aria-modal="true" aria-label={`Create ${props.title}`}><form onSubmit={(event) => void submitCreate(event)}><h3>Create {props.title}</h3>{props.createFields.map((field) => <FieldInput key={field.key} field={field} value={createRequest} onChange={setCreateRequest} />)}<div className="toolbar"><button type="button" className="secondary" onClick={() => setShowCreate(false)}>Close</button><button type="submit" disabled={props.createMutation.isPending}>Create</button></div></form></section>}{props.feedback.conflict && <div className="modal"><ConflictDialog entityId={props.feedback.conflict.id} serverState={props.feedback.conflict.serverState} attemptedChanges={props.feedback.conflict.attempted} onClose={() => props.feedback.setConflict(undefined)} /></div>}</section>;
+  return <section><header className="page-header"><div><p className="eyebrow">{props.eyebrow}</p><h2>{props.title}</h2><p>{history.data ? `${history.data.totalCount} records` : `Loading ${props.title.toLowerCase()}…`}</p></div><button type="button" onClick={() => setShowCreate(true)}>Create</button></header>{props.feedback.error && <p role="alert" className="error-banner">{props.feedback.error}</p>}{history.isError && <p role="alert">Unable to load {props.title.toLowerCase()}.</p>}{!history.isError && <VirtualizedDataTable data={history.data?.items ?? []} columns={columns} getRowId={props.idOf} />}{history.data && <nav className="toolbar" aria-label={`${props.title} pages`}><button type="button" disabled={page === 1 || history.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><span>Page {page}</span><button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button></nav>}{showCreate && <section className="modal" role="dialog" aria-modal="true" aria-label={`Create ${props.title}`}><ValidatedForm schema={createSchema} values={createRequest} onValid={submitCreate}><h3>Create {props.title}</h3>{props.createFields.map((field) => <FieldInput key={field.key} field={field} value={createRequest} onChange={setCreateRequest} />)}<div className="toolbar"><button type="button" className="secondary" onClick={() => setShowCreate(false)}>Close</button><button type="submit" disabled={props.createMutation.isPending}>Create</button></div></ValidatedForm></section>}{props.feedback.conflict && <div className="modal"><ConflictDialog entityId={props.feedback.conflict.id} serverState={props.feedback.conflict.serverState} attemptedChanges={props.feedback.conflict.attempted} onClose={() => props.feedback.setConflict(undefined)} /></div>}</section>;
 }
 
 type CapacityChanges = Omit<UpdateCapacityBookingRequest, 'capacityBookingId' | 'version'>;
