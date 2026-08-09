@@ -1,3 +1,5 @@
+# Superseded by `aspire run` for full local application orchestration. This file remains
+# available for database-only maintenance and compatibility workflows.
 services:
   postgres:
     image: postgres:17

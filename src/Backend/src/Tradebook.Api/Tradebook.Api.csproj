@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Tradebook.Core\Tradebook.Core.csproj" />
     <ProjectReference Include="..\Tradebook.Infrastructure\Tradebook.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Aspire\Tradebook.ServiceDefaults\Tradebook.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

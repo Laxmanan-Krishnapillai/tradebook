@@ -90,7 +90,7 @@ public sealed class ToolingConfigurationTests
         var repositoryRoot = FindRepositoryRoot();
         var projectFiles = FindProjectFiles(repositoryRoot);
 
-        Assert.Equal(7, projectFiles.Length);
+        Assert.Equal(10, projectFiles.Length);
         foreach (var projectFile in projectFiles)
         {
             var project = XDocument.Load(projectFile);
@@ -678,6 +678,8 @@ public sealed class ToolingConfigurationTests
             );
         }
 
+        AddTask21Versions(versions);
+
         return versions;
     }
 
@@ -887,6 +889,13 @@ public sealed class ToolingConfigurationTests
             )
             .Concat(
                 Directory.GetFiles(
+                    Path.Combine(repositoryRoot, "src", "Aspire"),
+                    "*.csproj",
+                    SearchOption.AllDirectories
+                )
+            )
+            .Concat(
+                Directory.GetFiles(
                     Path.Combine(repositoryRoot, "tests"),
                     "*.csproj",
                     SearchOption.AllDirectories
@@ -914,5 +923,30 @@ public sealed class ToolingConfigurationTests
             $"Could not locate repository file '{fileName}'.",
             fileName
         );
+    }
+
+    private static void AddTask21Versions(Dictionary<string, string> versions)
+    {
+        var task21Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Aspire.Hosting.AppHost"] = "13.4.6",
+            ["Aspire.Hosting.JavaScript"] = "13.4.6",
+            ["Aspire.Hosting.PostgreSQL"] = "13.4.6",
+            ["Aspire.Hosting.Testing"] = "13.4.6",
+            ["Microsoft.Extensions.ServiceDiscovery"] = "10.8.0",
+            ["Npgsql.OpenTelemetry"] = "10.0.3",
+            ["OpenTelemetry.Exporter.OpenTelemetryProtocol"] = "1.17.0",
+            ["OpenTelemetry.Extensions.Hosting"] = "1.17.0",
+            ["OpenTelemetry.Instrumentation.AspNetCore"] = "1.17.0",
+            ["OpenTelemetry.Instrumentation.Http"] = "1.17.0",
+            ["OpenTelemetry.Instrumentation.Runtime"] = "1.17.0",
+        };
+        foreach (var package in task21Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"Task 21 package '{package.Key}' duplicates an existing central pin."
+            );
+        }
     }
 }
