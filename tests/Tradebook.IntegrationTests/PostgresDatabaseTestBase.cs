@@ -24,8 +24,14 @@ public abstract class PostgresDatabaseTestBase(PostgresTestFixture fixture)
 
     protected virtual bool ResetDatabaseBeforeEachTest => true;
 
-    public virtual Task InitializeAsync() =>
-        ResetDatabaseBeforeEachTest ? Postgres.ResetDatabaseAsync() : Task.CompletedTask;
+    public virtual ValueTask InitializeAsync() =>
+        ResetDatabaseBeforeEachTest
+            ? new ValueTask(Postgres.ResetDatabaseAsync())
+            : ValueTask.CompletedTask;
 
-    public virtual Task DisposeAsync() => Task.CompletedTask;
+    public virtual ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 }

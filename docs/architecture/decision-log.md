@@ -208,3 +208,15 @@ fallbacks. Squawk owns migration lock/rewrite safety and sqlfluff owns PostgreSQ
 linting. If the pre-1.0 C# plugin cannot represent a PostgreSQL construct, the narrow
 fallback is an enumerated hand-written Dapper query rather than changing the schema or
 introducing an ORM.
+
+## D19 — .NET test platform and property testing (2026-08-09)
+
+All .NET test projects use xUnit v3 3.2.x directly on Microsoft.Testing.Platform. The
+VSTest bridge, xUnit v2 packages, and Coverlet collector are not part of the test stack;
+MTP's code-coverage extension produces coverage artifacts and Stryker 4.16 runs the unit
+suite through its MTP runner. CsCheck 4.x supplies seeded, shrinking property tests for
+the semantic compiler's parameterization and identifier-whitelist invariants and for
+Vogen value-object round-trip and validation invariants.
+
+TUnit was rejected because xUnit v3 preserves the existing fixture and assertion model
+while carrying lower integration risk for Testcontainers, ArchUnitNET, and Stryker.

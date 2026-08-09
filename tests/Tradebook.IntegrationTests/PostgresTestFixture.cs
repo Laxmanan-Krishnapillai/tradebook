@@ -22,7 +22,7 @@ public sealed class PostgresTestFixture : IAsyncLifetime, IDisposable
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync().ConfigureAwait(false);
         MigrationRunner.Run(ConnectionString);
@@ -44,7 +44,7 @@ public sealed class PostgresTestFixture : IAsyncLifetime, IDisposable
 
     public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _connection.DisposeAsync().ConfigureAwait(false);
         await _container.DisposeAsync().ConfigureAwait(false);

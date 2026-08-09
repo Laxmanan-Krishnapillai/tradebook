@@ -7,7 +7,11 @@ public abstract class DatabaseTestBase(CustomWebApplicationFactory factory)
     protected CustomWebApplicationFactory Factory { get; } = factory;
     protected HttpClient Client { get; } = factory.CreateClient();
 
-    public Task InitializeAsync() => Factory.ResetDatabaseAsync();
+    public ValueTask InitializeAsync() => new(Factory.ResetDatabaseAsync());
 
-    public virtual Task DisposeAsync() => Task.CompletedTask;
+    public virtual ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 }

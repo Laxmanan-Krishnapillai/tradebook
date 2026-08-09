@@ -53,13 +53,16 @@ public sealed class ToolingConfigurationTests
     ];
 
     [Fact]
-    public void StrykerUsesTheRepositoryScopeReleaseBuildAndSingle80PercentGate()
+    public void StrykerUsesMtpRepositoryScopeReleaseBuildAndRequiredThresholds()
     {
         var configPath = FindRepositoryFile("stryker-config.json");
         using var document = JsonDocument.Parse(File.ReadAllText(configPath));
         var config = document.RootElement.GetProperty("stryker-config");
 
         Assert.Equal("Release", config.GetProperty("configuration").GetString());
+        Assert.Equal("mtp", config.GetProperty("test-runner").GetString());
+        Assert.Equal(85, config.GetProperty("thresholds").GetProperty("high").GetInt32());
+        Assert.Equal(80, config.GetProperty("thresholds").GetProperty("low").GetInt32());
         Assert.Equal(80, config.GetProperty("thresholds").GetProperty("break").GetInt32());
         Assert.Equal("src/Backend/Tradebook.sln", config.GetProperty("solution").GetString());
         Assert.Equal("Tradebook.Api.csproj", config.GetProperty("project").GetString());
@@ -659,6 +662,11 @@ public sealed class ToolingConfigurationTests
     {
         var versions = ReadTargetPackageVersions(repositoryRoot)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        versions.Remove("Microsoft.NET.Test.Sdk");
+        versions.Remove("coverlet.collector");
+        versions.Remove("xunit");
+        versions.Remove("xunit.runner.visualstudio");
+        versions.Remove("TngTech.ArchUnitNET.xUnit");
         var task14Versions = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["Microsoft.Extensions.Options"] = "10.0.10",
@@ -677,6 +685,10 @@ public sealed class ToolingConfigurationTests
         var task20Versions = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["dbup-postgresql"] = "7.0.1",
+            ["CsCheck"] = "4.4.0",
+            ["Microsoft.Testing.Extensions.CodeCoverage"] = "17.14.2",
+            ["xunit.v3"] = "3.2.2",
+            ["TngTech.ArchUnitNET"] = "0.11.0",
         };
         foreach (var package in task20Versions)
         {
