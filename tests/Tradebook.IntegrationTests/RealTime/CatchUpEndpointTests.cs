@@ -140,7 +140,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
                             ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
@@ -152,24 +152,23 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
 
     private async Task ResetOutboxAsync()
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString).ConfigureAwait(
-            false
-        );
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         await connection.OpenAsync().ConfigureAwait(false);
-        await using var command = new NpgsqlCommand(
+        var command = new NpgsqlCommand(
             "TRUNCATE TABLE outbox_events RESTART IDENTITY",
             connection
         );
+        await using var configuredCommand = command.ConfigureAwait(false);
         await command.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
     private async Task InsertEventsAsync(int count)
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString).ConfigureAwait(
-            false
-        );
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         await connection.OpenAsync().ConfigureAwait(false);
-        await using var command = new NpgsqlCommand(
+        var command = new NpgsqlCommand(
             """
             INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
             SELECT CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
@@ -180,6 +179,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
             """,
             connection
         );
+        await using var configuredCommand = command.ConfigureAwait(false);
         command.Parameters.AddWithValue("count", count);
         await command.ExecuteNonQueryAsync().ConfigureAwait(false);
     }

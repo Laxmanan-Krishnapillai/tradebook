@@ -45,7 +45,7 @@ public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres)
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(
-                            new Dictionary<string, string?>
+                            new Dictionary<string, string?>(StringComparer.Ordinal)
                             {
                                 ["Database:ConnectionString"] = connectionString,
                                 ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",

@@ -19,6 +19,8 @@ namespace Tradebook.IntegrationTests;
 public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
+    private static readonly string[] InvalidMeasures = ["not_a_measure"];
+
     [Fact]
     public async Task DashboardEndpointsRequireAJwt()
     {
@@ -54,7 +56,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
         using var client = AuthenticatedClient(factory, Guid.NewGuid());
         var layout = JsonSerializer.SerializeToNode(Layout(dashboardId, 0))!.AsObject();
         layout["widgets"]![0]!["queryAst"]!["measures"] = JsonSerializer.SerializeToNode(
-            new[] { "not_a_measure" }
+            InvalidMeasures
         );
 
         var response = await client.PutAsJsonAsync(
@@ -310,7 +312,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(
-                            new Dictionary<string, string?>
+                            new Dictionary<string, string?>(StringComparer.Ordinal)
                             {
                                 ["Database:ConnectionString"] = Postgres.ConnectionString,
                                 ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",

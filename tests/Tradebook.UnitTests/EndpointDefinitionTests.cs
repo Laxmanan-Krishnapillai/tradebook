@@ -114,8 +114,29 @@ public sealed class EndpointDefinitionTests
     [Fact]
     public void AllDomainEndpointRoutesVerbsAndPoliciesArePinned()
     {
-        var definitions = new (BaseEndpoint Endpoint, string Verb, string Route, string Policy)[]
+        var definitions = ContractDefinitions()
+            .Concat(BioticketDefinitions())
+            .Concat(CapacityBookingDefinitions())
+            .Concat(TransferDefinitions())
+            .Concat(GooCertificateDefinitions())
+            .Concat(HedgeDefinitions())
+            .Concat(MarketPriceDefinitions())
+            .Concat(TaxTariffDefinitions())
+            .Concat(DashboardDefinitions());
+
+        foreach (var (endpoint, verb, route, policy) in definitions)
         {
+            AssertDefinition(endpoint, verb, route, policy);
+        }
+    }
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] ContractDefinitions() =>
+        [
             (
                 Factory.Create<CreateContractEndpoint>(default(object)!),
                 "POST",
@@ -146,6 +167,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/contracts/{contractId}",
                 "BackOfficePolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] BioticketDefinitions() =>
+        [
             (
                 Factory.Create<CreateBioticketEndpoint>(default(object)!),
                 "POST",
@@ -176,6 +206,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/biotickets/{bioticketId}",
                 "BackOfficePolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] CapacityBookingDefinitions() =>
+        [
             (
                 Factory.Create<CreateCapacityBookingEndpoint>(default(object)!),
                 "POST",
@@ -206,6 +245,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/capacity-bookings/{capacityBookingId}",
                 "BackOfficePolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] TransferDefinitions() =>
+        [
             (
                 Factory.Create<CreateTransferEndpoint>(default(object)!),
                 "POST",
@@ -236,6 +284,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/transfers/{transferId}",
                 "BackOfficePolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] GooCertificateDefinitions() =>
+        [
             (
                 Factory.Create<CreateGooCertificateEndpoint>(default(object)!),
                 "POST",
@@ -272,6 +329,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/goo-certificates/{gooCertificateTransactionId}",
                 "BackOfficePolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] HedgeDefinitions() =>
+        [
             (
                 Factory.Create<CreateHedgeEndpoint>(default(object)!),
                 "POST",
@@ -302,6 +368,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/hedges/{hedgeId}",
                 "BackOfficePolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] MarketPriceDefinitions() =>
+        [
             (
                 Factory.Create<UpsertMarketPriceEndpoint>(default(object)!),
                 "PUT",
@@ -326,6 +401,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/market-prices/{priceDate}",
                 "AdminPolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] TaxTariffDefinitions() =>
+        [
             (
                 Factory.Create<CreateTaxTariffEndpoint>(default(object)!),
                 "POST",
@@ -356,6 +440,15 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/tax-tariffs/{taxTariffId}",
                 "AdminPolicy"
             ),
+        ];
+
+    private static (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] DashboardDefinitions() =>
+        [
             (
                 Factory.Create<GetDashboardEndpoint>(default(object)!),
                 "GET",
@@ -372,13 +465,7 @@ public sealed class EndpointDefinitionTests
                 "/api/v1/dashboards/{dashboardId}",
                 "ReadPolicy"
             ),
-        };
-
-        foreach (var (endpoint, verb, route, policy) in definitions)
-        {
-            AssertDefinition(endpoint, verb, route, policy);
-        }
-    }
+        ];
 
     private static void AssertDefinition(
         BaseEndpoint endpoint,
@@ -387,13 +474,13 @@ public sealed class EndpointDefinitionTests
         string policy
     )
     {
-        Assert.Equal([route], endpoint.Definition.Routes!);
-        Assert.Equal([verb], endpoint.Definition.Verbs!);
-        Assert.Contains(policy, PoliciesOf(endpoint.Definition));
+        Assert.Equal([route], endpoint.Definition.Routes);
+        Assert.Equal([verb], endpoint.Definition.Verbs);
+        Assert.Contains(policy, PoliciesOf(endpoint.Definition), StringComparer.Ordinal);
         Assert.False(IsAnonymous(endpoint.Definition), "endpoint must not allow anonymous access");
     }
 
-    private static IReadOnlyCollection<string> PoliciesOf(EndpointDefinition definition)
+    private static List<string> PoliciesOf(EndpointDefinition definition)
     {
         var policies = new List<string>();
         foreach (

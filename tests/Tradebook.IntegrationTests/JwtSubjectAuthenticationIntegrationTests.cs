@@ -66,7 +66,7 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(
-                            new Dictionary<string, string?>
+                            new Dictionary<string, string?>(StringComparer.Ordinal)
                             {
                                 ["Database:ConnectionString"] = Postgres.ConnectionString,
                                 ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",

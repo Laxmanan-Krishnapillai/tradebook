@@ -6,6 +6,8 @@ namespace Tradebook.UnitTests;
 
 public sealed class ToolingConfigurationTests
 {
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
     [Fact]
     public void StrykerUsesTheRepositoryScopeReleaseBuildAndSingle80PercentGate()
     {
@@ -41,7 +43,7 @@ public sealed class ToolingConfigurationTests
         var repositoryRoot = FindRepositoryRoot();
         var projectFiles = FindProjectFiles(repositoryRoot);
 
-        Assert.Equal(6, projectFiles.Count);
+        Assert.Equal(6, projectFiles.Length);
         foreach (var projectFile in projectFiles)
         {
             var project = XDocument.Load(projectFile);
@@ -66,6 +68,17 @@ public sealed class ToolingConfigurationTests
         var operationalFiles = FindOperationalDotnetFiles(repositoryRoot);
 
         Assert.NotEmpty(operationalFiles);
+        AssertOperationalFilesTargetNet10(repositoryRoot, operationalFiles);
+        AssertWorkflowsUseGlobalJson(repositoryRoot);
+        AssertTypegenTargetsNet10(repositoryRoot);
+        AssertDockerRestoreStagesCopyRepositoryInputs(repositoryRoot, operationalFiles);
+    }
+
+    private static void AssertOperationalFilesTargetNet10(
+        string repositoryRoot,
+        string[] operationalFiles
+    )
+    {
         foreach (var path in operationalFiles)
         {
             var relativePath = Path.GetRelativePath(repositoryRoot, path);
@@ -79,17 +92,21 @@ public sealed class ToolingConfigurationTests
                 Match image in Regex.Matches(
                     contents,
                     @"mcr\.microsoft\.com/dotnet/(?:sdk|aspnet):(?<version>\d+\.\d+)",
-                    RegexOptions.IgnoreCase
+                    RegexOptions.IgnoreCase,
+                    RegexTimeout
                 )
             )
             {
                 Assert.True(
-                    image.Groups["version"].Value == "10.0",
+                    string.Equals(image.Groups["version"].Value, "10.0", StringComparison.Ordinal),
                     $"{relativePath} uses .NET container tag {image.Value} instead of 10.0."
                 );
             }
         }
+    }
 
+    private static void AssertWorkflowsUseGlobalJson(string repositoryRoot)
+    {
         var workflowDirectory = Path.Combine(repositoryRoot, ".github", "workflows");
         var workflows = Directory
             .GetFiles(workflowDirectory, "*.yml")
@@ -100,10 +117,12 @@ public sealed class ToolingConfigurationTests
             const string setupActionPattern =
                 @"(?m)^[ \t]*(?:-[ \t]+)?uses:[ \t]*actions/setup-dotnet@";
             var setupLineCount = workflowLines.Count(line =>
-                Regex.IsMatch(line, setupActionPattern)
+                Regex.IsMatch(line, setupActionPattern, RegexOptions.None, RegexTimeout)
             );
             var setupSteps = FindWorkflowSteps(workflowLines)
-                .Where(step => Regex.IsMatch(step, setupActionPattern))
+                .Where(step =>
+                    Regex.IsMatch(step, setupActionPattern, RegexOptions.None, RegexTimeout)
+                )
                 .ToArray();
 
             Assert.Equal(setupLineCount, setupSteps.Length);
@@ -112,14 +131,19 @@ public sealed class ToolingConfigurationTests
                 Assert.True(
                     Regex.IsMatch(
                         step,
-                        @"(?m)^[ \t]+global-json-file:[ \t]*global\.json(?:[ \t]+#.*)?[ \t]*\r?$"
+                        @"(?m)^[ \t]+global-json-file:[ \t]*global\.json(?:[ \t]+#.*)?[ \t]*\r?$",
+                        RegexOptions.None,
+                        RegexTimeout
                     ),
                     $"{Path.GetRelativePath(repositoryRoot, workflowPath)} has a setup-dotnet step without global.json."
                 );
-                Assert.DoesNotContain("dotnet-version:", step);
+                Assert.DoesNotContain("dotnet-version:", step, StringComparison.Ordinal);
             }
         }
+    }
 
+    private static void AssertTypegenTargetsNet10(string repositoryRoot)
+    {
         using var typegen = JsonDocument.Parse(
             File.ReadAllText(Path.Combine(repositoryRoot, "tgconfig.json"))
         );
@@ -133,7 +157,13 @@ public sealed class ToolingConfigurationTests
             typegenAssembly.Replace('\\', '/').Contains("/net10.0/", StringComparison.Ordinal),
             $"TypeGen assembly path is not net10.0: {typegenAssembly}"
         );
+    }
 
+    private static void AssertDockerRestoreStagesCopyRepositoryInputs(
+        string repositoryRoot,
+        string[] operationalFiles
+    )
+    {
         foreach (
             var dockerfilePath in operationalFiles.Where(path =>
                 Path.GetFileName(path).StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase)
@@ -158,7 +188,9 @@ public sealed class ToolingConfigurationTests
             {
                 var copy = Regex.Match(
                     restoreStagePrefix,
-                    $@"(?m)^COPY[^\r\n]*\b{Regex.Escape(restoreInput)}\b"
+                    $@"(?m)^COPY[^\r\n]*\b{Regex.Escape(restoreInput)}\b",
+                    RegexOptions.None,
+                    RegexTimeout
                 );
                 Assert.True(
                     copy.Success,
@@ -182,29 +214,7 @@ public sealed class ToolingConfigurationTests
         );
 
         var packageVersions = manifest.Descendants("PackageVersion").ToArray();
-        Assert.Equal(expectedVersions.Count + 2, packageVersions.Length);
-        var vogen = Assert.Single(
-            packageVersions,
-            element => element.Attribute("Include")?.Value == "Vogen"
-        );
-        Assert.StartsWith("8.", vogen.Attribute("Version")?.Value, StringComparison.Ordinal);
-        Assert.Equal(
-            packageVersions.Length,
-            packageVersions
-                .Select(element => element.Attribute("Include")!.Value)
-                .Distinct(StringComparer.Ordinal)
-                .Count()
-        );
-        foreach (var expected in expectedVersions)
-        {
-            var entry = Assert.Single(
-                packageVersions,
-                element => element.Attribute("Include")?.Value == expected.Key
-            );
-            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
-            var expectedVersion = expected.Key == "TypeGen" ? "7.0.0" : expected.Value;
-            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
-        }
+        AssertPackageVersions(expectedVersions, packageVersions);
 
         var referenceFiles = FindProjectFiles(repositoryRoot)
             .Append(Path.Combine(repositoryRoot, "Directory.Build.props"));
@@ -230,6 +240,48 @@ public sealed class ToolingConfigurationTests
                 .Keys.Except(referencedPackages, StringComparer.Ordinal)
                 .Except(transitiveOnlyPins, StringComparer.Ordinal)
         );
+    }
+
+    private static void AssertPackageVersions(
+        Dictionary<string, string> expectedVersions,
+        XElement[] packageVersions
+    )
+    {
+        Assert.Equal(expectedVersions.Count + 2, packageVersions.Length);
+        var vogen = Assert.Single(
+            packageVersions,
+            element =>
+                string.Equals(
+                    element.Attribute("Include")?.Value,
+                    "Vogen",
+                    StringComparison.Ordinal
+                )
+        );
+        Assert.StartsWith("8.", vogen.Attribute("Version")?.Value, StringComparison.Ordinal);
+        Assert.Equal(
+            packageVersions.Length,
+            packageVersions
+                .Select(element => element.Attribute("Include")!.Value)
+                .Distinct(StringComparer.Ordinal)
+                .Count()
+        );
+        foreach (var expected in expectedVersions)
+        {
+            var entry = Assert.Single(
+                packageVersions,
+                element =>
+                    string.Equals(
+                        element.Attribute("Include")?.Value,
+                        expected.Key,
+                        StringComparison.Ordinal
+                    )
+            );
+            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
+            var expectedVersion = string.Equals(expected.Key, "TypeGen", StringComparison.Ordinal)
+                ? "7.0.0"
+                : expected.Value;
+            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
+        }
     }
 
     [Fact]
@@ -270,8 +322,16 @@ public sealed class ToolingConfigurationTests
             Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml")
         );
 
-        Assert.Equal(2, Regex.Matches(workflow, @"global-json-file:\s*global\.json").Count);
-        Assert.DoesNotContain("dotnet-version:", workflow);
+        Assert.Equal(
+            2,
+            Regex.Count(
+                workflow,
+                @"global-json-file:\s*global\.json",
+                RegexOptions.None,
+                RegexTimeout
+            )
+        );
+        Assert.DoesNotContain("dotnet-version:", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -281,7 +341,11 @@ public sealed class ToolingConfigurationTests
         var manifestText = File.ReadAllText(manifestPath);
         var manifest = XDocument.Parse(manifestText);
 
-        Assert.Contains("Reserved for Task 14: GlobalPackageReference", manifestText);
+        Assert.Contains(
+            "Reserved for Task 14: GlobalPackageReference",
+            manifestText,
+            StringComparison.Ordinal
+        );
         Assert.Empty(manifest.Descendants("GlobalPackageReference"));
         Assert.DoesNotContain(
             manifest.Descendants("PackageVersion"),
@@ -301,15 +365,18 @@ public sealed class ToolingConfigurationTests
 
         Assert.Contains(
             "D15 — Adopt .NET 10 LTS and NuGet Central Package Management",
-            decisionLog
+            decisionLog,
+            StringComparison.Ordinal
         );
-        Assert.Contains("CentralPackageTransitivePinningEnabled", decisionLog);
-        Assert.Contains("GlobalPackageReference", decisionLog);
+        Assert.Contains(
+            "CentralPackageTransitivePinningEnabled",
+            decisionLog,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("GlobalPackageReference", decisionLog, StringComparison.Ordinal);
     }
 
-    private static IReadOnlyDictionary<string, string> ReadTargetPackageVersions(
-        string repositoryRoot
-    )
+    private static Dictionary<string, string> ReadTargetPackageVersions(string repositoryRoot)
     {
         var taskSpec = File.ReadAllLines(
             Path.Combine(
@@ -350,14 +417,19 @@ public sealed class ToolingConfigurationTests
         return versions;
     }
 
-    private static IReadOnlyList<string> FindWorkflowSteps(string[] lines)
+    private static List<string> FindWorkflowSteps(string[] lines)
     {
         var steps = new List<string>();
-        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+        var lineIndex = 0;
+        while (lineIndex < lines.Length)
         {
-            var header = Regex.Match(lines[lineIndex], @"^(?<indent>[ \t]*)steps:[ \t]*(?:#.*)?$");
+            var header = MatchYamlPattern(
+                lines[lineIndex],
+                @"^(?<indent>[ \t]*)steps:[ \t]*(?:#.*)?$"
+            );
             if (!header.Success)
             {
+                lineIndex++;
                 continue;
             }
 
@@ -373,7 +445,7 @@ public sealed class ToolingConfigurationTests
                     break;
                 }
 
-                var stepStart = Regex.Match(lines[cursor], @"^(?<indent>[ \t]*)-[ \t]+");
+                var stepStart = MatchYamlPattern(lines[cursor], @"^(?<indent>[ \t]*)-[ \t]+");
                 if (!stepStart.Success || stepStart.Groups["indent"].Value.Length <= headerIndent)
                 {
                     cursor++;
@@ -381,35 +453,45 @@ public sealed class ToolingConfigurationTests
                 }
 
                 var stepIndent = stepStart.Groups["indent"].Value.Length;
-                var stepEnd = cursor + 1;
-                while (stepEnd < lines.Length)
-                {
-                    if (
-                        IsYamlContentLine(lines[stepEnd])
-                        && GetIndentLength(lines[stepEnd]) <= headerIndent
-                    )
-                    {
-                        break;
-                    }
-
-                    var nextStep = Regex.Match(lines[stepEnd], @"^(?<indent>[ \t]*)-[ \t]+");
-                    if (nextStep.Success && nextStep.Groups["indent"].Value.Length == stepIndent)
-                    {
-                        break;
-                    }
-
-                    stepEnd++;
-                }
+                var stepEnd = FindStepEnd(lines, cursor, headerIndent, stepIndent);
 
                 steps.Add(string.Join(Environment.NewLine, lines[cursor..stepEnd]));
                 cursor = stepEnd;
             }
 
-            lineIndex = cursor - 1;
+            lineIndex = cursor;
         }
 
         return steps;
     }
+
+    private static int FindStepEnd(string[] lines, int cursor, int headerIndent, int stepIndent)
+    {
+        var stepEnd = cursor + 1;
+        while (stepEnd < lines.Length)
+        {
+            if (
+                IsYamlContentLine(lines[stepEnd])
+                && GetIndentLength(lines[stepEnd]) <= headerIndent
+            )
+            {
+                break;
+            }
+
+            var nextStep = MatchYamlPattern(lines[stepEnd], @"^(?<indent>[ \t]*)-[ \t]+");
+            if (nextStep.Success && nextStep.Groups["indent"].Value.Length == stepIndent)
+            {
+                break;
+            }
+
+            stepEnd++;
+        }
+
+        return stepEnd;
+    }
+
+    private static Match MatchYamlPattern(string input, string pattern) =>
+        Regex.Match(input, pattern, RegexOptions.None, RegexTimeout);
 
     private static bool IsYamlContentLine(string line) =>
         !string.IsNullOrWhiteSpace(line) && !line.TrimStart().StartsWith('#');
@@ -417,7 +499,7 @@ public sealed class ToolingConfigurationTests
     private static int GetIndentLength(string line) =>
         line.TakeWhile(character => character is ' ' or '\t').Count();
 
-    private static IReadOnlyList<string> FindOperationalDotnetFiles(string repositoryRoot)
+    private static string[] FindOperationalDotnetFiles(string repositoryRoot)
     {
         var excludedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -446,65 +528,81 @@ public sealed class ToolingConfigurationTests
 
         while (directories.TryPop(out var directory))
         {
-            foreach (var subdirectory in Directory.EnumerateDirectories(directory))
-            {
-                var name = Path.GetFileName(subdirectory);
-                var isNestedBuildOutput =
-                    name.Equals("bin", StringComparison.OrdinalIgnoreCase)
-                    && !directory.Equals(repositoryRoot, StringComparison.OrdinalIgnoreCase);
-                if (!excludedDirectories.Contains(name) && !isNestedBuildOutput)
-                {
-                    directories.Push(subdirectory);
-                }
-            }
-
-            foreach (var path in Directory.EnumerateFiles(directory))
-            {
-                var relativePath = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/');
-                var fileName = Path.GetFileName(path);
-                var extension = Path.GetExtension(path);
-                var isRootConfiguration =
-                    !relativePath.Contains('/')
-                    && (
-                        extension.Equals(".json", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".props", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".targets", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".yml", StringComparison.OrdinalIgnoreCase)
-                    );
-                var isDotnetConfiguration =
-                    relativePath.StartsWith(".config/", StringComparison.OrdinalIgnoreCase)
-                    && extension.Equals(".json", StringComparison.OrdinalIgnoreCase);
-                var isWorkflow =
-                    relativePath.StartsWith(
-                        ".github/workflows/",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                    && (
-                        extension.Equals(".yml", StringComparison.OrdinalIgnoreCase)
-                        || extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase)
-                    );
-
-                if (
-                    isRootConfiguration
-                    || isDotnetConfiguration
-                    || isWorkflow
-                    || scriptExtensions.Contains(extension)
-                    || fileName.StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    files.Add(path);
-                }
-            }
+            PushIncludedDirectories(repositoryRoot, directory, excludedDirectories, directories);
+            AddOperationalFiles(repositoryRoot, directory, scriptExtensions, files);
         }
 
         return files.Order(StringComparer.Ordinal).ToArray();
     }
 
+    private static void PushIncludedDirectories(
+        string repositoryRoot,
+        string directory,
+        HashSet<string> excludedDirectories,
+        Stack<string> directories
+    )
+    {
+        foreach (var subdirectory in Directory.EnumerateDirectories(directory))
+        {
+            var name = Path.GetFileName(subdirectory);
+            var isNestedBuildOutput =
+                name.Equals("bin", StringComparison.OrdinalIgnoreCase)
+                && !directory.Equals(repositoryRoot, StringComparison.OrdinalIgnoreCase);
+            if (!excludedDirectories.Contains(name) && !isNestedBuildOutput)
+            {
+                directories.Push(subdirectory);
+            }
+        }
+    }
+
+    private static void AddOperationalFiles(
+        string repositoryRoot,
+        string directory,
+        HashSet<string> scriptExtensions,
+        HashSet<string> files
+    )
+    {
+        foreach (var path in Directory.EnumerateFiles(directory))
+        {
+            var relativePath = Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/');
+            var fileName = Path.GetFileName(path);
+            var extension = Path.GetExtension(path);
+            var isRootConfiguration =
+                !relativePath.Contains('/') && IsOperationalConfigurationExtension(extension);
+            var isDotnetConfiguration =
+                relativePath.StartsWith(".config/", StringComparison.OrdinalIgnoreCase)
+                && extension.Equals(".json", StringComparison.OrdinalIgnoreCase);
+            var isWorkflow =
+                relativePath.StartsWith(".github/workflows/", StringComparison.OrdinalIgnoreCase)
+                && (
+                    extension.Equals(".yml", StringComparison.OrdinalIgnoreCase)
+                    || extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase)
+                );
+
+            if (
+                isRootConfiguration
+                || isDotnetConfiguration
+                || isWorkflow
+                || scriptExtensions.Contains(extension)
+                || fileName.StartsWith("Dockerfile", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                files.Add(path);
+            }
+        }
+    }
+
+    private static bool IsOperationalConfigurationExtension(string extension) =>
+        extension.Equals(".json", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".props", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".targets", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".yml", StringComparison.OrdinalIgnoreCase);
+
     private static string FindRepositoryRoot() =>
         Path.GetDirectoryName(FindRepositoryFile("Directory.Packages.props"))!;
 
-    private static IReadOnlyList<string> FindProjectFiles(string repositoryRoot) =>
+    private static string[] FindProjectFiles(string repositoryRoot) =>
         Directory
             .GetFiles(
                 Path.Combine(repositoryRoot, "src", "Backend", "src"),

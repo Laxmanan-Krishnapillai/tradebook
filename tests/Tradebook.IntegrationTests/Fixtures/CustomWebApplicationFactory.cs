@@ -34,9 +34,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         _connection = new NpgsqlConnection(ConnectionString);
         await _connection.OpenAsync().ConfigureAwait(false);
 
-        await using var connections = new NpgsqlConnectionFactory(
+        var connections = new NpgsqlConnectionFactory(
             Options.Create(new DatabaseOptions { ConnectionString = ConnectionString })
         );
+        await using var configuredConnections = connections.ConfigureAwait(false);
         await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance)
             .MigrateAsync()
             .ConfigureAwait(false);
@@ -62,7 +63,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration(
             (_, configuration) =>
                 configuration.AddInMemoryCollection(
-                    new Dictionary<string, string?>
+                    new Dictionary<string, string?>(StringComparer.Ordinal)
                     {
                         ["Database:ConnectionString"] = ConnectionString,
                         ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",

@@ -44,7 +44,7 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(
-                            new Dictionary<string, string?>
+                            new Dictionary<string, string?>(StringComparer.Ordinal)
                             {
                                 ["Database:ConnectionString"] = Postgres.ConnectionString,
                                 ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
@@ -67,11 +67,11 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
                 "Unrecognized test column rename."
             ),
         };
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString).ConfigureAwait(
-            false
-        );
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         await connection.OpenAsync().ConfigureAwait(false);
-        await using var command = new NpgsqlCommand(sql, connection).ConfigureAwait(false);
+        var command = new NpgsqlCommand(sql, connection);
+        await using var configuredCommand = command.ConfigureAwait(false);
         await command.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 }
