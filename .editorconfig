@@ -29,4 +29,5 @@ csharp_style_prefer_readonly_struct = true:suggestion
 # sqlc-gen-csharp output: generated sources are exempt from style/design analyzers.
 [src/Backend/src/Tradebook.Infrastructure/Data/generated/*.cs]
 generated_code = true
-dotnet_diagnostic.CS1591.severity = none
+# sqlc output annotates nullability without a #nullable directive (CS8669).
+dotnet_diagnostic.CS8669.severity = silent

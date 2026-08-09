@@ -1,9 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <!-- sqlc-generated sources annotate nullability without a #nullable directive. -->
-    <NoWarn>$(NoWarn);CS8669</NoWarn>
-  </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Tradebook.Core\Tradebook.Core.csproj" />
   </ItemGroup>
