@@ -172,6 +172,16 @@ to the Vite-supported 20.19+, 22.13+, and 24+ release lines.
 selects. D15 reserves `GlobalPackageReference` for Task 14; D17 activates it for the
 repo-wide analyzer entries.
 
+## D18 — Agent UI guardrails and visual QA (ADR-0023, 2026-08-09)
+
+UI consistency is enforced in descending order of determinism: ESLint rejects
+off-token Tailwind values and raw Base UI imports from feature code; the private
+`@tradebook` shadcn registry guides composition; Storybook/Argos visual regression and
+Playwright/axe accessibility jobs are required pull-request checks. `DESIGN.md` is
+mandatory agent context. The Playwright-driven design review command is advisory and
+cannot override a failing deterministic gate. Dynamic screenshot masks are restricted
+to live prices and timestamps.
+
 ## D17 — Backend compile-time safety toolchain (2026-08-09)
 
 Analyzer findings are build failures on every .NET project. The repository enables the

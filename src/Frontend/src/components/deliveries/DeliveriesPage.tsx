@@ -60,7 +60,7 @@ function DeliveryEditor({
     setStatus(delivery.status);
   }, [delivery.status, delivery.volumeRealisedMwh]);
   return (
-    <div className="row-actions">
+    <div className="grid grid-cols-4 items-center gap-2 max-[800px]:grid-cols-2">
       <input
         data-testid={`delivery-volume-${delivery.deliveryId}`}
         aria-label={`Realised volume for ${delivery.contractInstanceId}`}
@@ -94,7 +94,7 @@ function DeliveryEditor({
       <button
         data-testid={`btn-cancel-${delivery.deliveryId}`}
         type="button"
-        className="danger"
+        className="bg-red-700"
         disabled={delivery.status === "Cancelled"}
         onClick={() => onCancel(delivery)}
       >
@@ -342,9 +342,9 @@ export function DeliveriesPage() {
   const deliveries = history.data?.items ?? [];
   return (
     <section>
-      <header className="page-header">
+      <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
         <div>
-          <p className="eyebrow">Operations</p>
+          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Operations</p>
           <h2>Physical deliveries</h2>
           <p>
             {history.data
@@ -352,7 +352,7 @@ export function DeliveriesPage() {
               : "Loading delivery history…"}
           </p>
         </div>
-        <div className="toolbar">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void undo()}
@@ -377,7 +377,7 @@ export function DeliveriesPage() {
         </div>
       </header>
       {error && (
-        <p role="alert" className="error-banner">
+        <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">
           {error}
         </p>
       )}
@@ -391,7 +391,7 @@ export function DeliveriesPage() {
         />
       )}
       {history.data && (
-        <nav className="toolbar" aria-label="Delivery history pages">
+        <nav className="flex flex-wrap items-center gap-2" aria-label="Delivery history pages">
           <button type="button" disabled={page === 1 || history.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
           <span>Page {page}</span>
           <button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
@@ -399,7 +399,7 @@ export function DeliveriesPage() {
       )}
       {showCreate && (
         <section
-          className="modal"
+          className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Create physical delivery"
@@ -479,10 +479,10 @@ export function DeliveriesPage() {
                 }
               />
             </label>
-            <div className="toolbar">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="secondary"
+                className="bg-gray-200 text-gray-800"
                 onClick={closeCreate}
               >
                 Close
@@ -495,7 +495,7 @@ export function DeliveriesPage() {
         </section>
       )}
       {conflict && (
-        <div className="modal">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <ConflictDialog
             entityId={conflict.id}
             serverState={conflict.serverState}

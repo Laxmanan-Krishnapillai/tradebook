@@ -21,10 +21,10 @@ const navigation = [
 export function AppShell({ children }: { children: ReactNode }) {
   const commands = useCommandStack();
   return (
-    <div className="app-shell">
+    <div className="grid min-h-screen grid-cols-4 max-[800px]:grid-cols-1">
       <aside>
         <div>
-          <p className="eyebrow">BioGem</p>
+          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">BioGem</p>
           <h1>Tradebook</h1>
         </div>
         <nav aria-label="Primary">
@@ -34,10 +34,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="toolbar">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="secondary"
+            className="bg-gray-200 text-gray-800"
             disabled={!commands.canUndo}
             onClick={() => void commands.undo()}
           >
@@ -45,18 +45,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
           <button
             type="button"
-            className="secondary"
+            className="bg-gray-200 text-gray-800"
             disabled={!commands.canRedo}
             onClick={() => void commands.redo().catch(() => undefined)}
           >
             Redo
           </button>
         </div>
-        <button type="button" className="secondary" onClick={() => void endSession('logout')}>
+        <button type="button" className="bg-gray-200 text-gray-800" onClick={() => void endSession('logout')}>
           Sign out
         </button>
       </aside>
-      <main className="workspace">{children}</main>
+      <main className="col-span-3 min-w-0 p-8 max-[800px]:col-span-1 max-[800px]:p-4">{children}</main>
       <CommandPalette />
     </div>
   );

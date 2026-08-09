@@ -1,5 +1,7 @@
 # Tradebook Agent Directives
 
+- Read `docs/design/DESIGN.md` before changing UI and compose the approved
+  `@tradebook` registry components rather than hand-rolling primitives.
 - Do not create fake test passes or hardcode responses to satisfy tests.
 - Re-read the active task specification and record actual command output in the handoff.
 - Keep generated TypeScript contracts generated; never edit them directly.

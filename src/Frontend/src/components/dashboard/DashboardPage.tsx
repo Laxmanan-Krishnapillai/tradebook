@@ -158,11 +158,11 @@ export function DashboardPage() {
   }));
 
   return <section>
-    <header className="page-header">
-      <div><p className="eyebrow">Analytics</p><h2>{draft.title}</h2><p>{draft.description}</p></div>
+    <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
+      <div><p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Analytics</p><h2>{draft.title}</h2><p>{draft.description}</p></div>
       <button type="button" onClick={() => save.mutate(draft)} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save dashboard'}</button>
     </header>
-    <div className="toolbar" aria-label="Dashboard settings">
+    <div className="flex flex-wrap items-center gap-2" aria-label="Dashboard settings">
       <label>Title<input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label>
       <label>Theme<select value={draft.theme} onChange={(event) => setDraft((current) => ({ ...current, theme: event.target.value as DashboardSpecification['theme'] }))}><option>LIGHT</option><option>DARK</option><option>SYSTEM</option></select></label>
       <label>Refresh (seconds)<input type="number" min="5" value={Math.round(draft.refreshRateMs / 1000)} onChange={(event) => setDraft((current) => ({ ...current, refreshRateMs: Math.max(5, Number(event.target.value) || 5) * 1000 }))} /></label>
@@ -176,9 +176,9 @@ export function DashboardPage() {
         />
       : <div data-testid="dashboard-empty-state" role="status"><h3>No widgets configured</h3><p>This dashboard is empty. You can still edit its settings and save it.</p></div>}
     {dashboard.isError && <p role="alert">Unable to load the persisted dashboard. Showing the default workspace.</p>}
-    {save.isError && !conflict && <p role="alert" className="error-banner">Unable to save the dashboard.</p>}
-    <p data-testid="dashboard-last-entity-change" className="live-status">{lastEvent ? `Live: ${lastEvent.aggregateType} ${lastEvent.eventType} (#${lastEvent.sequenceId})` : 'Waiting for live entity changes…'}</p>
+    {save.isError && !conflict && <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">Unable to save the dashboard.</p>}
+    <p data-testid="dashboard-last-entity-change" className="text-sm text-green-800">{lastEvent ? `Live: ${lastEvent.aggregateType} ${lastEvent.eventType} (#${lastEvent.sequenceId})` : 'Waiting for live entity changes…'}</p>
     <DashboardGrid dashboard={draft} onChange={setDraft} />
-    {conflict && <div className="modal"><ConflictDialog entityId={dashboardId} serverState={conflict.serverState} attemptedChanges={conflict.attempted} onClose={() => setConflict(undefined)} /></div>}
+    {conflict && <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"><ConflictDialog entityId={dashboardId} serverState={conflict.serverState} attemptedChanges={conflict.attempted} onClose={() => setConflict(undefined)} /></div>}
   </section>;
 }

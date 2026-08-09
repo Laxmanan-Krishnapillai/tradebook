@@ -5,6 +5,7 @@ import boundaries from 'eslint-plugin-boundaries';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import reactHooks from 'eslint-plugin-react-hooks';
 import testingLibrary from 'eslint-plugin-testing-library';
+import tailwindcss from 'eslint-plugin-tailwindcss';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -23,12 +24,18 @@ export default tseslint.config(
     },
     plugins: {
       boundaries,
+      tailwindcss,
       'jsx-a11y': jsxA11y,
       'react-hooks': reactHooks,
     },
     settings: {
       'import/resolver': { typescript: { alwaysTryTypes: true } },
+      tailwindcss: {
+        cssConfigPath: './src/styles.css',
+        functions: ['cva', 'cx', 'cn', 'tv'],
+      },
       'boundaries/elements': [
+        { type: 'feature', pattern: 'src/features/**/*', mode: 'full' },
         { type: 'app', pattern: ['src/App.tsx', 'src/main.tsx'], mode: 'full' },
         { type: 'route', pattern: 'src/app/**/*', mode: 'full' },
         { type: 'feature-auth', pattern: 'src/components/auth/**/*', mode: 'full' },
@@ -48,6 +55,8 @@ export default tseslint.config(
       ],
     },
     rules: {
+      'tailwindcss/no-arbitrary-value': 'error',
+      'tailwindcss/no-custom-classname': ['error', { whitelist: ['u-density-override'] }],
       ...jsxA11y.flatConfigs.recommended.rules,
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
@@ -80,6 +89,14 @@ export default tseslint.config(
           { from: 'mock', allow: ['mock', 'lib', 'generated-contract', 'type'] },
           { from: 'worker', allow: ['lib', 'generated-contract', 'type', 'worker'] },
         ],
+      }],
+      'boundaries/external': ['error', {
+        default: 'allow',
+        rules: [{
+          from: ['feature'],
+          disallow: ['@base-ui-components/*'],
+          message: 'Compose @/components/ui/* — do not hand-roll a Base UI primitive the registry ships.',
+        }],
       }],
     },
   },

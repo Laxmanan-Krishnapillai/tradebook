@@ -1,5 +1,7 @@
 # Frontend Guide
 
+- Read `../../docs/design/DESIGN.md` before UI work. Compose components from the
+  `@tradebook` registry instead of importing raw Base UI primitives in feature code.
 - Use React 19 and TypeScript.
 - Import API contracts only from `src/api/generated`; regenerate them from C# DTOs rather than editing output.
 - Use MSW 2 handlers from `src/mocks` for frontend tests.

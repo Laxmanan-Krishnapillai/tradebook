@@ -1,0 +1,14 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "combobox",
+  "title": "Combobox",
+  "description": "Labelled keyboard-first option picker.",
+  "files": [
+    {
+      "path": "registry/tradebook/combobox/combobox.tsx",
+      "content": "export interface ComboboxOption { label: string; value: string }\nexport interface ComboboxProps {\n  label: string;\n  options: readonly ComboboxOption[];\n  value?: string;\n  onChange?: (value: string) => void;\n}\n\nexport function Combobox({ label, onChange, options, value }: ComboboxProps) {\n  return (\n    <label>\n      {label}\n      <select onChange={(event) => onChange?.(event.currentTarget.value)} value={value}>\n        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}\n      </select>\n    </label>\n  );\n}\n",
+      "type": "registry:component"
+    }
+  ],
+  "type": "registry:base"
+}

@@ -1,0 +1,46 @@
+name: Visual QA
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  storybook-argos:
+    name: Storybook Argos (required)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/Frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build-storybook
+      - run: npx @argos-ci/cli upload storybook-static
+        env:
+          ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+
+  e2e-a11y:
+    name: Playwright accessibility and visuals (required)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            src/Frontend/package-lock.json
+            tests/e2e/package-lock.json
+      - run: npm ci --prefix src/Frontend && npm ci --prefix tests/e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests/e2e
+      - run: npx playwright test --project chromium
+        working-directory: tests/e2e
+        env:
+          ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
