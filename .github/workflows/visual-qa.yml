@@ -48,12 +48,15 @@ jobs:
           POSTGRES_PASSWORD: tradebook-e2e-ci
           Database__ConnectionString: Host=127.0.0.1;Port=5432;Database=tradebook;Username=tradebook;Password=tradebook-e2e-ci
           ASPNETCORE_URLS: http://127.0.0.1:5000
+          ASPNETCORE_ENVIRONMENT: Testing
+          Entra__TenantId: 11111111-1111-1111-1111-111111111111
+          Entra__ClientId: 22222222-2222-2222-2222-222222222222
           NO_PROXY: localhost,127.0.0.1
         run: |
           docker compose up -d --wait
           dotnet run --project src/Backend/src/Tradebook.Api/Tradebook.Api.csproj > /tmp/api.log 2>&1 &
           npm --prefix src/Frontend run dev -- --host 127.0.0.1 > /tmp/ui.log 2>&1 &
-          timeout 180 bash -c 'until curl -fsS http://127.0.0.1:5000/health/ready && curl -fsS http://127.0.0.1:5173; do sleep 2; done'
+          timeout 300 bash -c 'until curl -fsS http://127.0.0.1:5000/health/ready && curl -fsS http://127.0.0.1:5173; do sleep 2; done' || { echo '=== api.log ==='; tail -50 /tmp/api.log; echo '=== ui.log ==='; tail -20 /tmp/ui.log; exit 124; }
       - run: npx playwright install --with-deps chromium
         working-directory: tests/e2e
       - run: npx playwright test --project chromium visual.spec.ts
