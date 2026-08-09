@@ -9,6 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./infra/database-ops:/opt/tradebook/database-ops:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready --username tradebook --dbname tradebook"]
       interval: 5s
