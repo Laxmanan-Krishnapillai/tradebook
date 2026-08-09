@@ -93,7 +93,8 @@ run_one() {
   prompt="$(render "$NN" "$spec")" \
     || { echo "prompt rendering failed" >>"$log"; echo "PROMPT-FAIL" >"$st"; return; }
   if ( cd "$wt" && codex exec --model "$MODEL" -c "model_reasoning_effort=${eff}" \
-        --sandbox workspace-write -c approval_policy=never "$prompt" ) >>"$log" 2>&1; then
+        --sandbox workspace-write -c sandbox_workspace_write.network_access=true \
+        -c approval_policy=never "$prompt" ) >>"$log" 2>&1; then
     codex_rc=0
   else
     codex_rc=$?
