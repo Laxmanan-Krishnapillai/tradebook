@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Ids;
 using Tradebook.Core.Domain.ValueObjects.Money;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record BioticketDetailsDto
 {
     public BioticketDetailsDto() { }
@@ -62,38 +60,27 @@ public sealed record BioticketDetailsDto
     public required string BookType { get; init; }
     public required DateOnly ContractMonth { get; init; }
 
-    [TsOptional]
     public DateOnly? StartDay { get; init; }
 
-    [TsOptional]
     public DateOnly? EndDay { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeNominatedTon { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeRealisedTon { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeTon { get; init; }
 
-    [TsOptional]
     public Amount? CostEurTon { get; init; }
 
-    [TsOptional]
     public Amount? RevenueEur { get; init; }
 
-    [TsOptional]
     public Amount? VatPct { get; init; }
 
-    [TsOptional]
     public Amount? VatEur { get; init; }
 
-    [TsOptional]
     public Amount? InvoiceAmountEur { get; init; }
     public required string Status { get; init; }
 
-    [TsOptional]
     public string? Comment { get; init; }
     public required long Version { get; init; }
     public required DateTime CreatedAt { get; init; }

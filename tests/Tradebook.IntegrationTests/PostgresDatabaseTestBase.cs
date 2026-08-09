@@ -13,12 +13,25 @@ public abstract class PostgresDatabaseTestBase(PostgresTestFixture fixture)
     : IClassFixture<PostgresTestFixture>,
         IAsyncLifetime
 {
+    static PostgresDatabaseTestBase()
+    {
+        // Deterministic Dapper handler registration for every derived test class;
+        // production registers the same set in NpgsqlConnectionFactory.
+        Tradebook.Infrastructure.Data.VogenTypeHandlers.RegisterAll();
+    }
+
     protected PostgresTestFixture Postgres { get; } = fixture;
 
     protected virtual bool ResetDatabaseBeforeEachTest => true;
 
-    public virtual Task InitializeAsync() =>
-        ResetDatabaseBeforeEachTest ? Postgres.ResetDatabaseAsync() : Task.CompletedTask;
+    public virtual ValueTask InitializeAsync() =>
+        ResetDatabaseBeforeEachTest
+            ? new ValueTask(Postgres.ResetDatabaseAsync())
+            : ValueTask.CompletedTask;
 
-    public virtual Task DisposeAsync() => Task.CompletedTask;
+    public virtual ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 }

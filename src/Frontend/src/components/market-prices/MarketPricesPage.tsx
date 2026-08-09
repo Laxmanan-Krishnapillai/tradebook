@@ -1,9 +1,10 @@
+import Decimal from "decimal.js";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
-import type { GetMarketPriceHistoryResponse } from "../../api/generated/get-market-price-history-response";
-import type { MarketPriceDetailsDto } from "../../api/generated/market-price-details-dto";
-import type { UpsertMarketPriceRequest } from "../../api/generated/upsert-market-price-request";
+import type { GetMarketPriceHistoryResponse } from "../../api/generated/types.gen";
+import type { MarketPriceDetailsDto } from "../../api/generated/types.gen";
+import type { UpsertMarketPriceRequest } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
@@ -23,17 +24,17 @@ interface ConflictState {
 const today = () => new Date().toISOString().slice(0, 10);
 const initialCreate = (): UpsertMarketPriceRequest => ({
   priceDate: today(),
-  ttfEurMwh: 0,
+  ttfEurMwh: "0",
   version: 0,
 });
 
 function currentRequest(
   price: MarketPriceDetailsDto,
-  ttfEurMwh: number,
+  ttfEurMwh: string,
 ): UpsertMarketPriceRequest {
   return {
     priceDate: price.priceDate,
-    ttfEurMwh,
+    ttfEurMwh: new Decimal(ttfEurMwh).toString(),
     egsiEtfEurMwh: price.egsiEtfEurMwh,
     theEurMwh: price.theEurMwh,
     bgoEurMwh: price.bgoEurMwh,
@@ -74,7 +75,7 @@ function MarketPriceEditor({
       <button
         type="button"
         disabled={ttf === ""}
-        onClick={() => onSave(price, currentRequest(price, Number(ttf)))}
+        onClick={() => onSave(price, currentRequest(price, ttf))}
       >
         Save
       </button>
@@ -121,7 +122,7 @@ export function MarketPricesPage() {
       setError("");
       attempted.current = request;
       let version = price.version;
-      const before = currentRequest(price, price.ttfEurMwh ?? 0);
+      const before = currentRequest(price, price.ttfEurMwh ?? "0");
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Update market price ${price.priceDate}`,
@@ -151,7 +152,7 @@ export function MarketPricesPage() {
       const reason = "Deleted from Tradebook UI";
       attempted.current = { reason };
       let version = price.version;
-      const snapshot = currentRequest(price, price.ttfEurMwh ?? 0);
+      const snapshot = currentRequest(price, price.ttfEurMwh ?? "0");
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Delete market price ${price.priceDate}`,
@@ -335,7 +336,7 @@ export function MarketPricesPage() {
                     ttfEurMwh:
                       event.target.value === ""
                         ? null
-                        : Number(event.target.value),
+                        : event.target.value,
                   }))
                 }
               />
@@ -353,7 +354,7 @@ export function MarketPricesPage() {
                     eurUsd:
                       event.target.value === ""
                         ? null
-                        : Number(event.target.value),
+                        : event.target.value,
                   }))
                 }
               />

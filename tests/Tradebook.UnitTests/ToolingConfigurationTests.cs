@@ -9,13 +9,16 @@ public sealed class ToolingConfigurationTests
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
 
     [Fact]
-    public void StrykerUsesTheRepositoryScopeReleaseBuildAndSingle80PercentGate()
+    public void StrykerUsesMtpRepositoryScopeReleaseBuildAndRequiredThresholds()
     {
         var configPath = FindRepositoryFile("stryker-config.json");
         using var document = JsonDocument.Parse(File.ReadAllText(configPath));
         var config = document.RootElement.GetProperty("stryker-config");
 
         Assert.Equal("Release", config.GetProperty("configuration").GetString());
+        Assert.Equal("mtp", config.GetProperty("test-runner").GetString());
+        Assert.Equal(85, config.GetProperty("thresholds").GetProperty("high").GetInt32());
+        Assert.Equal(80, config.GetProperty("thresholds").GetProperty("low").GetInt32());
         Assert.Equal(80, config.GetProperty("thresholds").GetProperty("break").GetInt32());
         Assert.Equal("src/Backend/Tradebook.sln", config.GetProperty("solution").GetString());
         Assert.Equal("Tradebook.Api.csproj", config.GetProperty("project").GetString());
@@ -43,7 +46,7 @@ public sealed class ToolingConfigurationTests
         var repositoryRoot = FindRepositoryRoot();
         var projectFiles = FindProjectFiles(repositoryRoot);
 
-        Assert.Equal(6, projectFiles.Length);
+        Assert.Equal(7, projectFiles.Length);
         foreach (var projectFile in projectFiles)
         {
             var project = XDocument.Load(projectFile);
@@ -70,8 +73,7 @@ public sealed class ToolingConfigurationTests
         Assert.NotEmpty(operationalFiles);
         AssertOperationalFilesTargetNet10(repositoryRoot, operationalFiles);
         AssertWorkflowsUseGlobalJson(repositoryRoot);
-        AssertTypegenTargetsNet10(repositoryRoot);
-        AssertDockerRestoreStagesCopyRepositoryInputs(repositoryRoot, operationalFiles);
+        AssertDockerRestoreInputsAreCopied(repositoryRoot, operationalFiles);
     }
 
     private static void AssertOperationalFilesTargetNet10(
@@ -142,24 +144,7 @@ public sealed class ToolingConfigurationTests
         }
     }
 
-    private static void AssertTypegenTargetsNet10(string repositoryRoot)
-    {
-        using var typegen = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(repositoryRoot, "tgconfig.json"))
-        );
-        var typegenAssembly = Assert.Single(
-            typegen
-                .RootElement.GetProperty("assemblies")
-                .EnumerateArray()
-                .Select(item => item.GetString()!)
-        );
-        Assert.True(
-            typegenAssembly.Replace('\\', '/').Contains("/net10.0/", StringComparison.Ordinal),
-            $"TypeGen assembly path is not net10.0: {typegenAssembly}"
-        );
-    }
-
-    private static void AssertDockerRestoreStagesCopyRepositoryInputs(
+    private static void AssertDockerRestoreInputsAreCopied(
         string repositoryRoot,
         string[] operationalFiles
     )
@@ -276,11 +261,7 @@ public sealed class ToolingConfigurationTests
                         StringComparison.Ordinal
                     )
             );
-            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
-            var expectedVersion = string.Equals(expected.Key, "TypeGen", StringComparison.Ordinal)
-                ? "7.0.0"
-                : expected.Value;
-            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
+            Assert.Equal(expected.Value, entry.Attribute("Version")?.Value);
         }
     }
 
@@ -316,14 +297,14 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
-    public void CiUsesGlobalJsonForBothDotnetSdkInstallations()
+    public void CiUsesGlobalJsonForDotnetSdkInstallation()
     {
         var workflow = File.ReadAllText(
             Path.Combine(FindRepositoryRoot(), ".github", "workflows", "ci.yml")
         );
 
         Assert.Equal(
-            2,
+            1,
             Regex.Count(
                 workflow,
                 @"global-json-file:\s*global\.json",
@@ -374,6 +355,70 @@ public sealed class ToolingConfigurationTests
             StringComparison.Ordinal
         );
         Assert.Contains("GlobalPackageReference", decisionLog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DecisionLogRecordsTask14AnalyzerFormatterMapperAndValidatorChoices()
+    {
+        var decisionLog = File.ReadAllText(
+            Path.Combine(FindRepositoryRoot(), "docs", "architecture", "decision-log.md")
+        );
+
+        Assert.Contains("D16", decisionLog, StringComparison.Ordinal);
+        Assert.Contains(
+            "Backend compile-time safety toolchain",
+            decisionLog,
+            StringComparison.Ordinal
+        );
+        Assert.Contains("BannedApiAnalyzers", decisionLog, StringComparison.Ordinal);
+        Assert.Contains("CSharpier", decisionLog, StringComparison.Ordinal);
+        Assert.Contains("Riok.Mapperly", decisionLog, StringComparison.Ordinal);
+        Assert.Contains("OptionsValidator", decisionLog, StringComparison.Ordinal);
+    }
+
+    private static Dictionary<string, string> ReadExpectedPackageVersions(string repositoryRoot)
+    {
+        var versions = ReadTargetPackageVersions(repositoryRoot)
+            .Where(pair => !string.Equals(pair.Key, "TypeGen", StringComparison.Ordinal))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        versions.Remove("Microsoft.NET.Test.Sdk");
+        versions.Remove("coverlet.collector");
+        versions.Remove("xunit");
+        versions.Remove("xunit.runner.visualstudio");
+        versions.Remove("TngTech.ArchUnitNET.xUnit");
+        var task14Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Microsoft.Extensions.Options"] = "10.0.10",
+            ["Riok.Mapperly"] = "4.3.1",
+            ["xunit.analyzers"] = "1.27.0",
+        };
+
+        foreach (var package in task14Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"Task 14 package '{package.Key}' duplicates a Task 13 central pin."
+            );
+        }
+
+        var task20Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["dbup-postgresql"] = "7.0.1",
+            ["Microsoft.Identity.Web"] = "4.14.2",
+            ["CsCheck"] = "4.4.0",
+            ["Microsoft.Testing.Extensions.CodeCoverage"] = "17.14.2",
+            ["xunit.v3"] = "3.2.2",
+            ["TngTech.ArchUnitNET"] = "0.11.0",
+        };
+        foreach (var package in task20Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"{package.Key} is pinned by more than one task"
+            );
+        }
+
+        return versions;
     }
 
     private static Dictionary<string, string> ReadTargetPackageVersions(string repositoryRoot)

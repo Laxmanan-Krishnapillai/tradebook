@@ -192,3 +192,44 @@ DTO/domain mapping uses Riok.Mapperly 4.3.1 source-generated partial mappers. Op
 Microsoft.Extensions.Options 10.0.10 source-generated `[OptionsValidator]` validators and
 startup `.ValidateOnStart()` checks. These choices keep mapping and configuration
 validation compile-time generated, with no reflection-based mapping or validation path.
+
+## D18 — DbUp and schema-checked SQL safety gates (2026-08-09)
+
+Database migrations are forward-only embedded SQL applied exclusively by DbUp, one
+transaction per ordered script, with the standard journal stored as
+`public.schema_journal`. Startup and the out-of-band migration executable call the same
+runner. Recovery from an applied migration is always a later numbered script.
+
+Authored static application queries are checked by sqlc against
+`src/Database/Migrations`; the pinned `sqlc-gen-csharp` WASM output is committed and must
+regenerate without drift. Dynamic identifier-whitelisted analytics SQL, binary COPY,
+runtime-arity filters, and administrative tooling remain the only hand-written Dapper
+fallbacks. Squawk owns migration lock/rewrite safety and sqlfluff owns PostgreSQL SQL
+linting. If the pre-1.0 C# plugin cannot represent a PostgreSQL construct, the narrow
+fallback is an enumerated hand-written Dapper query rather than changing the schema or
+introducing an ORM.
+
+## D19 — .NET test platform and property testing (2026-08-09)
+
+All .NET test projects use xUnit v3 3.2.x directly on Microsoft.Testing.Platform. The
+VSTest bridge, xUnit v2 packages, and Coverlet collector are not part of the test stack;
+MTP's code-coverage extension produces coverage artifacts and Stryker 4.16 runs the unit
+suite through its MTP runner. CsCheck 4.x supplies seeded, shrinking property tests for
+the semantic compiler's parameterization and identifier-whitelist invariants and for
+Vogen value-object round-trip and validation invariants.
+
+TUnit was rejected because xUnit v3 preserves the existing fixture and assertion model
+while carrying lower integration risk for Testcontainers, ArchUnitNET, and Stryker.
+
+## D20 — TypeSpec governs the API contract (2026-08-09)
+
+TypeSpec is the single source of truth for every REST endpoint and transport DTO. It emits
+OpenAPI 3.1, from which Hey API generates TypeScript types, Zod runtime validators, a fetch
+client, and TanStack Query v5 options. FastEndpoints remains the server implementation;
+the authenticated ASP.NET OpenAPI document and the TypeSpec document are compared by the
+blocking contract-drift gate. The alpha TypeSpec C# emitter is not used.
+
+This supersedes D12/D13's TypeGen ownership statements and Task 08's types-only pipeline.
+TypeGen is removed because assembly reflection produced no runtime validation, client, or
+query integration and made C# rather than the cross-stack contract authoritative. Money is
+represented as a decimal-formatted JSON string and enums use string wire values.

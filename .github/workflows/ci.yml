@@ -39,6 +39,8 @@ jobs:
               - '.config/dotnet-tools.json'
               - 'bin/check-banned-api.sh'
               - 'bin/verify.sh'
+              - 'scripts/check-contract-drift.sh'
+              - 'docs/api/typespec/**'
               - 'docs/architecture/decision-log.md'
               - 'docs/tasks/task-13-platform-currency-and-central-package-management.md'
               - 'tgconfig.json'
@@ -104,21 +106,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-node@v4
         with:
-          global-json-file: global.json
-      - run: dotnet tool restore
-      - run: dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug
-      - run: dotnet typegen generate --project-folder .
-      - name: Fail on tracked or untracked contract drift
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/Frontend/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: src/Frontend
+      - run: bash scripts/check-contract-drift.sh
+
+  sql-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: 1.29.0
+      - name: Regenerate schema-checked C# and reject drift
         shell: bash
         run: |
-          contract_drift="$(git status --porcelain -- src/Frontend/src/api/generated)"
-          if [[ -n "$contract_drift" ]]; then
-            printf '%s\n' "$contract_drift"
-            git diff -- src/Frontend/src/api/generated
-            exit 1
-          fi
+          sqlc generate
+          git diff --exit-code -- src/Backend/src/Tradebook.Infrastructure/Data/generated
+          test -z "$(git status --porcelain -- src/Backend/src/Tradebook.Infrastructure/Data/generated)"
+      - name: Install sqlfluff
+        run: pipx install sqlfluff==3.4.2
+      - name: Lint all PostgreSQL SQL
+        run: sqlfluff lint src/Database/Migrations src/Backend/src/Tradebook.Infrastructure/Data/queries
+      - name: Squawk changed migrations
+        uses: sbdchd/squawk-action@v2
+        with:
+          config: .squawk.toml
+          path: src/Database/Migrations
 
   backend:
     needs: changes
@@ -185,7 +208,7 @@ jobs:
           bash infra/validation/verify-backup-restore.sh
 
   ci-required:
-    needs: [governance, contracts, backend, frontend, infra]
+    needs: [governance, contracts, sql-safety, backend, frontend, infra]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -93,7 +93,7 @@ public sealed class DomainPrimitiveTests
 
         foreach (var row in ValueObjects)
         {
-            var type = (Type)row[1];
+            var type = row.Data.Item2;
             Assert.True(
                 Dapper.SqlMapper.HasTypeHandler(type),
                 $"No Dapper handler is registered for {type.Name}."

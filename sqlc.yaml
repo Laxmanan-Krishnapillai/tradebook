@@ -1,0 +1,57 @@
+version: "2"
+plugins:
+  - name: csharp
+    wasm:
+      url: https://github.com/DaredevilOSS/sqlc-gen-csharp/releases/download/v0.23.0/sqlc-gen-csharp.wasm
+      sha256: 14aaa98ca141bde2160df534f6d19036d474dba5cd168d6096cf881d33153338
+sql:
+  - engine: postgresql
+    schema:
+      - src/Database/Migrations/001_extensions_and_enums.sql
+      - src/Database/Migrations/002_master_data.sql
+      - src/Database/Migrations/003_contracts.sql
+    queries: src/Backend/src/Tradebook.Infrastructure/Data/queries
+    codegen:
+      - plugin: csharp
+        out: src/Backend/src/Tradebook.Infrastructure/Data/generated
+        options:
+          namespaceName: Tradebook.Infrastructure.Data.Generated
+          generateCsproj: false
+          useDapper: true
+          useCentralPackageManagement: true
+          overrideDriverVersion: 10.0.3
+          overrideDapperVersion: 2.1.79
+          withCancellationToken: true
+          overrides:
+            - column: "*:avg_ttf_eur_mwh"
+              csharp_type:
+                type: "decimal"
+                notNull: false
+            - column: "*:avg_egsi_etf_eur_mwh"
+              csharp_type:
+                type: "decimal"
+                notNull: false
+            - column: "*:avg_the_eur_mwh"
+              csharp_type:
+                type: "decimal"
+                notNull: false
+            - column: "*:avg_eur_sek"
+              csharp_type:
+                type: "decimal"
+                notNull: false
+            - column: "*:avg_eur_chf"
+              csharp_type:
+                type: "decimal"
+                notNull: false
+            - column: "*:avg_eur_dkk"
+              csharp_type:
+                type: "decimal"
+                notNull: false
+            - column: "GetContractPersistenceProbe:id"
+              csharp_type:
+                type: "Tradebook.Core.Domain.ValueObjects.Ids.ContractId"
+                notNull: true
+            - column: "GetContractPersistenceProbe:price"
+              csharp_type:
+                type: "Tradebook.Core.Domain.ValueObjects.Money.Price"
+                notNull: false

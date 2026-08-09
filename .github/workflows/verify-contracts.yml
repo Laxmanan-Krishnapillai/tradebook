@@ -1,4 +1,4 @@
-name: Verify TypeScript Contract Drift
+name: Verify API Contract Drift
 
 on:
   push:
@@ -11,21 +11,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22.x
-      - run: dotnet tool restore
-      - run: dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug
-      - run: dotnet typegen generate --project-folder .
-      - name: Fail on tracked or untracked contract drift
-        shell: bash
-        run: |
-          contract_drift="$(git status --porcelain -- src/Frontend/src/api/generated)"
-          if [[ -n "$contract_drift" ]]; then
-            printf '%s\n' "$contract_drift"
-            git diff -- src/Frontend/src/api/generated
-            exit 1
-          fi
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/Frontend/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: src/Frontend
+      - run: bash scripts/check-contract-drift.sh

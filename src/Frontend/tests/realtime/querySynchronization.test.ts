@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/physical-delivery-details-dto';
+import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/types.gen';
 import { affectedQueryRoots, reconcileRealtimeBatch } from '../../src/hooks/useRealtimeQuerySync';
 import { queryKeys } from '../../src/lib/query/queryKeys';
 import { subscribedAggregateTypes, type EntityChangedEvent } from '../../src/lib/realtime/signalRClient';

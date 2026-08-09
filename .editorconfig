@@ -25,3 +25,9 @@ csharp_using_directive_placement = outside_namespace:suggestion
 csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_braces = true:suggestion
 csharp_style_prefer_readonly_struct = true:suggestion
+
+# sqlc-gen-csharp output: generated sources are exempt from style/design analyzers.
+[src/Backend/src/Tradebook.Infrastructure/Data/generated/*.cs]
+generated_code = true
+# sqlc output annotates nullability without a #nullable directive (CS8669).
+dotnet_diagnostic.CS8669.severity = silent

@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
@@ -23,37 +22,29 @@ public sealed class PostgresTestFixture : IAsyncLifetime, IDisposable
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await _container.StartAsync().ConfigureAwait(false);
-        var connections = new NpgsqlConnectionFactory(
-            Options.Create(new DatabaseOptions { ConnectionString = ConnectionString })
-        );
-        await using (connections.ConfigureAwait(false))
-        {
-            await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance)
-                .MigrateAsync()
-                .ConfigureAwait(false);
+        MigrationRunner.Run(ConnectionString);
 
-            _connection = new NpgsqlConnection(ConnectionString);
-            await _connection.OpenAsync().ConfigureAwait(false);
-            _respawner = await Respawner
-                .CreateAsync(
-                    _connection,
-                    new RespawnerOptions
-                    {
-                        DbAdapter = DbAdapter.Postgres,
-                        SchemasToInclude = ["public"],
-                        TablesToIgnore = ["schema_migrations"],
-                    }
-                )
-                .ConfigureAwait(false);
-        }
+        _connection = new NpgsqlConnection(ConnectionString);
+        await _connection.OpenAsync().ConfigureAwait(false);
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_journal"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
     public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _connection.DisposeAsync().ConfigureAwait(false);
         await _container.DisposeAsync().ConfigureAwait(false);

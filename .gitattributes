@@ -4,3 +4,7 @@
 # generated contracts as normalized text with NO forced eol so each platform's
 # checkout matches what typegen regenerates there; blobs stay LF in the index.
 src/Frontend/src/api/generated/** text !eol
+
+# sqlc-gen-csharp emits deterministic but mixed newlines; store the generated C#
+# byte-faithful (no eol normalization) so regeneration is drift-free on every platform.
+src/Backend/src/Tradebook.Infrastructure/Data/generated/** -text
