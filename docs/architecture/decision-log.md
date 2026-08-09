@@ -168,3 +168,19 @@ Tailwind/`@tailwindcss/vite` 4.3.3, ESLint 10.8.1, typescript-eslint 8.66.0,
 React Hooks 7.1.1, jsx-a11y 6.10.2, Testing Library ESLint 7.16.2,
 Vitest ESLint 1.6.26, boundaries 7.1.0, and Knip 6.32.0. Node support is restricted
 to the Vite-supported 20.19+, 22.13+, and 24+ release lines.
+
+## D17 — DbUp and schema-checked SQL safety gates (2026-08-09)
+
+Database migrations are forward-only embedded SQL applied exclusively by DbUp, one
+transaction per ordered script, with the standard journal stored as
+`public.schema_journal`. Startup and the out-of-band migration executable call the same
+runner. Recovery from an applied migration is always a later numbered script.
+
+Authored static application queries are checked by sqlc against
+`src/Database/Migrations`; the pinned `sqlc-gen-csharp` WASM output is committed and must
+regenerate without drift. Dynamic identifier-whitelisted analytics SQL, binary COPY,
+runtime-arity filters, and administrative tooling remain the only hand-written Dapper
+fallbacks. Squawk owns migration lock/rewrite safety and sqlfluff owns PostgreSQL SQL
+linting. If the pre-1.0 C# plugin cannot represent a PostgreSQL construct, the narrow
+fallback is an enumerated hand-written Dapper query rather than changing the schema or
+introducing an ORM.

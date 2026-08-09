@@ -109,17 +109,10 @@ if ($dockerfile -notmatch 'FROM postgres:17-bookworm AS database-ops') {
 }
 
 $shellMigrator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'infra\database-ops\run-migrations.sh') -Raw
-$csharpMigrator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\Backend\src\Tradebook.Infrastructure\Migrations\DatabaseMigrator.cs') -Raw
-$migrationContractPatterns = @(
-    "pg_advisory_lock\(hashtextextended\('tradebook-schema-migrations', 0\)\)",
-    'version VARCHAR\(255\) PRIMARY KEY',
-    'checksum_sha256 CHAR\(64\) NOT NULL',
-    'schema_migrations \(version, checksum_sha256\)'
-)
-foreach ($pattern in $migrationContractPatterns) {
-    if ($shellMigrator -notmatch $pattern -or $csharpMigrator -notmatch $pattern) {
-        throw "The shell and C# migration runners do not share contract pattern: $pattern"
-    }
+$csharpMigrator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\Backend\src\Tradebook.Infrastructure\Migrations\MigrationRunner.cs') -Raw
+if ($shellMigrator -notmatch 'Tradebook.Migrations.dll' -or
+    $csharpMigrator -notmatch 'JournalToPostgresqlTable\("public", "schema_journal"\)') {
+    throw 'The operations image and application must use the shared DbUp migration runner.'
 }
 
 $previousPostgresPassword = $env:POSTGRES_PASSWORD

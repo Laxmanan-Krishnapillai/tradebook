@@ -76,6 +76,6 @@ database_created=true
 pg_restore --host="$PGHOST" --port="${PGPORT:-5432}" --username="$PGUSER" --dbname="$RESTORE_DATABASE" --no-owner --no-acl --exit-on-error "$dump_path"
 
 PGDATABASE="$RESTORE_DATABASE" /bin/bash "$(dirname "$0")/run-migrations.sh"
-psql --no-psqlrc --host="$PGHOST" --port="${PGPORT:-5432}" --username="$PGUSER" --dbname="$RESTORE_DATABASE" --set=ON_ERROR_STOP=1 --command="SELECT count(*) FROM schema_migrations; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
+psql --no-psqlrc --host="$PGHOST" --port="${PGPORT:-5432}" --username="$PGUSER" --dbname="$RESTORE_DATABASE" --set=ON_ERROR_STOP=1 --command="SELECT count(*) FROM schema_journal; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
 
 printf '{"event":"restore.completed","blob":"%s","database":"%s","kept":%s}\n' "$BACKUP_BLOB" "$RESTORE_DATABASE" "$RESTORE_KEEP_DATABASE"

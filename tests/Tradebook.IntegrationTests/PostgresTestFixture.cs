@@ -1,11 +1,8 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.Migrations;
-using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests;
 
@@ -26,9 +23,7 @@ public sealed class PostgresTestFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
-        await using var connections = new NpgsqlConnectionFactory(Options.Create(
-            new DatabaseOptions { ConnectionString = ConnectionString }));
-        await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance).MigrateAsync();
+        MigrationRunner.Run(ConnectionString);
 
         _connection = new NpgsqlConnection(ConnectionString);
         await _connection.OpenAsync();
@@ -36,7 +31,7 @@ public sealed class PostgresTestFixture : IAsyncLifetime
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = ["public"],
-            TablesToIgnore = ["schema_migrations"]
+            TablesToIgnore = ["schema_journal"]
         });
     }
 

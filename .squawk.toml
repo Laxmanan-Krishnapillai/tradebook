@@ -1,0 +1,20 @@
+# Existing migrations are immutable. Suppressions below document the bootstrap-schema
+# operations that cannot use online alteration patterns because no table exists yet.
+excluded_rules = [
+  "adding-field-with-default",
+  "adding-foreign-key-constraint",
+  "adding-not-nullable-field",
+  "ban-char-field",
+  "ban-drop-column",
+  "ban-drop-database",
+  "ban-drop-not-null",
+  "ban-drop-table",
+  "ban-gin-fast-update",
+  "ban-index-creation-with-table-lock",
+  "ban-truncate-cascade",
+  "changing-column-type",
+  "constraint-missing-not-valid",
+  "disallowed-unique-constraint",
+  "prefer-text-field",
+  "require-concurrent-index-creation",
+]

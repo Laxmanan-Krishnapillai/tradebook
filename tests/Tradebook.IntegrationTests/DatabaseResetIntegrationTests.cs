@@ -47,7 +47,7 @@ public sealed class DatabaseResetIntegrationTests(CustomWebApplicationFactory fa
     {
         await using var connection = new NpgsqlConnection(Factory.ConnectionString);
         await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("SELECT count(*) FROM schema_migrations", connection);
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM schema_journal", connection);
         return (long)(await command.ExecuteScalarAsync())!;
     }
 }

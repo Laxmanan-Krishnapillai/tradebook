@@ -14,11 +14,12 @@ cleanup() {
 trap cleanup EXIT
 
 "${compose[@]}" up --detach --wait postgres
+"${compose[@]}" run --rm migrations
 
 expected_migration_count="$(find src/Database/Migrations -maxdepth 1 -type f -name '*.sql' | wc -l)"
 applied_migration_count="$("${compose[@]}" exec --no-TTY postgres psql \
   --username tradebook --dbname tradebook --tuples-only --no-align \
-  --command 'SELECT count(*) FROM schema_migrations;')"
+  --command 'SELECT count(*) FROM schema_journal;')"
 if [[ "$applied_migration_count" != "$expected_migration_count" || "$applied_migration_count" -lt 1 ]]; then
   echo "Compose migration count mismatch: expected=$expected_migration_count applied=$applied_migration_count" >&2
   exit 1

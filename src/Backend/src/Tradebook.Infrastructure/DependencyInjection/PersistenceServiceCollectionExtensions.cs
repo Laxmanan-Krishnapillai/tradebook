@@ -20,7 +20,6 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IMarketPriceRepository, MarketPriceRepository>();
         services.AddScoped<ITaxTariffRepository, TaxTariffRepository>();
         services.AddScoped<IHedgeRepository, HedgeRepository>();
-        services.AddSingleton<DatabaseMigrator>();
         return services;
     }
 }

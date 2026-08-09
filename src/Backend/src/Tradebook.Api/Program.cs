@@ -8,6 +8,7 @@ using Tradebook.Infrastructure.Caching;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.DependencyInjection;
 using Tradebook.Infrastructure.Options;
+using Tradebook.Infrastructure.Migrations;
 using Tradebook.Api.RealTime;
 using Tradebook.Core.Analytics;
 using Tradebook.Api.Features.Health;
@@ -37,6 +38,7 @@ builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
+app.ApplyTradebookMigrations();
 
 try
 {

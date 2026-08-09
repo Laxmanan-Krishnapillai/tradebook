@@ -8,7 +8,7 @@ public sealed class PostgresFixtureResetIntegrationTests(PostgresTestFixture pos
     [Fact]
     public async Task Reset_clears_application_rows_and_preserves_the_migration_ledger()
     {
-        var migrationCount = await CountAsync("SELECT count(*) FROM schema_migrations");
+        var migrationCount = await CountAsync("SELECT count(*) FROM schema_journal");
         Assert.True(migrationCount > 0);
 
         var counterpartyId = Guid.NewGuid();
@@ -33,7 +33,7 @@ public sealed class PostgresFixtureResetIntegrationTests(PostgresTestFixture pos
         Assert.Equal(0, await CountAsync(
             "SELECT count(*) FROM counterparties WHERE id = @id",
             counterpartyId));
-        Assert.Equal(migrationCount, await CountAsync("SELECT count(*) FROM schema_migrations"));
+        Assert.Equal(migrationCount, await CountAsync("SELECT count(*) FROM schema_journal"));
     }
 
     private async Task<long> CountAsync(string sql, Guid? id = null)

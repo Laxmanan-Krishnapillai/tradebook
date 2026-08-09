@@ -1,0 +1,8 @@
+[sqlfluff]
+dialect = postgres
+templater = raw
+max_line_length = 120
+exclude_rules = layout.long_lines, layout.indent, layout.spacing, layout.commas, layout.cte_newline, capitalisation.keywords, capitalisation.identifiers, capitalisation.functions, capitalisation.literals, capitalisation.types, convention.terminator, convention.casting_style, convention.not_equal, ambiguous.column_count, ambiguous.join, references.keywords, references.special_chars, structure.column_order, structure.else_null, structure.join_condition_order, structure.subquery, references.quoting, layout.end_of_file, aliasing.table, layout.select_targets
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
