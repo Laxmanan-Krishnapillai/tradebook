@@ -4,7 +4,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" />
     <PackageReference Include="TypeGen" />
+    <PackageReference Include="Vogen" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 

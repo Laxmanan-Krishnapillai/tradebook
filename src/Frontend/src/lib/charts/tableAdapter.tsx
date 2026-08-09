@@ -12,7 +12,11 @@ export class TableAdapter implements ChartAdapter {
   update(data: SeriesData): void {
     if (!this.root) return;
     const first = data.series[0];
-    const rows: SeriesRow[] = (first?.x ?? []).map((x, index) => Object.assign({ x }, ...data.series.map((series) => ({ [series.name]: Number(series.y[index]) }))));
+    const rows: SeriesRow[] = (first?.x ?? []).map((x, index) =>
+      data.series.reduce<SeriesRow>(
+        (row, series) => ({ ...row, [series.name]: Number(series.y[index]) }),
+        { x },
+      ));
     const columns: ColumnDef<SeriesRow>[] = [
       { accessorKey: 'x', header: 'Category' },
       ...data.series.map((series) => ({ accessorKey: series.name, header: series.name }))

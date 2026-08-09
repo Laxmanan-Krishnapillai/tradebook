@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
-using Microsoft.Extensions.Options;
 using Npgsql;
+using Tradebook_Core;
 using Tradebook.Api;
 using Tradebook.Api.ErrorHandling;
 using Tradebook.Api.Features.Health;
@@ -15,15 +15,20 @@ using Tradebook.Infrastructure.DependencyInjection;
 using Tradebook.Infrastructure.Options;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+VogenTypeHandlers.RegisterAll();
 builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.TypeInfoResolver = AppJsonSerializerContext.Default
-);
+{
+    options.SerializerOptions.Converters.Add(new VogenTypesFactory());
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
+});
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter())
 );
-builder.Services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
-builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateOnStart();
+builder
+    .Services.AddOptions<DatabaseOptions>()
+    .BindConfiguration("Database")
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.AddTradebookPersistence();
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton<ICacheService, HybridCacheService>();
@@ -38,28 +43,23 @@ builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
-var logDeferredSchemaValidation = LoggerMessage.Define(
-    LogLevel.Warning,
-    new EventId(1001, "SemanticSchemaValidationDeferred"),
-    "Semantic schema startup validation was deferred because PostgreSQL is unavailable."
-);
 
 try
 {
-    var connection = await (
-        app
-            .Services.GetRequiredService<INpgsqlConnectionFactory>()
-            .OpenConnectionAsync(CancellationToken.None)
-    ).ConfigureAwait(false);
-    await using var configuredConnection = connection.ConfigureAwait(false);
-    await (semanticModels.ValidateDatabaseSchemaAsync(connection)).ConfigureAwait(false);
+    await using var connection = await app
+        .Services.GetRequiredService<INpgsqlConnectionFactory>()
+        .OpenConnectionAsync(CancellationToken.None);
+    await semanticModels.ValidateDatabaseSchemaAsync(connection);
 }
 catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
 {
     // Keep liveness independent from PostgreSQL availability. Readiness repeats the
     // validation and stays unhealthy until the database can be reached, while a
     // reachable database with semantic-model drift still fails startup above.
-    logDeferredSchemaValidation(app.Logger, exception);
+    app.Logger.LogWarning(
+        exception,
+        "Semantic schema startup validation was deferred because PostgreSQL is unavailable."
+    );
 }
 
 app.UseExceptionHandler();
@@ -77,9 +77,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapFallbackToFile("{*path:regex(^(?!api|hubs)(.*)$)}", "index.html");
 
-await app.RunAsync().ConfigureAwait(false);
+app.Run();
 
-public partial class Program
-{
-    protected Program() { }
-}
+public partial class Program;

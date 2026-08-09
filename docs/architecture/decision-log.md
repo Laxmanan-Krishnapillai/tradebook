@@ -142,10 +142,37 @@ NuGet Central Package Management is the sole package-version source. Root
 `CentralPackageTransitivePinningEnabled`; project files keep versionless
 `PackageReference` entries. Transitive pinning makes security-response upgrades explicit
 and reviewable in one manifest instead of relying on whichever transitive version restore
-selects. D15 reserves `GlobalPackageReference` for Task 14; D16 activates it for the
+selects. `GlobalPackageReference` is deliberately documented but unused here; Task 14 owns
+the repo-wide analyzer entries.
+
+## D16 — Frontend compiler and quality platform (2026-08-09)
+
+The frontend is compiled with Vite 8's default Rolldown pipeline and React Compiler
+1.0 for every React source file. `@vitejs/plugin-react` 6 moved compiler integration
+from its removed `babel` option to the official `reactCompilerPreset` together with
+`@rolldown/plugin-babel`; this is the supported Vite 8 equivalent of the originally
+specified plugin-react 5 configuration. React Hooks 7 exposes compiler diagnostics as
+individual rules rather than a rule named `react-compiler`, so the flat configuration
+enables the supported `config` rule alongside the Rules of Hooks.
+
+Tailwind 4 is CSS-first through `@tailwindcss/vite`; design tokens live in
+`src/Frontend/src/styles.css`, with no JavaScript Tailwind configuration. ESLint 10 uses
+only flat configuration and type-aware typescript-eslint rules. Boundaries 7 is used
+instead of the task draft's 5.x pin because 5.x calls an ESLint context API removed by
+ESLint 10. Knip is a required frontend CI gate. JSON APIs are made `unknown` by
+`@total-typescript/ts-reset` so validation remains mandatory at external boundaries.
+
+The exact adopted platform matrix is: React/React DOM 19.2.8, TypeScript 5.9.3,
+Vite 8.2.1, `@vitejs/plugin-react` 6.0.5, React Compiler 1.0.0,
+Tailwind/`@tailwindcss/vite` 4.3.3, ESLint 10.8.1, typescript-eslint 8.66.0,
+React Hooks 7.1.1, jsx-a11y 6.10.2, Testing Library ESLint 7.16.2,
+Vitest ESLint 1.6.26, boundaries 7.1.0, and Knip 6.32.0. Node support is restricted
+to the Vite-supported 20.19+, 22.13+, and 24+ release lines.
+
+selects. D15 reserves `GlobalPackageReference` for Task 14; D17 activates it for the
 repo-wide analyzer entries.
 
-## D16 — Backend compile-time safety toolchain (2026-08-09)
+## D17 — Backend compile-time safety toolchain (2026-08-09)
 
 Analyzer findings are build failures on every .NET project. The repository enables the
 SDK analyzers plus Meziantou.Analyzer 3.0.139, SonarAnalyzer.CSharp 10.30.0.144632,

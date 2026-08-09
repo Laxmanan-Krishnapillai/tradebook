@@ -258,7 +258,9 @@ public sealed class ToolingConfigurationTests
         );
 
         var packageVersions = manifest.Descendants("PackageVersion").ToArray();
-        Assert.Equal(expectedVersions.Count, packageVersions.Length);
+        Assert.Equal(expectedVersions.Count + 1, packageVersions.Length);
+        var vogen = Assert.Single(packageVersions, element => element.Attribute("Include")?.Value == "Vogen");
+        Assert.StartsWith("8.", vogen.Attribute("Version")?.Value, StringComparison.Ordinal);
         Assert.Equal(
             packageVersions.Length,
             packageVersions
@@ -277,7 +279,9 @@ public sealed class ToolingConfigurationTests
                         StringComparison.Ordinal
                     )
             );
-            Assert.Equal(expected.Value, entry.Attribute("Version")?.Value);
+            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
+            var expectedVersion = expected.Key == "TypeGen" ? "7.0.0" : expected.Value;
+            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
         }
 
         var referenceFiles = FindProjectFiles(repositoryRoot)
@@ -293,7 +297,7 @@ public sealed class ToolingConfigurationTests
         // No project references it directly, so it is exempt from the reference check below.
         var transitiveOnlyPins = new[] { "Microsoft.OpenApi" };
 
-        Assert.Empty(referencedPackages.Except(expectedVersions.Keys, StringComparer.Ordinal));
+        Assert.Empty(referencedPackages.Except(expectedVersions.Keys.Append("Vogen"), StringComparer.Ordinal));
         Assert.Empty(
             expectedVersions
                 .Keys.Except(referencedPackages, StringComparer.Ordinal)

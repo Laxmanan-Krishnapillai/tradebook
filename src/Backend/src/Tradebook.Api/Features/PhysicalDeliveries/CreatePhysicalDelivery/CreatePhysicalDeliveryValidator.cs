@@ -8,7 +8,7 @@ public sealed class CreatePhysicalDeliveryValidator : Validator<CreatePhysicalDe
 {
     public CreatePhysicalDeliveryValidator()
     {
-        RuleFor(request => request.ContractId).NotEmpty();
+        RuleFor(request => request.ContractId).Must(id => id.Value != Guid.Empty);
         RuleFor(request => request.ContractInstanceId)
             .NotEmpty()
             .MaximumLength(120)

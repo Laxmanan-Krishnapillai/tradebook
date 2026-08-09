@@ -8,7 +8,7 @@ public sealed class UpdatePhysicalDeliveryValidator : Validator<UpdatePhysicalDe
 {
     public UpdatePhysicalDeliveryValidator()
     {
-        RuleFor(request => request.DeliveryId).NotEmpty();
+        RuleFor(request => request.DeliveryId).Must(id => id.Value != Guid.Empty);
         RuleFor(request => request.Version).GreaterThan(0);
         RuleFor(request => request.Status)
             .Must(value =>

@@ -1,7 +1,7 @@
 import type { QueryKey } from '@tanstack/react-query';
 import type { JsonQueryAst } from '../../types/semanticAst';
 
-export type ListFilterValue = string | number | boolean | null | readonly (string | number | boolean)[];
+type ListFilterValue = string | number | boolean | null | readonly (string | number | boolean)[];
 
 export interface ListQueryRequest {
   page?: number;
@@ -19,7 +19,8 @@ export interface NormalizedListQueryRequest {
 
 function normalizeFilterValue(value: ListFilterValue): ListFilterValue {
   if (!Array.isArray(value)) return value;
-  return [...value].sort((left, right) => String(left).localeCompare(String(right)));
+  return [...(value as readonly (string | number | boolean)[])]
+    .sort((left, right) => String(left).localeCompare(String(right)));
 }
 
 export function normalizeListRequest(request: ListQueryRequest = {}): NormalizedListQueryRequest {

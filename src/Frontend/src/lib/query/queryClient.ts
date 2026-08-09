@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 
-export function queryRetryPolicy(failureCount: number, error: unknown): boolean {
+function queryRetryPolicy(failureCount: number, error: unknown): boolean {
   const status = typeof error === 'object' && error !== null && 'status' in error
     ? (error as { status?: unknown }).status
     : undefined;

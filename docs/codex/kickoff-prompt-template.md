@@ -42,6 +42,11 @@ WORKFLOW
 1. Plan first: restate scope and map each acceptance criterion to the test/command
    that will prove it.
 2. Implement against the spec.
-3. Run `bin/verify.sh` after changes; stop-and-fix until green — do not push forward
-   on a red gate.
-4. Reconcile the acceptance-criterion → test table. Do not end with only a plan.
+3. Iterate with `bin/verify.sh --fast` after changes (build -warnaserror, unit +
+   architecture tests, contract drift, frontend gates; skips integration + mutation
+   for loop speed); stop-and-fix until green — do not push forward on a red gate.
+4. Before declaring done, run the FULL `bin/verify.sh` (no flags) once and fix what
+   it surfaces. If this environment cannot run the Docker-bound gates (integration
+   tests, mutation), state that explicitly instead of skipping silently — the merge
+   gate runs them regardless.
+5. Reconcile the acceptance-criterion → test table. Do not end with only a plan.
