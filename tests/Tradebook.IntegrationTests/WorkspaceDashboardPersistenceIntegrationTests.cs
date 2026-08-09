@@ -1,23 +1,26 @@
 using Dapper;
 using Npgsql;
+using Tradebook.Core.Domain;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.IntegrationTests;
 
 public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFixture postgres) : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Dashboard_writes_are_audited_outboxed_and_versioned()
+    public async Task Dashboard_writes_are_audited_published_and_versioned()
     {
         var actorId = Guid.NewGuid();
         var dashboardId = Guid.NewGuid();
+        var publisher = new RecordingTransactionalEventPublisher();
 
-        var created = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"first\",\"widgets\":[]}", 1);
+        var created = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"first\",\"widgets\":[]}", 1, publisher);
         Assert.Equal(1, created);
 
-        var updated = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"second\",\"widgets\":[]}", created!.Value);
+        var updated = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"second\",\"widgets\":[]}", created!.Value, publisher);
         Assert.Equal(2, updated);
 
-        var stale = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"stale\",\"widgets\":[]}", created.Value);
+        var stale = await SaveAsync(dashboardId, actorId, "{\"dashboardId\":\"stale\",\"widgets\":[]}", created.Value, publisher);
         Assert.Null(stale);
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
@@ -31,16 +34,21 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
             entry => { Assert.Equal("INSERT", entry.Operation); Assert.Equal(actorId, entry.ActorId); },
             entry => { Assert.Equal("UPDATE", entry.Operation); Assert.Equal(actorId, entry.ActorId); });
 
-        var events = (await connection.QueryAsync<(string AggregateType, string EventType)>("""
-            SELECT aggregate_type AS AggregateType, event_type AS EventType
-            FROM outbox_events
-            WHERE aggregate_id = @DashboardId
-            ORDER BY sequence_id
-            """, new { DashboardId = dashboardId.ToString() })).ToList();
-        Assert.Equal([("WorkspaceDashboard", "Created"), ("WorkspaceDashboard", "Updated")], events);
+        Assert.Equal(
+            [(RealtimeAggregateTypes.WorkspaceDashboard, "Created"),
+             (RealtimeAggregateTypes.WorkspaceDashboard, "Updated")],
+            publisher.Events.Select(item => (item.AggregateType, item.EventType)));
+        Assert.All(publisher.Events, item => Assert.Equal(dashboardId.ToString(), item.AggregateId));
+        Assert.Equal(2, publisher.Transactions.Count);
+        Assert.Equal(2, publisher.FlushCount);
     }
 
-    private async Task<long?> SaveAsync(Guid dashboardId, Guid actorId, string layout, long expectedVersion)
+    private async Task<long?> SaveAsync(
+        Guid dashboardId,
+        Guid actorId,
+        string layout,
+        long expectedVersion,
+        RecordingTransactionalEventPublisher publisher)
     {
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
@@ -64,12 +72,15 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
             return null;
         }
 
-        await connection.ExecuteAsync(new CommandDefinition("""
-            INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-            VALUES ('WorkspaceDashboard', @DashboardId::text, @EventType,
-                    jsonb_build_object('dashboardId', @DashboardId::text, 'version', @Version));
-            """, new { DashboardId = dashboardId, EventType = result.Created ? "Created" : "Updated", result.Version }, transaction));
+        await publisher.EnlistAsync(transaction, default);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.WorkspaceDashboard,
+            dashboardId.ToString(),
+            result.Created ? "Created" : "Updated",
+            result.Version,
+            actorId: actorId));
         await transaction.CommitAsync();
+        await publisher.FlushAsync();
         return result.Version;
     }
 }

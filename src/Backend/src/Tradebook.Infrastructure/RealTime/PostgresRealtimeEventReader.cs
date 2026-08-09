@@ -1,11 +1,12 @@
 using System.Data;
+using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
 using Tradebook.Infrastructure.Data;
 
-namespace Tradebook.Infrastructure.Outbox;
+namespace Tradebook.Infrastructure.RealTime;
 
-public sealed class PostgresOutboxEventReader(INpgsqlConnectionFactory connections) : IOutboxEventReader
+public sealed class PostgresRealtimeEventReader(INpgsqlConnectionFactory connections) : IRealtimeEventReader
 {
     public async Task<GetEventsSinceResponse> GetSinceAsync(
         long afterSequence,
@@ -21,16 +22,17 @@ public sealed class PostgresOutboxEventReader(INpgsqlConnectionFactory connectio
         command.Transaction = transaction;
         command.CommandText = """
             SELECT event_id, sequence_id, aggregate_type, aggregate_id, event_type, payload::text
-            FROM outbox_events
+            FROM realtime_event_log
             WHERE sequence_id > @afterSequence
-              AND (aggregate_type <> 'WorkspaceDashboard' OR payload->>'actorId' = @actorId)
+              AND (aggregate_type <> @workspaceDashboard OR group_name = @dashboardGroup)
             ORDER BY sequence_id ASC
             LIMIT @limit;
-            SELECT COALESCE(MAX(sequence_id), 0) FROM outbox_events;
+            SELECT COALESCE(MAX(sequence_id), 0) FROM realtime_event_log;
             """;
         command.Parameters.AddWithValue("afterSequence", afterSequence);
         command.Parameters.AddWithValue("limit", limit);
-        command.Parameters.AddWithValue("actorId", actorId.ToString());
+        command.Parameters.AddWithValue("workspaceDashboard", RealtimeAggregateTypes.WorkspaceDashboard);
+        command.Parameters.AddWithValue("dashboardGroup", $"dashboard:{actorId}");
 
         var events = new List<EntityChangedEventDto>();
         var latestSequence = 0L;

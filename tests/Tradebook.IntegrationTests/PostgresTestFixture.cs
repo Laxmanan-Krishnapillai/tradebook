@@ -19,9 +19,12 @@ public sealed class PostgresTestFixture : IAsyncLifetime
         .Build();
 
     private NpgsqlConnection _connection = null!;
-    private Respawner _respawner = null!;
 
     public string ConnectionString => _container.GetConnectionString();
+
+    public Task PauseAsync() => _container.PauseAsync();
+
+    public Task UnpauseAsync() => _container.UnpauseAsync();
 
     public async Task InitializeAsync()
     {
@@ -32,15 +35,18 @@ public sealed class PostgresTestFixture : IAsyncLifetime
 
         _connection = new NpgsqlConnection(ConnectionString);
         await _connection.OpenAsync();
-        _respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"],
-            TablesToIgnore = ["schema_migrations"]
-        });
     }
 
-    public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
+    public async Task ResetDatabaseAsync()
+    {
+        var respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
+        {
+            DbAdapter = DbAdapter.Postgres,
+            SchemasToInclude = ["public", "wolverine"],
+            TablesToIgnore = ["schema_migrations"]
+        });
+        await respawner.ResetAsync(_connection);
+    }
 
     public async Task DisposeAsync()
     {

@@ -2,6 +2,7 @@
 
 **Status**: Authoritative. Where this log conflicts with older statements in `architecture/master-architecture-blueprint.md`, `tasks/*.md`, `review/*.md`, or `research/*.md`, **this log wins**.
 **Date**: 2026-08-06 (post-adversarial-review de-scope)
+**Amended**: 2026-08-07 (Task 17 durable-messaging modernization)
 
 ---
 
@@ -15,13 +16,25 @@
 
 Supersedes the Aug 5 bootstrap-pivot recommendation (`review/adversarial-tasklist-review.md` §5). The 10-task roadmap continues, but on the reduced stack defined here. The Aug 5 review's findings remain the acceptance bar for revised specs.
 
-## D2 — Cut NATS JetStream
+## D2 — Cut NATS JetStream; standardize on Wolverine durability
 
-Transactional **outbox stays**. The dispatcher becomes an in-process `BackgroundService` using `System.Threading.Channels`, woken by Postgres `LISTEN/NOTIFY` (fallback poll: 1s). Correctness rules:
-- Claim outbox rows with `SELECT ... FOR UPDATE SKIP LOCKED` **inside an open transaction** (outside one, the lock is a no-op).
-- Dispatch to the SignalR fan-out, then mark `processed_at` and commit in the same transaction. Delivery is at-least-once; consumers are idempotent by event id.
+NATS remains removed. Task 17 supersedes Task 03's hand-rolled `BackgroundService`,
+`LISTEN/NOTIFY`, and `SKIP LOCKED` dispatcher with Wolverine 5.x durable PostgreSQL
+outbox/inbox on the existing Dapper/Npgsql transaction. Durable local queues provide
+at-least-once delivery; Wolverine inbox identity plus `realtime_event_log.event_id`
+provide an idempotent SignalR effect while preserving sequence and catch-up history.
+Because migrations precede API rollout, Task 17 is an expand migration: the legacy
+table and reciprocal compatibility triggers remain for one rollback window while the
+new binary contains no legacy dispatcher. A later forward-only contract migration may
+remove them only after the preceding image is no longer rollback-eligible and no
+legacy row remains pending. Pending legacy rows are copied into `realtime_event_log`;
+the rolling restart disconnects browser sessions, whose normal reconnect catch-up is
+the durable handoff if the preceding dispatcher has not already pushed such a row.
 
-**Re-entry trigger**: a second consumer *process* (e.g. Salesforce sync worker) or multi-node API scale-out (which also forces a SignalR backplane decision). The outbox schema does not change when a broker is added — only the dispatcher does.
+**Re-entry trigger**: a second consumer *process* (for example, a Salesforce sync
+worker) or multi-node API scale-out. At that point, choose an external Wolverine
+transport and a SignalR backplane; command transactions and the durable message
+contract remain unchanged.
 
 ## D3 — Cut TimescaleDB
 
@@ -99,8 +112,8 @@ Single repository: `src/Backend`, `src/Frontend`, `src/Database`, `infra/`, `tes
 | Contract | Owner | Consumers |
 | :--- | :--- | :--- |
 | REST API endpoints + DTOs (TypeGen source, one pinned version) | Task 02 | Tasks 05, 06, 09 |
-| DB schema, `audit_log` triggers, outbox table | Task 01 | Tasks 02, 03 |
-| Outbox dispatcher + SignalR hub/groups + client event envelope | Task 03 | Task 05 |
+| DB schema + `audit_log` triggers | Task 01 | Tasks 02, 17 |
+| Wolverine outbox/inbox + SignalR hub/groups + client event envelope | Task 17 | Task 05 |
 | Semantic AST + `POST /api/v1/analytics/query` | Task 04 | Task 06 (its divergent `SemanticQueryAST`/`/api/v1/semantic/query` is void) |
 | `ChartAdapter` contract + registry | Task 06 | dashboards |
 | docker-compose + Terraform Tier 1 | Task 07 | Tasks 09, 10 |
@@ -112,7 +125,7 @@ Single repository: `src/Backend`, `src/Frontend`, `src/Database`, `infra/`, `tes
 | :--- | :--- | :--- |
 | 01 | Minor | Drop TimescaleDB (extension, hypertable, continuous aggregate); plain `postgres:17`; keep btree_gist bi-temporal audit; add `version BIGINT` to mutable entities |
 | 02 | Moderate | Drop AOT; JWT policies replace `AllowAnonymous`; drop `/api/v1/mutations/batch`; OCC via `version` column |
-| 03 | **Rewrite** | NATS removed entirely → in-proc outbox dispatcher + LISTEN/NOTIFY + SignalR fan-out (incl. the delivery pipeline the old spec never specified) |
+| 03 | **Superseded by Task 17** | NATS remains removed; Wolverine durable PostgreSQL messaging replaces the hand-rolled dispatcher while retaining SignalR fan-out |
 | 04 | Moderate | Drop DuckDB WASM/Arrow; fix identifier-whitelist injection holes; one query path; wire or delete dbt marts |
 | 05 | Major | Drop Dexie/offline/batch/3-way merge; TanStack optimistic + 409 flow; in-memory undo |
 | 06 | Major | ChartAdapter contract is the deliverable; ECharts + Lightweight Charts; delete WebGL pool + memory governor; adopt Task 04's AST/endpoint |

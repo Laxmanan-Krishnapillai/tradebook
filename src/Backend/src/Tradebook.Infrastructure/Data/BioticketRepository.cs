@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : IBioticketRepository
+public sealed class BioticketRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : IBioticketRepository
 {
     private const string Projection = """
         id AS BioticketId, contract_id AS ContractId, contract_instance_id AS ContractInstanceId,
@@ -63,9 +67,11 @@ public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : 
                 EXTRACT(YEAR FROM @ContractMonth::date))
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.BioticketDelivery,
-            created.BioticketId.ToString(), "Created", created.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.BioticketDelivery, created.BioticketId.ToString(), "Created", created.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return created;
     }
 
@@ -87,9 +93,11 @@ public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : 
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
         if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.BioticketDelivery,
-            updated.BioticketId.ToString(), "Updated", updated.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.BioticketDelivery, updated.BioticketId.ToString(), "Updated", updated.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return updated;
     }
 
@@ -104,9 +112,11 @@ public sealed class BioticketRepository(INpgsqlConnectionFactory connections) : 
             """, new { Id = id, Version = version }, transaction, cancellationToken: ct));
         if (newVersion is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.BioticketDelivery,
-                id.ToString(), "Cancelled", newVersion.Value, reason, ct);
+            await publisher.EnlistAsync((DbTransaction)transaction, ct);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.BioticketDelivery, id.ToString(), "Cancelled", newVersion.Value, reason));
             await transaction.CommitAsync(ct);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(ct);

@@ -23,7 +23,7 @@ public sealed class GetEventsSinceValidator : Validator<GetEventsSinceRequest>
     }
 }
 
-public sealed class GetEventsSinceEndpoint(IOutboxEventReader events)
+public sealed class GetEventsSinceEndpoint(IRealtimeEventReader events)
     : Endpoint<GetEventsSinceRequest, GetEventsSinceResponse>
 {
     public override void Configure()

@@ -122,7 +122,7 @@ public sealed class EndpointDefinitionTests
             (Factory.Create<DeleteTaxTariffEndpoint>(default(object)!), "DELETE", "/api/v1/tax-tariffs/{taxTariffId}", "AdminPolicy"),
 
             (Factory.Create<GetDashboardEndpoint>(default(object)!), "GET", "/api/v1/dashboards/{dashboardId}", "ReadPolicy"),
-            (Factory.Create<SaveDashboardEndpoint>(default(object)!, default(object)!, default(object)!), "PUT", "/api/v1/dashboards/{dashboardId}", "ReadPolicy"),
+            (Factory.Create<SaveDashboardEndpoint>(default(object)!, default(object)!, default(object)!, default(object)!), "PUT", "/api/v1/dashboards/{dashboardId}", "ReadPolicy"),
         };
 
         foreach (var (endpoint, verb, route, policy) in definitions)

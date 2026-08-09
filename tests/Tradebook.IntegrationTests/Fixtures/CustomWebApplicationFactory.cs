@@ -24,7 +24,6 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         .Build();
 
     private NpgsqlConnection _connection = null!;
-    private Respawner _respawner = null!;
 
     public string ConnectionString => _container.GetConnectionString();
 
@@ -38,19 +37,31 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
             new DatabaseOptions { ConnectionString = ConnectionString }));
         await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance).MigrateAsync();
 
-        _respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"],
-            TablesToIgnore = ["schema_migrations"]
-        });
     }
 
-    public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
+    public async Task ResetDatabaseAsync()
+    {
+        var respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
+        {
+            DbAdapter = DbAdapter.Postgres,
+            SchemasToInclude = ["public", "wolverine"],
+            TablesToIgnore =
+            [
+                "schema_migrations",
+                "wolverine_nodes",
+                "wolverine_node_assignments",
+                "wolverine_control_queue",
+                "wolverine_node_records",
+                "wolverine_agent_restrictions"
+            ]
+        });
+        await respawner.ResetAsync(_connection);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting("Database:ConnectionString", ConnectionString);
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {

@@ -22,17 +22,30 @@ public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres)
     [Fact]
     public async Task Readiness_fails_but_liveness_stays_healthy_when_postgres_is_unavailable()
     {
-        const string unavailableDatabase =
-            "Host=127.0.0.1;Port=1;Database=tradebook;Username=tradebook;Password=tradebook;Timeout=1;Command Timeout=1";
-        await using var factory = CreateFactory(unavailableDatabase);
+        var connectionString =
+            Postgres.ConnectionString + ";Timeout=1;Command Timeout=1";
+        await using var factory = CreateFactory(connectionString);
         using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
 
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health/ready")).StatusCode);
+        await Postgres.PauseAsync();
+        try
+        {
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
+            Assert.Equal(
+                HttpStatusCode.ServiceUnavailable,
+                (await client.GetAsync("/health/ready")).StatusCode);
+        }
+        finally
+        {
+            await Postgres.UnpauseAsync();
+        }
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string connectionString) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Database:ConnectionString", connectionString);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -40,5 +53,6 @@ public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres)
                     ["Jwt:Issuer"] = "Tradebook",
                     ["Jwt:Audience"] = "Tradebook",
                     ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                })));
+                }));
+        });
 }

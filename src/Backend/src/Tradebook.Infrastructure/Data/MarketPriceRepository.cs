@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class MarketPriceRepository(INpgsqlConnectionFactory connections) : IMarketPriceRepository
+public sealed class MarketPriceRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : IMarketPriceRepository
 {
     private const string Projection = """
         price_date AS PriceDate, ttf_eur_mwh AS TtfEurMwh,
@@ -81,10 +85,12 @@ public sealed class MarketPriceRepository(INpgsqlConnectionFactory connections) 
         var result = await connection.QuerySingleOrDefaultAsync<MarketPriceDetailsDto>(new CommandDefinition(
             sql, request, transaction, cancellationToken: ct));
         if (result is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.MarketPrice,
-            result.PriceDate.ToString("yyyy-MM-dd"), request.Version == 0 ? "Created" : "Updated",
-            result.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.MarketPrice, result.PriceDate.ToString("yyyy-MM-dd"),
+            request.Version == 0 ? "Created" : "Updated", result.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return result;
     }
 
@@ -98,9 +104,12 @@ public sealed class MarketPriceRepository(INpgsqlConnectionFactory connections) 
             new { PriceDate = priceDate, Version = version }, transaction, cancellationToken: ct));
         if (deletedVersion is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.MarketPrice,
-                priceDate.ToString("yyyy-MM-dd"), "Deleted", deletedVersion.Value, reason, ct);
+            await publisher.EnlistAsync((DbTransaction)transaction, ct);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.MarketPrice, priceDate.ToString("yyyy-MM-dd"),
+                "Deleted", deletedVersion.Value, reason));
             await transaction.CommitAsync(ct);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(ct);

@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : IDeliveryRepository
+public sealed class DeliveryRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : IDeliveryRepository
 {
     private sealed record DeliveryRow(
         Guid DeliveryId, Guid ContractId, string ContractInstanceId, string BookType,
@@ -63,9 +67,11 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
         await RepositoryMutation.SetActorAsync(connection, transaction, actorId, cancellationToken);
         const string insert = """INSERT INTO physical_deliveries (id, contract_id, contract_instance_id, book_type, supply_month, capacity_mw, volume_nominated_mwh, volume_realised_mwh, volume_mwh, price_mechanism, start_day, end_day) VALUES (@DeliveryId, @ContractId, @ContractInstanceId, @BookType::book_type_enum, @SupplyMonth, @CapacityMw, @VolumeNominatedMwh, @VolumeRealisedMwh, @VolumeRealisedMwh, @PriceMechanism::gas_price_mech_enum, @StartDay, @EndDay) RETURNING """ + DetailsProjection;
         var details = ToDto(await connection.QuerySingleAsync<DeliveryRow>(new CommandDefinition(insert, new { DeliveryId = deliveryId, request.ContractId, request.ContractInstanceId, request.BookType, request.SupplyMonth, request.CapacityMw, request.VolumeNominatedMwh, request.VolumeRealisedMwh, request.PriceMechanism, request.StartDay, request.EndDay }, transaction, cancellationToken: cancellationToken)));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.PhysicalDelivery,
-            deliveryId.ToString(), "Created", details.Version, null, cancellationToken);
+        await publisher.EnlistAsync((DbTransaction)transaction, cancellationToken);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.PhysicalDelivery, deliveryId.ToString(), "Created", details.Version));
         await transaction.CommitAsync(cancellationToken);
+        await publisher.FlushAsync();
         return details;
     }
 
@@ -78,9 +84,11 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
         var row = await connection.QuerySingleOrDefaultAsync<DeliveryRow>(new CommandDefinition(sql, request, transaction, cancellationToken: cancellationToken));
         if (row is null) { await transaction.RollbackAsync(cancellationToken); return null; }
         var details = ToDto(row);
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.PhysicalDelivery,
-            request.DeliveryId.ToString(), "Updated", details.Version, null, cancellationToken);
+        await publisher.EnlistAsync((DbTransaction)transaction, cancellationToken);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.PhysicalDelivery, request.DeliveryId.ToString(), "Updated", details.Version));
         await transaction.CommitAsync(cancellationToken);
+        await publisher.FlushAsync();
         return details;
     }
 
@@ -92,9 +100,11 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
         var row = await connection.QuerySingleOrDefaultAsync<DeliveryRow>(new CommandDefinition("UPDATE physical_deliveries SET status = 'Cancelled', updated_at = clock_timestamp(), version = version + 1 WHERE id = @DeliveryId AND version = @ExpectedVersion RETURNING " + DetailsProjection, new { DeliveryId = deliveryId, ExpectedVersion = expectedVersion }, transaction, cancellationToken: cancellationToken));
         if (row is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.PhysicalDelivery,
-                deliveryId.ToString(), "Cancelled", row.Version, reason, cancellationToken);
+            await publisher.EnlistAsync((DbTransaction)transaction, cancellationToken);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.PhysicalDelivery, deliveryId.ToString(), "Cancelled", row.Version, reason));
             await transaction.CommitAsync(cancellationToken);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(cancellationToken);

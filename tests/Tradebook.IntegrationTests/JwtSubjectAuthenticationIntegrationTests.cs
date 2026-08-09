@@ -55,6 +55,8 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -62,7 +64,8 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
                     ["Jwt:Issuer"] = "Tradebook",
                     ["Jwt:Audience"] = "Tradebook",
                     ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                })));
+                }));
+        });
 
     private static HubConnection BuildHubConnection(
         WebApplicationFactory<Program> factory,

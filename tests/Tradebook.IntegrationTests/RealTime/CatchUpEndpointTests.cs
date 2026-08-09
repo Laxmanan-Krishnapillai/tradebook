@@ -19,7 +19,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
     [Fact]
     public async Task Returns_ordered_pages_and_the_latest_sequence_from_real_postgres()
     {
-        await ResetOutboxAsync();
+        await ResetRealtimeEventLogAsync();
         await InsertEventsAsync(25);
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -63,18 +63,19 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
     [Fact]
     public async Task Catch_up_excludes_other_actors_private_dashboard_events()
     {
-        await ResetOutboxAsync();
+        await ResetRealtimeEventLogAsync();
         var actorId = Guid.NewGuid();
         var otherActorId = Guid.NewGuid();
         await using (var connection = new NpgsqlConnection(Postgres.ConnectionString))
         {
             await connection.OpenAsync();
             await using var command = new NpgsqlCommand("""
-                INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
+                INSERT INTO realtime_event_log
+                    (event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
                 VALUES
-                    ('WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @otherActorId::text)),
-                    ('WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @actorId::text)),
-                    ('MarketPrice', '2026-08-08', 'Updated', '{}'::jsonb);
+                    (gen_random_uuid(), 'dashboard:' || @otherActorId::text, 'WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @otherActorId::text)),
+                    (gen_random_uuid(), 'dashboard:' || @actorId::text, 'WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @actorId::text)),
+                    (gen_random_uuid(), 'entity:MarketPrice', 'MarketPrice', '2026-08-08', 'Updated', '{}'::jsonb);
                 """, connection);
             command.Parameters.AddWithValue("actorId", actorId);
             command.Parameters.AddWithValue("otherActorId", otherActorId);
@@ -110,21 +111,25 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
     }
 
     private WebApplicationFactory<Program> CreateFactory() => new WebApplicationFactory<Program>()
-        .WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        .WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Database:ConnectionString"] = Postgres.ConnectionString,
                 ["Jwt:Issuer"] = "Tradebook",
                 ["Jwt:Audience"] = "Tradebook",
                 ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-            })));
+            }));
+        });
 
-    private async Task ResetOutboxAsync()
+    private async Task ResetRealtimeEventLogAsync()
     {
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand(
-            "TRUNCATE TABLE outbox_events RESTART IDENTITY",
+            "TRUNCATE TABLE realtime_event_log RESTART IDENTITY",
             connection);
         await command.ExecuteNonQueryAsync();
     }
@@ -134,8 +139,11 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("""
-            INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-            SELECT CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
+            INSERT INTO realtime_event_log
+                (event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
+            SELECT gen_random_uuid(),
+                   CASE WHEN value = 1 THEN 'entity:MarketPrice' ELSE 'entity:PhysicalDelivery' END,
+                   CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
                    CASE WHEN value = 1 THEN '2026-08-07' ELSE gen_random_uuid()::text END,
                    'Created',
                    jsonb_build_object('ordinal', value)

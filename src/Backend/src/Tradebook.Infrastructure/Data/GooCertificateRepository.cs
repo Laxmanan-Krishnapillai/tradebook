@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class GooCertificateRepository(INpgsqlConnectionFactory connections) : IGooCertificateRepository
+public sealed class GooCertificateRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : IGooCertificateRepository
 {
     private const string Projection = """
         id AS GooCertificateTransactionId, sf_transaction_id AS SalesforceTransactionId,
@@ -68,9 +72,12 @@ public sealed class GooCertificateRepository(INpgsqlConnectionFactory connection
                 @TransactionStartDate, @TransactionVolumeMwh, @VolumeMwh, @EnergySource, @Text)
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.GooCertificateTransaction,
-            created.GooCertificateTransactionId.ToString(), "Created", created.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.GooCertificateTransaction, created.GooCertificateTransactionId.ToString(),
+            "Created", created.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return created;
     }
 
@@ -94,9 +101,12 @@ public sealed class GooCertificateRepository(INpgsqlConnectionFactory connection
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
         if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.GooCertificateTransaction,
-            updated.GooCertificateTransactionId.ToString(), "Updated", updated.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.GooCertificateTransaction, updated.GooCertificateTransactionId.ToString(),
+            "Updated", updated.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return updated;
     }
 
@@ -111,9 +121,12 @@ public sealed class GooCertificateRepository(INpgsqlConnectionFactory connection
             WHERE id = @Id AND version = @Version RETURNING
             """ + " " + Projection, new { Id = id, Version = version }, transaction, cancellationToken: ct));
         if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.GooCertificateTransaction,
-            id.ToString(), "BatchExportRequested", updated.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.GooCertificateTransaction, id.ToString(),
+            "BatchExportRequested", updated.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return updated;
     }
 
@@ -127,9 +140,12 @@ public sealed class GooCertificateRepository(INpgsqlConnectionFactory connection
             new { Id = id, Version = version }, transaction, cancellationToken: ct));
         if (deletedVersion is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.GooCertificateTransaction,
-                id.ToString(), "Deleted", deletedVersion.Value, reason, ct);
+            await publisher.EnlistAsync((DbTransaction)transaction, ct);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.GooCertificateTransaction, id.ToString(),
+                "Deleted", deletedVersion.Value, reason));
             await transaction.CommitAsync(ct);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(ct);

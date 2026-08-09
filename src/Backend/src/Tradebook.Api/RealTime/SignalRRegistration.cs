@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Tradebook.Core.Interfaces;
-using Tradebook.Infrastructure.Outbox;
+using Tradebook.Infrastructure.RealTime;
 
 namespace Tradebook.Api.RealTime;
 
@@ -10,13 +10,7 @@ public static class SignalRRegistration
     public static IServiceCollection AddDashboardPush(this IServiceCollection services)
     {
         services.AddSignalR().AddMessagePackProtocol();
-        services.AddOptions<OutboxOptions>()
-            .BindConfiguration("Outbox")
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-        services.AddScoped<IOutboxEventReader, PostgresOutboxEventReader>();
-        services.AddSingleton<IOutboxEventFanout, DashboardPushFanout>();
-        services.AddHostedService<OutboxDispatcher>();
+        services.AddScoped<IRealtimeEventReader, PostgresRealtimeEventReader>();
         return services;
     }
 

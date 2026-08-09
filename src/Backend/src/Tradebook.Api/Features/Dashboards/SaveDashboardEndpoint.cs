@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Dapper;
@@ -6,13 +7,16 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
 using Tradebook.Api.Security;
 using Tradebook.Core.Analytics;
+using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
+using Tradebook.Core.Messaging;
 using Tradebook.Infrastructure.Data;
 
 namespace Tradebook.Api.Features.Dashboards;
 
 public sealed class SaveDashboardEndpoint(
     INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher,
     SemanticQueryCompiler semanticQueries,
     IOptions<JsonOptions> jsonOptions) : Endpoint<SaveDashboardRequest, SaveDashboardResponse>
 {
@@ -62,12 +66,15 @@ public sealed class SaveDashboardEndpoint(
             return;
         }
 
-        await connection.ExecuteAsync(new CommandDefinition("""
-            INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-            VALUES ('WorkspaceDashboard', @Id::text, @EventType,
-                    jsonb_build_object('dashboardId', @Id::text, 'actorId', @ActorId::text, 'version', @Version));
-            """, new { Id = request.DashboardId, ActorId = actorId, EventType = eventType, saved.Version }, transaction, cancellationToken: cancellationToken));
+        await publisher.EnlistAsync((DbTransaction)transaction, cancellationToken);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.WorkspaceDashboard,
+            request.DashboardId.ToString(),
+            eventType,
+            saved.Version,
+            actorId: actorId));
         await transaction.CommitAsync(cancellationToken);
+        await publisher.FlushAsync();
         await Send.ResponseAsync(ToResponse(request.DashboardId, saved), cancellation: cancellationToken);
     }
 

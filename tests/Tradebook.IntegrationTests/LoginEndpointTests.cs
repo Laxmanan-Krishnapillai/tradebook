@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Dapper;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -62,6 +63,8 @@ public sealed class LoginEndpointTests(PostgresTestFixture postgres) : PostgresD
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
             builder.ConfigureAppConfiguration((_, config) =>
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -69,7 +72,8 @@ public sealed class LoginEndpointTests(PostgresTestFixture postgres) : PostgresD
                     ["Jwt:Issuer"] = "Tradebook",
                     ["Jwt:Audience"] = "Tradebook",
                     ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
-                })));
+                }));
+        });
 
     private async Task InsertUserAsync(string username, string password, bool isActive, string[] roles)
     {

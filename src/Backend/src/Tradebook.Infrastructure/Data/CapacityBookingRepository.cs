@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connections) : ICapacityBookingRepository
+public sealed class CapacityBookingRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : ICapacityBookingRepository
 {
     private const string Projection = """
         id AS CapacityBookingId, contract_id AS ContractId,
@@ -61,9 +65,11 @@ public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connectio
                 @CapacityCostEur, @Comments)
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.CapacityBooking,
-            created.CapacityBookingId.ToString(), "Created", created.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.CapacityBooking, created.CapacityBookingId.ToString(), "Created", created.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return created;
     }
 
@@ -86,9 +92,11 @@ public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connectio
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
         if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.CapacityBooking,
-            updated.CapacityBookingId.ToString(), "Updated", updated.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.CapacityBooking, updated.CapacityBookingId.ToString(), "Updated", updated.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return updated;
     }
 
@@ -105,9 +113,11 @@ public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connectio
             new { Id = id, Version = version }, transaction, cancellationToken: ct));
         if (deletedVersion is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.CapacityBooking,
-                id.ToString(), "Deleted", deletedVersion.Value, reason, ct);
+            await publisher.EnlistAsync((DbTransaction)transaction, ct);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.CapacityBooking, id.ToString(), "Deleted", deletedVersion.Value, reason));
             await transaction.CommitAsync(ct);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(ct);

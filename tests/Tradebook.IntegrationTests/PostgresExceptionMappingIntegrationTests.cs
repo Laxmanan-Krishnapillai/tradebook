@@ -79,13 +79,15 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             new { Id = capacityBookingId });
         Assert.Equal(new DateOnly(2026, 2, 20), persisted.EndDay);
         Assert.Equal(version, persisted.Version);
-        Assert.Equal(1, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM outbox_events WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @Id",
-            new { Id = capacityBookingId.ToString() }));
+        Assert.Equal(1, await WaitForRealtimeEventCountAsync(
+            connection,
+            capacityBookingId.ToString()));
     }
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -93,7 +95,8 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
                     ["Jwt:Issuer"] = "Tradebook",
                     ["Jwt:Audience"] = "Tradebook",
                     ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                })));
+                }));
+        });
 
     private static HttpClient AuthenticatedClient(WebApplicationFactory<Program> factory)
     {
@@ -149,5 +152,30 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
                 CounterpartyId = counterpartyId
             });
         return contractId;
+    }
+
+    private static async Task<int> WaitForRealtimeEventCountAsync(
+        NpgsqlConnection connection,
+        string aggregateId)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var count = await connection.ExecuteScalarAsync<int>(
+                """
+                SELECT COUNT(*)
+                FROM realtime_event_log
+                WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @AggregateId
+                """,
+                new { AggregateId = aggregateId });
+            if (count > 0)
+            {
+                return count;
+            }
+
+            await Task.Delay(50);
+        }
+
+        return 0;
     }
 }

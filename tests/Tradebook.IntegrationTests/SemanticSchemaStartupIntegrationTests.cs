@@ -39,6 +39,8 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -46,7 +48,8 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
                     ["Jwt:Issuer"] = "Tradebook",
                     ["Jwt:Audience"] = "Tradebook",
                     ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                })));
+                }));
+        });
 
     private async Task RenameVolumeColumnAsync(string from, string to)
     {

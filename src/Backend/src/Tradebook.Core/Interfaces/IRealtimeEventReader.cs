@@ -2,7 +2,7 @@ using Tradebook.Core.DTOs;
 
 namespace Tradebook.Core.Interfaces;
 
-public interface IOutboxEventReader
+public interface IRealtimeEventReader
 {
     Task<GetEventsSinceResponse> GetSinceAsync(
         long afterSequence,

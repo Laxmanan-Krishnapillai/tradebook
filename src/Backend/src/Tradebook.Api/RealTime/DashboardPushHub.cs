@@ -26,8 +26,8 @@ public sealed class DashboardPushHub : Hub<IDashboardPushClient>
         const string entityPrefix = "entity:";
         const string dashboardPrefix = "dashboard:";
         var validEntity = group?.StartsWith(entityPrefix, StringComparison.Ordinal) == true &&
-                          OutboxAggregateTypes.IsKnown(group[entityPrefix.Length..]) &&
-                          group[entityPrefix.Length..] != OutboxAggregateTypes.WorkspaceDashboard;
+                          RealtimeAggregateTypes.IsKnown(group[entityPrefix.Length..]) &&
+                          group[entityPrefix.Length..] != RealtimeAggregateTypes.WorkspaceDashboard;
         var validDashboard = group?.StartsWith(dashboardPrefix, StringComparison.Ordinal) == true &&
                              Guid.TryParse(group[dashboardPrefix.Length..], out var dashboardId) &&
                              dashboardId == ActorId.From(Context.User!);

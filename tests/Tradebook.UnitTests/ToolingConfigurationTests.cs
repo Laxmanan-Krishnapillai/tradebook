@@ -6,6 +6,13 @@ namespace Tradebook.UnitTests;
 
 public sealed class ToolingConfigurationTests
 {
+    private static readonly IReadOnlyDictionary<string, string> Task17PackageVersions =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["WolverineFx"] = "5.40.1",
+            ["WolverineFx.Postgresql"] = "5.40.1",
+        };
+
     [Fact]
     public void Stryker_uses_the_repository_scope_release_build_and_single_80_percent_gate()
     {
@@ -177,6 +184,92 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
+    public void Msg04_hand_rolled_outbox_dispatcher_source_is_absent()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var infrastructureRoot = Path.Combine(
+            repositoryRoot, "src", "Backend", "src", "Tradebook.Infrastructure");
+        var outboxDirectory = Path.Combine(infrastructureRoot, "Outbox");
+
+        Assert.False(
+            Directory.Exists(outboxDirectory),
+            $"The hand-rolled outbox directory still exists: {outboxDirectory}");
+
+        var forbiddenMarkers = new[]
+        {
+            "BackgroundService",
+            "LISTEN",
+            "NOTIFY",
+            "SKIP LOCKED",
+            "FOR UPDATE",
+            "OutboxDispatcher",
+            "PostgresOutboxEventReader",
+            "IOutboxEventReader",
+            "WriteOutboxAsync",
+            "outbox_events",
+        };
+        var matches = FindSourceMarkerMatches(
+            repositoryRoot,
+            FindProductionFiles(infrastructureRoot),
+            forbiddenMarkers);
+
+        Assert.Empty(matches);
+    }
+
+    [Fact]
+    public void Msg05_wolverine_packages_are_the_only_task17_dependency_additions()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var platformPackages = ReadPlatformPackageVersions(repositoryRoot);
+        var manifest = XDocument.Load(Path.Combine(repositoryRoot, "Directory.Packages.props"));
+        var task17Additions = manifest.Descendants("PackageVersion")
+            .Select(element => new
+            {
+                Package = element.Attribute("Include")!.Value,
+                Version = element.Attribute("Version")!.Value,
+            })
+            .Where(entry => !platformPackages.ContainsKey(entry.Package))
+            .ToArray();
+
+        Assert.Equal(Task17PackageVersions.Count, task17Additions.Length);
+        foreach (var expected in Task17PackageVersions)
+        {
+            var addition = Assert.Single(
+                task17Additions,
+                entry => entry.Package == expected.Key);
+            Assert.Equal(expected.Value, addition.Version);
+        }
+    }
+
+    [Fact]
+    public void Msg05_backend_source_and_dependency_graph_contain_no_orm()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var backendRoot = Path.Combine(repositoryRoot, "src", "Backend", "src");
+        var forbiddenMarkers = new[] { "EntityFrameworkCore", "Marten" };
+        var sourceMatches = FindSourceMarkerMatches(
+            repositoryRoot,
+            FindProductionFiles(backendRoot),
+            forbiddenMarkers);
+
+        Assert.Empty(sourceMatches);
+
+        var assetsPath = Path.Combine(
+            backendRoot, "Tradebook.Api", "obj", "project.assets.json");
+        Assert.True(File.Exists(assetsPath), $"Restored dependency graph is missing: {assetsPath}");
+        using var assets = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        var forbiddenPackages = assets.RootElement.GetProperty("libraries")
+            .EnumerateObject()
+            .Select(library => library.Name[..library.Name.LastIndexOf('/')])
+            .Where(package => forbiddenMarkers.Any(marker =>
+                package.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Assert.Empty(forbiddenPackages);
+    }
+
+    [Fact]
     public void Compilation_defaults_are_enabled_only_in_directory_build_props()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -239,6 +332,21 @@ public sealed class ToolingConfigurationTests
 
     private static IReadOnlyDictionary<string, string> ReadTargetPackageVersions(string repositoryRoot)
     {
+        var versions = new Dictionary<string, string>(
+            ReadPlatformPackageVersions(repositoryRoot),
+            StringComparer.Ordinal);
+        foreach (var task17Package in Task17PackageVersions)
+        {
+            Assert.True(
+                versions.TryAdd(task17Package.Key, task17Package.Value),
+                $"Task 17 package '{task17Package.Key}' already exists in the platform baseline.");
+        }
+
+        return versions;
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadPlatformPackageVersions(string repositoryRoot)
+    {
         var taskSpec = File.ReadAllLines(Path.Combine(
             repositoryRoot,
             "docs",
@@ -270,6 +378,31 @@ public sealed class ToolingConfigurationTests
         Assert.NotEmpty(versions);
         return versions;
     }
+
+    private static IReadOnlyList<string> FindProductionFiles(string root) =>
+        Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Where(path => Path.GetExtension(path) is ".cs" or ".csproj" or ".props")
+            .Where(path => !Path.GetRelativePath(root, path)
+                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Any(segment => segment is "bin" or "obj"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+    private static IReadOnlyList<string> FindSourceMarkerMatches(
+        string repositoryRoot,
+        IEnumerable<string> sourceFiles,
+        IReadOnlyList<string> forbiddenMarkers) =>
+        sourceFiles
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(repositoryRoot, path),
+                Contents = File.ReadAllText(path),
+            })
+            .SelectMany(source => forbiddenMarkers
+                .Where(marker => source.Contents.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                .Select(marker => $"{source.Path}: {marker}"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     private static IReadOnlyList<string> FindWorkflowSteps(string[] lines)
     {

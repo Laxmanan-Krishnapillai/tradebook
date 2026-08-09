@@ -11,54 +11,55 @@ namespace Tradebook.IntegrationTests;
 public sealed class DomainRepositoryIntegrationTests(PostgresTestFixture postgres) : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Every_task02_repository_writes_a_real_transactional_outbox_event()
+    public async Task Every_task02_repository_publishes_a_transactional_domain_event()
     {
         var actorId = Guid.NewGuid();
         var counterpartyId = await CreateCounterpartyAsync();
         await using var connections = new NpgsqlConnectionFactory(Options.Create(
             new DatabaseOptions { ConnectionString = Postgres.ConnectionString }));
+        var publisher = new RecordingTransactionalEventPublisher();
 
-        var contract = await new ContractRepository(connections).CreateAtomicAsync(
+        var contract = await new ContractRepository(connections, publisher).CreateAtomicAsync(
             new CreateContractRequest(
                 $"REPO45.SG.{Guid.NewGuid():N}.NOQS", counterpartyId, "Gas", "Sell",
                 "REPO", "DK", 45, null, 2026, null, null, "BGEM", null, "SUB",
                 "TTF", null, "External", "repository integration"),
             actorId, default);
 
-        var capacity = await new CapacityBookingRepository(connections).CreateAtomicAsync(
+        var capacity = await new CapacityBookingRepository(connections, publisher).CreateAtomicAsync(
             new CreateCapacityBookingRequest(
                 contract.ContractId, new DateOnly(2026, 1, 1), null, counterpartyId,
                 "BGEM", null, "GTF", "THE", null, null, null, null, 10m, 2m, 20m, null),
             actorId, default);
-        var transfer = await new TransferRepository(connections).CreateAtomicAsync(
+        var transfer = await new TransferRepository(connections, publisher).CreateAtomicAsync(
             new CreateTransferRequest(
                 contract.ContractId, new DateOnly(2026, 2, 1), null, counterpartyId,
                 "BGEM", "GTF", 10m, 9m, 100m, 1m, null, null, "TTF", 2m, 1m,
                 "Awaiting", null),
             actorId, default);
-        var bioticket = await new BioticketRepository(connections).CreateAtomicAsync(
+        var bioticket = await new BioticketRepository(connections, publisher).CreateAtomicAsync(
             new CreateBioticketRequest(
                 contract.ContractId, "Sales", new DateOnly(2026, 3, 1), null, null, null,
                 10m, 9m, 9m, 15m, 135m, .25m, 33.75m, 168.75m, "Awaiting", null),
             actorId, default);
-        var goo = await new GooCertificateRepository(connections).CreateAtomicAsync(
+        var goo = await new GooCertificateRepository(connections, publisher).CreateAtomicAsync(
             new CreateGooCertificateTransactionRequest(
                 $"SF-{Guid.NewGuid():N}", "Repository event", null, null, "DK",
                 contract.ContractId, "Producer", 1m, new DateOnly(2026, 3, 1),
                 null, null, "DENA", "Latest transaction", new DateOnly(2026, 3, 1),
                 9m, 9m, "Biogas", null),
             actorId, default);
-        var market = await new MarketPriceRepository(connections).UpsertAtomicAsync(
+        var market = await new MarketPriceRepository(connections, publisher).UpsertAtomicAsync(
             new UpsertMarketPriceRequest(
                 new DateOnly(2026, 4, 1), 30m, null, null, null, null, null, null,
                 7.5m, null, null, null, 7.46m, 0),
             actorId, default);
-        var tax = await new TaxTariffRepository(connections).CreateAtomicAsync(
+        var tax = await new TaxTariffRepository(connections, publisher).CreateAtomicAsync(
             new CreateTaxTariffRequest(
                 contract.ContractId, counterpartyId, new DateOnly(2026, 5, 1),
                 new DateOnly(2026, 5, 31), 1m, 2m, 3m, 4m, 5m, 6m, "SEK"),
             actorId, default);
-        var hedgeRepository = new HedgeRepository(connections);
+        var hedgeRepository = new HedgeRepository(connections, publisher);
         var hedge = await hedgeRepository.CreateAtomicAsync(
             new CreateHedgeRequest(contract.ContractId, new DateOnly(2026, 6, 1), 100m, 29m),
             actorId, default);
@@ -75,35 +76,21 @@ public sealed class DomainRepositoryIntegrationTests(PostgresTestFixture postgre
             new UpdateHedgeRequest(hedge.HedgeId, 120m, 31m, hedge.Version), actorId, default));
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        var aggregateTypes = (await connection.QueryAsync<string>(
-            """
-            SELECT DISTINCT aggregate_type
-            FROM outbox_events
-            WHERE aggregate_type = ANY(@Expected)
-            """, new
-            {
-                Expected = new[]
-                {
-                    OutboxAggregateTypes.Contract,
-                    OutboxAggregateTypes.CapacityBooking,
-                    OutboxAggregateTypes.Transfer,
-                    OutboxAggregateTypes.BioticketDelivery,
-                    OutboxAggregateTypes.GooCertificateTransaction,
-                    OutboxAggregateTypes.MarketPrice,
-                    OutboxAggregateTypes.TaxTariff,
-                    OutboxAggregateTypes.Hedge
-                }
-            })).ToHashSet(StringComparer.Ordinal);
+        var aggregateTypes = publisher.Events
+            .Select(item => item.AggregateType)
+            .ToHashSet(StringComparer.Ordinal);
 
         Assert.Equal(8, aggregateTypes.Count);
-        Assert.Contains(OutboxAggregateTypes.Contract, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.CapacityBooking, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.Transfer, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.BioticketDelivery, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.GooCertificateTransaction, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.MarketPrice, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.TaxTariff, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.Hedge, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.Contract, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.CapacityBooking, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.Transfer, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.BioticketDelivery, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.GooCertificateTransaction, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.MarketPrice, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.TaxTariff, aggregateTypes);
+        Assert.Contains(RealtimeAggregateTypes.Hedge, aggregateTypes);
+        Assert.Equal(publisher.Events.Count, publisher.Transactions.Count);
+        Assert.Equal(publisher.Events.Count, publisher.FlushCount);
 
         var auditedActors = await connection.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM audit_log WHERE actor_id = @ActorId", new { ActorId = actorId });
@@ -120,7 +107,8 @@ public sealed class DomainRepositoryIntegrationTests(PostgresTestFixture postgre
         var priceDate = new DateOnly(2041, 7, 19);
         await using var connections = new NpgsqlConnectionFactory(Options.Create(
             new DatabaseOptions { ConnectionString = Postgres.ConnectionString }));
-        var repository = new MarketPriceRepository(connections);
+        var publisher = new RecordingTransactionalEventPublisher();
+        var repository = new MarketPriceRepository(connections, publisher);
 
         var created = await repository.UpsertAtomicAsync(
             new UpsertMarketPriceRequest(
@@ -179,6 +167,8 @@ public sealed class DomainRepositoryIntegrationTests(PostgresTestFixture postgre
 
         Assert.Null(await concurrentUpdate);
         Assert.Null(await repository.GetByDateAsync(priceDate, default));
+        Assert.Equal(2, publisher.Events.Count);
+        Assert.Equal(2, publisher.FlushCount);
     }
 
     private async Task<Guid> CreateCounterpartyAsync()

@@ -1,9 +1,13 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
+using JasperFx;
+using JasperFx.Resources;
 using Npgsql;
 using Tradebook.Api;
+using Tradebook.Api.Messaging;
 using Tradebook.Api.Security;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 using Tradebook.Infrastructure.Caching;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.DependencyInjection;
@@ -12,14 +16,35 @@ using Tradebook.Api.RealTime;
 using Tradebook.Core.Analytics;
 using Tradebook.Api.Features.Health;
 using Tradebook.Api.ErrorHandling;
+using Wolverine;
+using Wolverine.Configuration;
+using Wolverine.ErrorHandling;
+using Wolverine.Postgresql;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.ApplyJasperFxExtensions();
+var connectionString = builder.Configuration["Database:ConnectionString"]
+    ?? throw new InvalidOperationException("Database:ConnectionString is required.");
+builder.Host.UseWolverine(options =>
+{
+    options.PersistMessagesWithPostgresql(connectionString, "wolverine");
+    options.Policies.UseDurableLocalQueues();
+    options.LocalQueueFor<EntityChangedDomainEvent>().Sequential();
+    options.Policies.AutoApplyTransactions();
+    options.Policies.OnException<NpgsqlException>().OrInner<NpgsqlException>()
+        .RetryWithCooldown(
+            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(250));
+});
+builder.Services.AddResourceSetupOnStartup();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolver = AppJsonSerializerContext.Default);
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddTradebookPersistence();
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton<ICacheService, HybridCacheService>();
+builder.Services.AddScoped<ITransactionalEventPublisher, WolverineTransactionalEventPublisher>();
 var semanticModels = new SemanticModelLoader();
 builder.Services.AddSingleton(semanticModels);
 builder.Services.AddSingleton<SemanticQueryCompiler>();
@@ -62,6 +87,13 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapFallbackToFile("{*path:regex(^(?!api|hubs)(.*)$)}", "index.html");
 
-app.Run();
+if (args.FirstOrDefault() is { } firstArgument &&
+    !firstArgument.StartsWith("--", StringComparison.Ordinal))
+{
+    return await app.RunJasperFxCommands(args);
+}
+
+await app.RunAsync();
+return 0;
 
 public partial class Program;

@@ -38,7 +38,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Invalid_semantic_query_is_rejected_before_dashboard_or_outbox_persistence()
+    public async Task Invalid_semantic_query_is_rejected_before_dashboard_or_event_persistence()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -57,7 +57,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
             "SELECT COUNT(*) FROM workspace_dashboards WHERE id = @DashboardId",
             new { DashboardId = dashboardId }));
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM outbox_events WHERE aggregate_id = @DashboardId",
+            "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @DashboardId",
             new { DashboardId = dashboardId.ToString() }));
     }
 
@@ -187,7 +187,11 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
         Assert.Equal("Current", body.RootElement.GetProperty("layout").GetProperty("title").GetString());
     }
 
-    private WebApplicationFactory<Program> CreateFactory() => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Database:ConnectionString"] = Postgres.ConnectionString, ["Jwt:Issuer"] = "Tradebook", ["Jwt:Audience"] = "Tradebook", ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey })));
+    private WebApplicationFactory<Program> CreateFactory() => new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+    {
+        builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
+        builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Database:ConnectionString"] = Postgres.ConnectionString, ["Jwt:Issuer"] = "Tradebook", ["Jwt:Audience"] = "Tradebook", ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey }));
+    });
     private static HttpClient AuthenticatedClient(WebApplicationFactory<Program> factory, Guid actorId) { var client = factory.CreateClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(actorId)); return client; }
     private static string Token(Guid actorId)
     {

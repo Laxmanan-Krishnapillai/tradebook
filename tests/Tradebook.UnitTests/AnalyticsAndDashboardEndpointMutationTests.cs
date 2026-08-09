@@ -73,6 +73,7 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var connections = new ThrowingConnectionFactory(new InvalidOperationException("Postgres must not be opened."));
         var endpoint = Factory.Create<SaveDashboardEndpoint>(
             connections,
+            default(object)!,
             new SemanticQueryCompiler(new SemanticModelLoader()),
             DashboardJsonOptions());
         var request = new SaveDashboardRequest(
@@ -100,6 +101,7 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var endpoint = Factory.Create<SaveDashboardEndpoint>(
             context => context.User = Principal(actorId),
             connections,
+            default(object)!,
             new SemanticQueryCompiler(new SemanticModelLoader()),
             DashboardJsonOptions());
 

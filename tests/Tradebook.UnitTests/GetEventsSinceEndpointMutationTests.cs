@@ -56,7 +56,7 @@ public sealed class GetEventsSinceEndpointMutationTests
                 "Updated",
                 "{\"version\":2}")],
             42);
-        var reader = new RecordingOutboxEventReader(response);
+        var reader = new RecordingRealtimeEventReader(response);
         var endpoint = Factory.Create<GetEventsSinceEndpoint>(
             context => context.User = Principal(actorId),
             reader);
@@ -76,7 +76,7 @@ public sealed class GetEventsSinceEndpointMutationTests
     private static ClaimsPrincipal Principal(Guid actorId) =>
         new(new ClaimsIdentity([new Claim("sub", actorId.ToString())], "test"));
 
-    private sealed class RecordingOutboxEventReader(GetEventsSinceResponse response) : IOutboxEventReader
+    private sealed class RecordingRealtimeEventReader(GetEventsSinceResponse response) : IRealtimeEventReader
     {
         public int Calls { get; private set; }
         public long AfterSequence { get; private set; }

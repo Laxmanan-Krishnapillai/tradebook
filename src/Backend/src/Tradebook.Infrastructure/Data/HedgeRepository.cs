@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class HedgeRepository(INpgsqlConnectionFactory connections) : IHedgeRepository
+public sealed class HedgeRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : IHedgeRepository
 {
     private const string Projection = """
         id AS HedgeId, contract_id AS ContractId, month AS Month,
@@ -49,9 +53,11 @@ public sealed class HedgeRepository(INpgsqlConnectionFactory connections) : IHed
             VALUES (@ContractId, @Month, @HedgeAmountMwh, @HedgePriceEurMwh)
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Hedge,
-            created.HedgeId.ToString(), "Created", created.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.Hedge, created.HedgeId.ToString(), "Created", created.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return created;
     }
 
@@ -69,9 +75,11 @@ public sealed class HedgeRepository(INpgsqlConnectionFactory connections) : IHed
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
         if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Hedge,
-            updated.HedgeId.ToString(), "Updated", updated.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.Hedge, updated.HedgeId.ToString(), "Updated", updated.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return updated;
     }
 
@@ -85,9 +93,11 @@ public sealed class HedgeRepository(INpgsqlConnectionFactory connections) : IHed
             new { Id = id, Version = version }, transaction, cancellationToken: ct));
         if (deletedVersion is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Hedge,
-                id.ToString(), "Deleted", deletedVersion.Value, reason, ct);
+            await publisher.EnlistAsync((DbTransaction)transaction, ct);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.Hedge, id.ToString(), "Deleted", deletedVersion.Value, reason));
             await transaction.CommitAsync(ct);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(ct);

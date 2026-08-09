@@ -1,12 +1,16 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class ContractRepository(INpgsqlConnectionFactory connections) : IContractRepository
+public sealed class ContractRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher) : IContractRepository
 {
     private const string Projection = """
         id AS ContractId, contract_name AS ContractName, counterparty_id AS CounterpartyId,
@@ -72,9 +76,11 @@ public sealed class ContractRepository(INpgsqlConnectionFactory connections) : I
             """ + " " + Projection;
         var created = await connection.QuerySingleAsync<ContractDetailsDto>(new CommandDefinition(
             insert, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Contract,
-            created.ContractId.ToString(), "Created", created.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.Contract, created.ContractId.ToString(), "Created", created.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return created;
     }
 
@@ -101,9 +107,11 @@ public sealed class ContractRepository(INpgsqlConnectionFactory connections) : I
             RETURNING
             """ + " " + Projection, request, transaction, cancellationToken: ct));
         if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Contract,
-            updated.ContractId.ToString(), "Updated", updated.Version, null, ct);
+        await publisher.EnlistAsync((DbTransaction)transaction, ct);
+        await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+            RealtimeAggregateTypes.Contract, updated.ContractId.ToString(), "Updated", updated.Version));
         await transaction.CommitAsync(ct);
+        await publisher.FlushAsync();
         return updated;
     }
 
@@ -118,9 +126,11 @@ public sealed class ContractRepository(INpgsqlConnectionFactory connections) : I
             """, new { ContractId = contractId, Version = version }, transaction, cancellationToken: ct));
         if (newVersion is not null)
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.Contract,
-                contractId.ToString(), "Deactivated", newVersion.Value, reason, ct);
+            await publisher.EnlistAsync((DbTransaction)transaction, ct);
+            await publisher.PublishAsync(EntityChangedDomainEvent.Create(
+                RealtimeAggregateTypes.Contract, contractId.ToString(), "Deactivated", newVersion.Value, reason));
             await transaction.CommitAsync(ct);
+            await publisher.FlushAsync();
             return null;
         }
         await transaction.RollbackAsync(ct);
