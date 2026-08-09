@@ -21,6 +21,8 @@ services:
     build:
       context: .
       target: database-ops
+    volumes:
+      - ops-backup:/tmp/tradebook-backup
     environment:
       PGHOST: postgres
       PGDATABASE: tradebook
@@ -33,3 +35,4 @@ services:
 
 volumes:
   pgdata:
+  ops-backup:

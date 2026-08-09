@@ -38,14 +38,11 @@ source_contract_count="$("${compose[@]}" exec --no-TTY postgres psql \
   --username tradebook --dbname tradebook --tuples-only --no-align \
   --command 'SELECT count(*) FROM contracts;')"
 
-"${compose[@]}" exec --no-TTY \
-  -e PGHOST=/var/run/postgresql \
-  -e PGDATABASE=tradebook \
-  -e PGUSER=tradebook \
+"${compose[@]}" run --rm --no-TTY \
   -e BACKUP_OUTPUT_DIRECTORY=/tmp/tradebook-backup \
-  postgres bash /opt/tradebook/database-ops/backup.sh
+  migrations bash /opt/tradebook/database-ops/backup.sh
 
-backup_blob="$("${compose[@]}" exec --no-TTY postgres \
+backup_blob="$("${compose[@]}" run --rm --no-TTY migrations \
   find /tmp/tradebook-backup/tradebook -type f -name '*.dump' -printf '%P\n')"
 if [[ -z "$backup_blob" || "$(printf '%s\n' "$backup_blob" | wc -l)" -ne 1 ]]; then
   echo "Expected exactly one local backup dump, found: $backup_blob" >&2
@@ -53,14 +50,12 @@ if [[ -z "$backup_blob" || "$(printf '%s\n' "$backup_blob" | wc -l)" -ne 1 ]]; t
 fi
 backup_blob="tradebook/$backup_blob"
 
-"${compose[@]}" exec --no-TTY \
-  -e PGHOST=/var/run/postgresql \
-  -e PGUSER=tradebook \
+"${compose[@]}" run --rm --no-TTY \
   -e BACKUP_BLOB="$backup_blob" \
   -e BACKUP_INPUT_DIRECTORY=/tmp/tradebook-backup \
   -e RESTORE_DATABASE=tradebook_restore_ci \
   -e RESTORE_KEEP_DATABASE=true \
-  postgres bash /opt/tradebook/database-ops/restore.sh
+  migrations bash /opt/tradebook/database-ops/restore.sh
 
 restored_contract_count="$("${compose[@]}" exec --no-TTY postgres psql \
   --username tradebook --dbname tradebook_restore_ci --tuples-only --no-align \
