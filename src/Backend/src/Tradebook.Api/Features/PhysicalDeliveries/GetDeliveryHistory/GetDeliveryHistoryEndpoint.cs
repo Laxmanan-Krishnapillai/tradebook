@@ -4,8 +4,20 @@ using Tradebook.Core.Interfaces;
 
 namespace Tradebook.Api.Features.PhysicalDeliveries.GetDeliveryHistory;
 
-public sealed class GetDeliveryHistoryEndpoint(IDeliveryRepository repository) : Endpoint<GetDeliveryHistoryRequest, GetDeliveryHistoryResponse>
+public sealed class GetDeliveryHistoryEndpoint(IDeliveryRepository repository)
+    : Endpoint<GetDeliveryHistoryRequest, GetDeliveryHistoryResponse>
 {
-    public override void Configure() { Get("/api/v1/deliveries"); Policies("ReadPolicy"); }
-    public override async Task HandleAsync(GetDeliveryHistoryRequest request, CancellationToken cancellationToken) => await Send.OkAsync(await repository.GetHistoryAsync(request, cancellationToken), cancellation: cancellationToken);
+    public override void Configure()
+    {
+        Get("/api/v1/deliveries");
+        Policies("ReadPolicy");
+    }
+
+    public override async Task HandleAsync(GetDeliveryHistoryRequest req, CancellationToken ct) =>
+        await (
+            Send.OkAsync(
+                await (repository.GetHistoryAsync(req, ct)).ConfigureAwait(false),
+                cancellation: ct
+            )
+        ).ConfigureAwait(false);
 }

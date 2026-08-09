@@ -7,6 +7,6 @@ public static class DatabaseMigrationHostExtensions
 {
     public static Task ApplyTradebookMigrationsAsync(
         this IHost host,
-        CancellationToken cancellationToken = default) =>
-        host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cancellationToken);
+        CancellationToken cancellationToken = default
+    ) => host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cancellationToken);
 }

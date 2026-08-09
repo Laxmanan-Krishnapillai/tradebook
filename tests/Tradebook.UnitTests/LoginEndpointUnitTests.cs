@@ -13,34 +13,42 @@ namespace Tradebook.UnitTests;
 public sealed class LoginEndpointUnitTests
 {
     private const string SigningKey = "unit-test-signing-key-with-enough-entropy-123456";
+    private static readonly DateTimeOffset TestUtcNow = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
 
-    private static IOptions<JwtOptions> Options() => Microsoft.Extensions.Options.Options.Create(new JwtOptions
-    {
-        SigningKey = SigningKey,
-        Issuer = "TestIssuer",
-        Audience = "TestAudience"
-    });
+    private static IOptions<JwtOptions> Options() =>
+        Microsoft.Extensions.Options.Options.Create(
+            new JwtOptions
+            {
+                SigningKey = SigningKey,
+                Issuer = "TestIssuer",
+                Audience = "TestAudience",
+            }
+        );
 
     private static (LoginEndpoint Endpoint, FakeUserRepository Users) CreateEndpoint()
     {
         var users = new FakeUserRepository();
         var endpoint = Factory.Create<LoginEndpoint>(
             ctx => ctx.AddTestServices(services => services.AddHttpContextAccessor()),
-            users, Options());
+            users,
+            Options(),
+            new FixedTimeProvider(TestUtcNow)
+        );
         return (endpoint, users);
     }
 
-    private static User ActiveUser(string username, string password, params string[] roles) => new()
-    {
-        Id = Guid.NewGuid(),
-        Username = username,
-        PasswordHash = PasswordHasher.Hash(password),
-        Roles = roles,
-        IsActive = true,
-    };
+    private static User ActiveUser(string username, string password, params string[] roles) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            Username = username,
+            PasswordHash = PasswordHasher.Hash(password),
+            Roles = roles,
+            IsActive = true,
+        };
 
     [Fact]
-    public async Task Valid_credentials_return_signed_token_with_sub_and_role_claims()
+    public async Task ValidCredentialsReturnSignedTokenWithSubAndRoleClaims()
     {
         var (endpoint, users) = CreateEndpoint();
         var user = ActiveUser("trader1", "S3cure!passphrase", "Trader", "Admin");
@@ -51,23 +59,28 @@ public sealed class LoginEndpointUnitTests
         Assert.Equal(200, endpoint.HttpContext.Response.StatusCode);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(endpoint.Response.AccessToken);
         Assert.Equal("TestIssuer", token.Issuer);
-        Assert.Contains("TestAudience", token.Audiences);
-        Assert.Equal(user.Id.ToString(), token.Claims.Single(claim => claim.Type == "sub").Value);
-        var roles = token.Claims
-            .Where(claim => claim.Type is "role" or ClaimTypes.Role)
+        Assert.Contains("TestAudience", token.Audiences, StringComparer.Ordinal);
+        Assert.Equal(
+            user.Id.Value.ToString(),
+            token
+                .Claims.Single(claim => string.Equals(claim.Type, "sub", StringComparison.Ordinal))
+                .Value
+        );
+        var roles = token
+            .Claims.Where(claim => claim.Type is "role" or ClaimTypes.Role)
             .Select(claim => claim.Value)
             .ToArray();
         Assert.Equal(["Trader", "Admin"], roles);
 
-        var expectedExpiry = DateTimeOffset.UtcNow.AddHours(8);
-        Assert.InRange(endpoint.Response.ExpiresAtUtc, expectedExpiry.AddMinutes(-5), expectedExpiry.AddMinutes(5));
-        Assert.InRange(token.ValidTo, expectedExpiry.AddMinutes(-5).UtcDateTime, expectedExpiry.AddMinutes(5).UtcDateTime);
+        var expectedExpiry = TestUtcNow.AddHours(8);
+        Assert.Equal(expectedExpiry, endpoint.Response.ExpiresAtUtc);
+        Assert.Equal(expectedExpiry.UtcDateTime, token.ValidTo);
     }
 
     [Fact]
-    public async Task Unknown_user_wrong_password_and_inactive_user_all_get_401()
+    public async Task UnknownUserWrongPasswordAndInactiveUserAllGet401()
     {
-        var (endpoint, users) = CreateEndpoint();
+        var (_, users) = CreateEndpoint();
         var active = ActiveUser("trader1", "S3cure!passphrase", "Trader");
         users.Users[active.Username] = active;
         var inactive = ActiveUser("leaver", "S3cure!passphrase", "Trader");
@@ -80,12 +93,14 @@ public sealed class LoginEndpointUnitTests
             IsActive = false,
         };
 
-        foreach (var request in new[]
-                 {
-                     new LoginRequest("nobody", "S3cure!passphrase"),
-                     new LoginRequest("trader1", "wrong"),
-                     new LoginRequest("leaver", "S3cure!passphrase"),
-                 })
+        foreach (
+            var request in new[]
+            {
+                new LoginRequest("nobody", "S3cure!passphrase"),
+                new LoginRequest("trader1", "wrong"),
+                new LoginRequest("leaver", "S3cure!passphrase"),
+            }
+        )
         {
             var (freshEndpoint, freshUsers) = CreateEndpoint();
             foreach (var (name, user) in users.Users)
@@ -99,12 +114,17 @@ public sealed class LoginEndpointUnitTests
     }
 
     [Fact]
-    public void Password_hasher_rejects_a_valid_payload_with_an_unrecognized_scheme()
+    public void PasswordHasherRejectsAValidPayloadWithAnUnrecognizedScheme()
     {
         const string password = "S3cure!passphrase";
         var encodedHash = PasswordHasher.Hash(password);
         var wrongSchemeHash = $"argon2id.{encodedHash[(encodedHash.IndexOf('.') + 1)..]}";
 
         Assert.False(PasswordHasher.Verify(password, wrongSchemeHash));
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

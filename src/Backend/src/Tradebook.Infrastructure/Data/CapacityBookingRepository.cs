@@ -6,7 +6,8 @@ using Tradebook.Core.Interfaces;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connections) : ICapacityBookingRepository
+public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connections)
+    : ICapacityBookingRepository
 {
     private const string Projection = """
         id AS CapacityBookingId, contract_id AS ContractId,
@@ -21,98 +22,246 @@ public sealed class CapacityBookingRepository(INpgsqlConnectionFactory connectio
 
     public async Task<CapacityBookingDetailsDto?> GetByIdAsync(Guid id, CancellationToken ct)
     {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        return await connection.QuerySingleOrDefaultAsync<CapacityBookingDetailsDto>(new CommandDefinition(
-            $"SELECT {Projection} FROM capacity_bookings WHERE id = @Id", new { Id = id }, cancellationToken: ct));
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            return await (
+                connection.QuerySingleOrDefaultAsync<CapacityBookingDetailsDto>(
+                    new CommandDefinition(
+                        $"SELECT {Projection} FROM capacity_bookings WHERE id = @Id",
+                        new { Id = id },
+                        cancellationToken: ct
+                    )
+                )
+            ).ConfigureAwait(false);
+        }
     }
 
-    public async Task<GetCapacityBookingHistoryResponse> GetHistoryAsync(GetCapacityBookingHistoryRequest request, CancellationToken ct)
+    public async Task<GetCapacityBookingHistoryResponse> GetHistoryAsync(
+        GetCapacityBookingHistoryRequest request,
+        CancellationToken ct
+    )
     {
         var (page, size, offset) = RepositoryMutation.Page(request.Page, request.PageSize);
-        var filters = new List<string>();
-        var parameters = new DynamicParameters(new { Limit = size, Offset = offset });
-        if (request.ContractId is { } id) { filters.Add("contract_id = @ContractId"); parameters.Add("ContractId", id); }
-        if (request.FromMonth is { } from) { filters.Add("supply_month >= @FromMonth"); parameters.Add("FromMonth", from); }
-        if (request.ToMonth is { } to) { filters.Add("supply_month <= @ToMonth"); parameters.Add("ToMonth", to); }
-        var where = filters.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", filters);
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        var items = (await connection.QueryAsync<CapacityBookingDetailsDto>(new CommandDefinition(
-            $"SELECT {Projection} FROM capacity_bookings{where} ORDER BY supply_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset",
-            parameters, cancellationToken: ct))).AsList();
-        var total = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            $"SELECT COUNT(*) FROM capacity_bookings{where}", parameters, cancellationToken: ct));
-        return new(items.AsReadOnly(), total, page, size, offset + items.Count < total);
-    }
-
-    public async Task<CapacityBookingDetailsDto> CreateAtomicAsync(CreateCapacityBookingRequest request, Guid actorId, CancellationToken ct)
-    {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct);
-        var created = await connection.QuerySingleAsync<CapacityBookingDetailsDto>(new CommandDefinition("""
-            INSERT INTO capacity_bookings (
-                contract_id, contract_instance_id, supply_month, counterparty_id, balancing_group,
-                price_mechanism, start_area, end_area, ship_fix, border_point, start_day, end_day,
-                capacity_mw, capacity_price_eur_mwh, capacity_cost_eur, comments)
-            VALUES (
-                @ContractId, @ContractInstanceId, @SupplyMonth, @CounterpartyId, @BalancingGroup,
-                CAST(@PriceMechanism AS capacity_price_mech_enum), @StartArea, @EndArea, @ShipFix,
-                @BorderPoint, @StartDay, @EndDay, @CapacityMw, @CapacityPriceEurMwh,
-                @CapacityCostEur, @Comments)
-            RETURNING
-            """ + " " + Projection, request, transaction, cancellationToken: ct));
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.CapacityBooking,
-            created.CapacityBookingId.ToString(), "Created", created.Version, null, ct);
-        await transaction.CommitAsync(ct);
-        return created;
-    }
-
-    public async Task<CapacityBookingDetailsDto?> UpdateAtomicAsync(UpdateCapacityBookingRequest request, Guid actorId, CancellationToken ct)
-    {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct);
-        var updated = await connection.QuerySingleOrDefaultAsync<CapacityBookingDetailsDto>(new CommandDefinition("""
-            UPDATE capacity_bookings SET
-                balancing_group = COALESCE(@BalancingGroup, balancing_group),
-                price_mechanism = COALESCE(CAST(@PriceMechanism AS capacity_price_mech_enum), price_mechanism),
-                start_area = COALESCE(@StartArea, start_area), end_area = COALESCE(@EndArea, end_area),
-                start_day = COALESCE(@StartDay, start_day), end_day = COALESCE(@EndDay, end_day),
-                capacity_mw = COALESCE(@CapacityMw, capacity_mw),
-                capacity_price_eur_mwh = COALESCE(@CapacityPriceEurMwh, capacity_price_eur_mwh),
-                capacity_cost_eur = COALESCE(@CapacityCostEur, capacity_cost_eur),
-                comments = COALESCE(@Comments, comments), updated_at = clock_timestamp(), version = version + 1
-            WHERE id = @CapacityBookingId AND version = @Version
-            RETURNING
-            """ + " " + Projection, request, transaction, cancellationToken: ct));
-        if (updated is null) { await transaction.RollbackAsync(ct); return null; }
-        await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.CapacityBooking,
-            updated.CapacityBookingId.ToString(), "Updated", updated.Version, null, ct);
-        await transaction.CommitAsync(ct);
-        return updated;
-    }
-
-    public Task<MutationOutcome?> DeleteAtomicAsync(Guid id, long version, string reason, Guid actorId, CancellationToken ct) =>
-        DeleteInternalAsync(id, version, reason, actorId, ct);
-
-    private async Task<MutationOutcome?> DeleteInternalAsync(Guid id, long version, string reason, Guid actorId, CancellationToken ct)
-    {
-        await using var connection = await connections.OpenConnectionAsync(ct);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        await RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct);
-        var deletedVersion = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
-            "DELETE FROM capacity_bookings WHERE id = @Id AND version = @Version RETURNING version",
-            new { Id = id, Version = version }, transaction, cancellationToken: ct));
-        if (deletedVersion is not null)
+        var parameters = new
         {
-            await RepositoryMutation.WriteOutboxAsync(connection, transaction, OutboxAggregateTypes.CapacityBooking,
-                id.ToString(), "Deleted", deletedVersion.Value, reason, ct);
-            await transaction.CommitAsync(ct);
-            return null;
+            Limit = size,
+            Offset = offset,
+            request.ContractId,
+            request.FromMonth,
+            request.ToMonth,
+        };
+        const string rowsSql =
+            $"SELECT {Projection} FROM capacity_bookings WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@FromMonth IS NULL OR supply_month >= @FromMonth) AND (@ToMonth IS NULL OR supply_month <= @ToMonth) ORDER BY supply_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
+        const string countSql =
+            "SELECT COUNT(*) FROM capacity_bookings WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@FromMonth IS NULL OR supply_month >= @FromMonth) AND (@ToMonth IS NULL OR supply_month <= @ToMonth)";
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var items = (
+                await (
+                    connection.QueryAsync<CapacityBookingDetailsDto>(
+                        new CommandDefinition(rowsSql, parameters, cancellationToken: ct)
+                    )
+                ).ConfigureAwait(false)
+            ).AsList();
+            var total = await (
+                connection.ExecuteScalarAsync<int>(
+                    new CommandDefinition(countSql, parameters, cancellationToken: ct)
+                )
+            ).ConfigureAwait(false);
+            return new(items.AsReadOnly(), total, page, size, offset + items.Count < total);
         }
-        await transaction.RollbackAsync(ct);
-        var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
-            "SELECT EXISTS(SELECT 1 FROM capacity_bookings WHERE id = @Id)", new { Id = id }, cancellationToken: ct));
-        return exists ? MutationOutcome.VersionConflict : MutationOutcome.NotFound;
+    }
+
+    public async Task<CapacityBookingDetailsDto> CreateAtomicAsync(
+        CreateCapacityBookingRequest request,
+        Guid actorId,
+        CancellationToken ct
+    )
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                await (
+                    RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct)
+                ).ConfigureAwait(false);
+                var created = await (
+                    connection.QuerySingleAsync<CapacityBookingDetailsDto>(
+                        new CommandDefinition(
+                            """
+                            INSERT INTO capacity_bookings (
+                                contract_id, contract_instance_id, supply_month, counterparty_id, balancing_group,
+                                price_mechanism, start_area, end_area, ship_fix, border_point, start_day, end_day,
+                                capacity_mw, capacity_price_eur_mwh, capacity_cost_eur, comments)
+                            VALUES (
+                                @ContractId, @ContractInstanceId, @SupplyMonth, @CounterpartyId, @BalancingGroup,
+                                CAST(@PriceMechanism AS capacity_price_mech_enum), @StartArea, @EndArea, @ShipFix,
+                                @BorderPoint, @StartDay, @EndDay, @CapacityMw, @CapacityPriceEurMwh,
+                                @CapacityCostEur, @Comments)
+                            RETURNING
+                            """
+                                + " "
+                                + Projection,
+                            request,
+                            transaction,
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                await (
+                    RepositoryMutation.WriteOutboxAsync(
+                        connection,
+                        transaction,
+                        OutboxAggregateTypes.CapacityBooking,
+                        created.CapacityBookingId.Value.ToString(),
+                        "Created",
+                        created.Version,
+                        null,
+                        ct
+                    )
+                ).ConfigureAwait(false);
+                await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                return created;
+            }
+        }
+    }
+
+    public async Task<CapacityBookingDetailsDto?> UpdateAtomicAsync(
+        UpdateCapacityBookingRequest request,
+        Guid actorId,
+        CancellationToken ct
+    )
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                await (
+                    RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct)
+                ).ConfigureAwait(false);
+                var updated = await (
+                    connection.QuerySingleOrDefaultAsync<CapacityBookingDetailsDto>(
+                        new CommandDefinition(
+                            """
+                            UPDATE capacity_bookings SET
+                                balancing_group = COALESCE(@BalancingGroup, balancing_group),
+                                price_mechanism = COALESCE(CAST(@PriceMechanism AS capacity_price_mech_enum), price_mechanism),
+                                start_area = COALESCE(@StartArea, start_area), end_area = COALESCE(@EndArea, end_area),
+                                start_day = COALESCE(@StartDay, start_day), end_day = COALESCE(@EndDay, end_day),
+                                capacity_mw = COALESCE(@CapacityMw, capacity_mw),
+                                capacity_price_eur_mwh = COALESCE(@CapacityPriceEurMwh, capacity_price_eur_mwh),
+                                capacity_cost_eur = COALESCE(@CapacityCostEur, capacity_cost_eur),
+                                comments = COALESCE(@Comments, comments), updated_at = clock_timestamp(), version = version + 1
+                            WHERE id = @CapacityBookingId AND version = @Version
+                            RETURNING
+                            """
+                                + " "
+                                + Projection,
+                            request,
+                            transaction,
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                if (updated is null)
+                {
+                    await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
+                    return null;
+                }
+                await (
+                    RepositoryMutation.WriteOutboxAsync(
+                        connection,
+                        transaction,
+                        OutboxAggregateTypes.CapacityBooking,
+                        updated.CapacityBookingId.Value.ToString(),
+                        "Updated",
+                        updated.Version,
+                        null,
+                        ct
+                    )
+                ).ConfigureAwait(false);
+                await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                return updated;
+            }
+        }
+    }
+
+    public Task<MutationOutcome?> DeleteAtomicAsync(
+        Guid id,
+        long version,
+        string reason,
+        Guid actorId,
+        CancellationToken ct
+    ) => DeleteInternalAsync(id, version, reason, actorId, ct);
+
+    private async Task<MutationOutcome?> DeleteInternalAsync(
+        Guid id,
+        long version,
+        string reason,
+        Guid actorId,
+        CancellationToken ct
+    )
+    {
+        var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
+        await using (connection.ConfigureAwait(false))
+        {
+            var transaction = await connection
+                .BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                .ConfigureAwait(false);
+            await using (transaction.ConfigureAwait(false))
+            {
+                await (
+                    RepositoryMutation.SetActorAsync(connection, transaction, actorId, ct)
+                ).ConfigureAwait(false);
+                var deletedVersion = await (
+                    connection.ExecuteScalarAsync<long?>(
+                        new CommandDefinition(
+                            "DELETE FROM capacity_bookings WHERE id = @Id AND version = @Version RETURNING version",
+                            new { Id = id, Version = version },
+                            transaction,
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                if (deletedVersion is not null)
+                {
+                    await (
+                        RepositoryMutation.WriteOutboxAsync(
+                            connection,
+                            transaction,
+                            OutboxAggregateTypes.CapacityBooking,
+                            id.ToString(),
+                            "Deleted",
+                            deletedVersion.Value,
+                            reason,
+                            ct
+                        )
+                    ).ConfigureAwait(false);
+                    await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                    return null;
+                }
+                await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
+                var exists = await (
+                    connection.ExecuteScalarAsync<bool>(
+                        new CommandDefinition(
+                            "SELECT EXISTS(SELECT 1 FROM capacity_bookings WHERE id = @Id)",
+                            new { Id = id },
+                            cancellationToken: ct
+                        )
+                    )
+                ).ConfigureAwait(false);
+                return exists ? MutationOutcome.VersionConflict : MutationOutcome.NotFound;
+            }
+        }
     }
 }

@@ -1,24 +1,45 @@
 using FastEndpoints;
+using Tradebook.Api.Security;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
-using Tradebook.Api.Security;
 
 namespace Tradebook.Api.Features.PhysicalDeliveries.DeletePhysicalDelivery;
 
-public sealed class DeletePhysicalDeliveryEndpoint(IDeliveryRepository repository, ICacheService cache) : Endpoint<DeletePhysicalDeliveryRequest>
+public sealed class DeletePhysicalDeliveryEndpoint(
+    IDeliveryRepository repository,
+    ICacheService cache
+) : Endpoint<DeletePhysicalDeliveryRequest>
 {
-    public override void Configure() { Delete("/api/v1/deliveries/{deliveryId}"); Policies("BackOfficePolicy"); }
-    public override async Task HandleAsync(DeletePhysicalDeliveryRequest request, CancellationToken cancellationToken)
+    public override void Configure()
     {
-        var outcome = await repository.CancelAtomicAsync(request.DeliveryId, request.Version, request.Reason, ActorId.From(User), cancellationToken);
-        if (outcome == MutationOutcome.NotFound) { await Send.NotFoundAsync(cancellationToken); return; }
+        Delete("/api/v1/deliveries/{deliveryId}");
+        Policies("BackOfficePolicy");
+    }
+
+    public override async Task HandleAsync(DeletePhysicalDeliveryRequest req, CancellationToken ct)
+    {
+        var outcome = await (
+            repository.CancelAtomicAsync(
+                req.DeliveryId,
+                req.Version,
+                req.Reason,
+                ActorId.From(User),
+                ct
+            )
+        ).ConfigureAwait(false);
+        if (outcome == MutationOutcome.NotFound)
+        {
+            await (Send.NotFoundAsync(ct)).ConfigureAwait(false);
+            return;
+        }
         if (outcome == MutationOutcome.VersionConflict)
         {
-            var current = await repository.GetByIdAsync(request.DeliveryId, cancellationToken);
-            await Send.ResponseAsync(current!, 409, cancellation: cancellationToken); return;
+            var current = await (repository.GetByIdAsync(req.DeliveryId, ct)).ConfigureAwait(false);
+            await (Send.ResponseAsync(current!, 409, cancellation: ct)).ConfigureAwait(false);
+            return;
         }
-        await cache.RemoveAsync($"delivery:{request.DeliveryId}", cancellationToken);
-        await cache.RemoveAsync("deliveries:list", cancellationToken);
-        await Send.NoContentAsync(cancellationToken);
+        await (cache.RemoveAsync($"delivery:{req.DeliveryId}", ct)).ConfigureAwait(false);
+        await (cache.RemoveAsync("deliveries:list", ct)).ConfigureAwait(false);
+        await (Send.NoContentAsync(ct)).ConfigureAwait(false);
     }
 }

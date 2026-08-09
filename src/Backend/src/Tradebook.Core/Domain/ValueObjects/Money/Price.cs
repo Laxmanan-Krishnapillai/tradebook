@@ -2,7 +2,11 @@ using Vogen;
 
 namespace Tradebook.Core.Domain.ValueObjects.Money;
 
-[ValueObject<decimal>]
+[ValueObject<decimal>(
+    conversions: Conversions.SystemTextJson,
+    parsableForStrings: ParsableForStrings.GenerateNothing,
+    parsableForPrimitives: ParsableForPrimitives.GenerateNothing
+)]
 public readonly partial struct Price
 {
     private static Validation Validate(decimal value)
@@ -14,4 +18,12 @@ public readonly partial struct Price
             ? Validation.Ok
             : Validation.Invalid("Price scale must not exceed 4 decimal places.");
     }
+
+    public static bool operator <(Price left, Price right) => left.Value < right.Value;
+
+    public static bool operator >(Price left, Price right) => left.Value > right.Value;
+
+    public static bool operator <=(Price left, Price right) => left.Value <= right.Value;
+
+    public static bool operator >=(Price left, Price right) => left.Value >= right.Value;
 }

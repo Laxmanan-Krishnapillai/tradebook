@@ -9,6 +9,10 @@
     "dotnet-stryker": {
       "version": "4.16.0",
       "commands": ["dotnet-stryker"]
+    },
+    "csharpier": {
+      "version": "1.3.0",
+      "commands": ["csharpier"]
     }
   }
 }

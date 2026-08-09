@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
-using Tradebook.Core.Interfaces;
 using Tradebook.Core.Domain;
+using Tradebook.Core.Interfaces;
 
 namespace Tradebook.Api.RealTime;
 
@@ -9,16 +9,37 @@ namespace Tradebook.Api.RealTime;
 /// API-side implementation of the Core fan-out port: pushes committed outbox events to
 /// the per-entity SignalR groups defined by <see cref="DashboardPushHub"/>.
 /// </summary>
-internal sealed class DashboardPushFanout(IHubContext<DashboardPushHub, IDashboardPushClient> hub) : IOutboxEventFanout
+internal sealed class DashboardPushFanout(IHubContext<DashboardPushHub> hub) : IOutboxEventFanout
 {
-    public Task PublishEntityChangedAsync(Guid eventId, long sequenceId, string aggregateType,
-        string aggregateId, string eventType, string payloadJson, CancellationToken cancellationToken)
+    public Task PublishEntityChangedAsync(
+        Guid eventId,
+        long sequenceId,
+        string aggregateType,
+        string aggregateId,
+        string eventType,
+        string payloadJson,
+        CancellationToken cancellationToken
+    )
     {
-        var group = aggregateType == OutboxAggregateTypes.WorkspaceDashboard
+        var group = string.Equals(
+            aggregateType,
+            OutboxAggregateTypes.WorkspaceDashboard,
+            StringComparison.Ordinal
+        )
             ? WorkspaceGroup(payloadJson)
             : $"entity:{aggregateType}";
-        return hub.Clients.Group(group).EntityChanged(
-            eventId, sequenceId, aggregateType, aggregateId, eventType, payloadJson);
+        return hub
+            .Clients.Group(group)
+            .SendAsync(
+                "EntityChanged",
+                eventId,
+                sequenceId,
+                aggregateType,
+                aggregateId,
+                eventType,
+                payloadJson,
+                cancellationToken
+            );
     }
 
     private static string WorkspaceGroup(string payloadJson)
@@ -26,9 +47,10 @@ internal sealed class DashboardPushFanout(IHubContext<DashboardPushHub, IDashboa
         try
         {
             using var payload = JsonDocument.Parse(payloadJson);
-            return payload.RootElement.TryGetProperty("actorId", out var actor) &&
-                   actor.ValueKind == JsonValueKind.String &&
-                   Guid.TryParse(actor.GetString(), out var actorId)
+            return
+                payload.RootElement.TryGetProperty("actorId", out var actor)
+                && actor.ValueKind == JsonValueKind.String
+                && Guid.TryParse(actor.GetString(), out var actorId)
                 ? $"dashboard:{actorId}"
                 : throw InvalidWorkspacePayload();
         }
@@ -39,7 +61,5 @@ internal sealed class DashboardPushFanout(IHubContext<DashboardPushHub, IDashboa
     }
 
     private static InvalidOperationException InvalidWorkspacePayload(Exception? inner = null) =>
-        new(
-            "WorkspaceDashboard outbox payload must contain a UUID actorId.",
-            inner);
+        new("WorkspaceDashboard outbox payload must contain a UUID actorId.", inner);
 }
