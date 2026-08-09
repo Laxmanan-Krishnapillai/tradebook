@@ -7,7 +7,7 @@ RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
-COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props BannedSymbols.txt .editorconfig ./
+COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props BannedSymbols.txt .editorconfig .csharpierignore ./
 COPY src/Backend/ ./src/Backend/
 COPY src/Database/ ./src/Database/
 COPY tests/ ./tests/
