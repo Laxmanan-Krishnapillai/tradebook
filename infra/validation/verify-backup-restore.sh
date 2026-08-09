@@ -7,7 +7,7 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repository_root"
 
 compose_project="tradebook-v6-${GITHUB_RUN_ID:-$$}"
-compose=(docker compose --project-name "$compose_project")
+compose=(docker compose --profile ops --project-name "$compose_project")
 cleanup() {
   "${compose[@]}" down --volumes
 }

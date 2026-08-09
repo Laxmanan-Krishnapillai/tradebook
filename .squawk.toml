@@ -9,7 +9,6 @@ excluded_rules = [
   "ban-drop-database",
   "ban-drop-not-null",
   "ban-drop-table",
-  "ban-index-creation-with-table-lock",
   "ban-truncate-cascade",
   "changing-column-type",
   "constraint-missing-not-valid",
