@@ -90,7 +90,7 @@ public sealed class ToolingConfigurationTests
         var repositoryRoot = FindRepositoryRoot();
         var projectFiles = FindProjectFiles(repositoryRoot);
 
-        Assert.Equal(6, projectFiles.Length);
+        Assert.Equal(7, projectFiles.Length);
         foreach (var projectFile in projectFiles)
         {
             var project = XDocument.Load(projectFile);
@@ -682,10 +682,21 @@ public sealed class ToolingConfigurationTests
             );
         }
 
-        versions.Add("CsCheck", "4.4.0");
-        versions.Add("Microsoft.Testing.Extensions.CodeCoverage", "17.14.2");
-        versions.Add("xunit.v3", "3.2.2");
-        versions.Add("TngTech.ArchUnitNET", "0.11.0");
+        var task20Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["dbup-postgresql"] = "7.0.1",
+            ["CsCheck"] = "4.4.0",
+            ["Microsoft.Testing.Extensions.CodeCoverage"] = "17.14.2",
+            ["xunit.v3"] = "3.2.2",
+            ["TngTech.ArchUnitNET"] = "0.11.0",
+        };
+        foreach (var package in task20Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"{package.Key} is pinned by more than one task"
+            );
+        }
 
         return versions;
     }

@@ -58,7 +58,7 @@ public sealed class DatabaseResetIntegrationTests(CustomWebApplicationFactory fa
         await using (connection.ConfigureAwait(false))
         {
             await connection.OpenAsync().ConfigureAwait(false);
-            var command = new NpgsqlCommand("SELECT count(*) FROM schema_migrations", connection);
+            var command = new NpgsqlCommand("SELECT count(*) FROM schema_journal", connection);
             await using (command.ConfigureAwait(false))
             {
                 return (long)(await command.ExecuteScalarAsync().ConfigureAwait(false))!;
