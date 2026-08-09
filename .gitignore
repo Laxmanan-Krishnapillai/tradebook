@@ -10,3 +10,6 @@ stryker-run*.log
 .codegraph/
 src/Frontend/dist/
 reports/
+
+# codex CLI writes error.log debris into the cwd on some runs
+error.log
