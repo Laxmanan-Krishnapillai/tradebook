@@ -47,22 +47,6 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHostedService<Tradebook.Infrastructure.Migrations.MigrationHostedService>();
 
 var app = builder.Build();
-try
-{
-    var connection = await app
-        .Services.GetRequiredService<INpgsqlConnectionFactory>()
-        .OpenConnectionAsync(CancellationToken.None)
-        .ConfigureAwait(false);
-    await using var _ = connection.ConfigureAwait(false);
-    await semanticModels.ValidateDatabaseSchemaAsync(connection).ConfigureAwait(false);
-}
-catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
-{
-    // Keep liveness independent from PostgreSQL availability. Readiness repeats the
-    // validation and stays unhealthy until the database can be reached, while a
-    // reachable database with semantic-model drift still fails startup above.
-    ProgramLog.SchemaValidationDeferred(app.Logger, exception);
-}
 
 app.UseExceptionHandler();
 app.UseAuthentication();
