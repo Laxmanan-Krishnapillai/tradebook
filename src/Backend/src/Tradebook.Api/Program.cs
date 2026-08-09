@@ -12,9 +12,15 @@ using Tradebook.Api.RealTime;
 using Tradebook.Core.Analytics;
 using Tradebook.Api.Features.Health;
 using Tradebook.Api.ErrorHandling;
+using Tradebook_Core;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.TypeInfoResolver = AppJsonSerializerContext.Default);
+VogenTypeHandlers.RegisterAll();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new VogenTypesFactory());
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
+});
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddTradebookPersistence();

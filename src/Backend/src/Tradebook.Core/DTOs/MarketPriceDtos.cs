@@ -1,3 +1,4 @@
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -5,35 +6,35 @@ namespace Tradebook.Core.DTOs;
 [ExportTsInterface]
 public sealed record UpsertMarketPriceRequest(
     DateOnly PriceDate,
-    [property: TsOptional] decimal? TtfEurMwh,
-    [property: TsOptional] decimal? EgsiEtfEurMwh,
-    [property: TsOptional] decimal? TheEurMwh,
-    [property: TsOptional] decimal? BgoEurMwh,
-    [property: TsOptional] decimal? PgoEurMwh,
-    [property: TsOptional] decimal? EuaEurMwh,
-    [property: TsOptional] decimal? WithinDayMktEurMwh,
-    [property: TsOptional] decimal? EurSek,
-    [property: TsOptional] decimal? EurChf,
-    [property: TsOptional] decimal? EurGbp,
-    [property: TsOptional] decimal? EurUsd,
-    [property: TsOptional] decimal? EurDkk,
+    [property: TsOptional] Price? TtfEurMwh,
+    [property: TsOptional] Price? EgsiEtfEurMwh,
+    [property: TsOptional] Price? TheEurMwh,
+    [property: TsOptional] Price? BgoEurMwh,
+    [property: TsOptional] Price? PgoEurMwh,
+    [property: TsOptional] Price? EuaEurMwh,
+    [property: TsOptional] Price? WithinDayMktEurMwh,
+    [property: TsOptional] Amount? EurSek,
+    [property: TsOptional] Amount? EurChf,
+    [property: TsOptional] Amount? EurGbp,
+    [property: TsOptional] Amount? EurUsd,
+    [property: TsOptional] Amount? EurDkk,
     long Version = 0);
 
 [ExportTsInterface]
 public sealed record MarketPriceDetailsDto(
     DateOnly PriceDate,
-    [property: TsOptional] decimal? TtfEurMwh,
-    [property: TsOptional] decimal? EgsiEtfEurMwh,
-    [property: TsOptional] decimal? TheEurMwh,
-    [property: TsOptional] decimal? BgoEurMwh,
-    [property: TsOptional] decimal? PgoEurMwh,
-    [property: TsOptional] decimal? EuaEurMwh,
-    [property: TsOptional] decimal? WithinDayMktEurMwh,
-    [property: TsOptional] decimal? EurSek,
-    [property: TsOptional] decimal? EurChf,
-    [property: TsOptional] decimal? EurGbp,
-    [property: TsOptional] decimal? EurUsd,
-    [property: TsOptional] decimal? EurDkk,
+    [property: TsOptional] Price? TtfEurMwh,
+    [property: TsOptional] Price? EgsiEtfEurMwh,
+    [property: TsOptional] Price? TheEurMwh,
+    [property: TsOptional] Price? BgoEurMwh,
+    [property: TsOptional] Price? PgoEurMwh,
+    [property: TsOptional] Price? EuaEurMwh,
+    [property: TsOptional] Price? WithinDayMktEurMwh,
+    [property: TsOptional] Amount? EurSek,
+    [property: TsOptional] Amount? EurChf,
+    [property: TsOptional] Amount? EurGbp,
+    [property: TsOptional] Amount? EurUsd,
+    [property: TsOptional] Amount? EurDkk,
     long Version, DateTime CreatedAt);
 
 [ExportTsInterface]

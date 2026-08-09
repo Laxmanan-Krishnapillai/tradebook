@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Analytics;
 using Tradebook.Api.Features.Analytics;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 
 namespace Tradebook.Api;
 
@@ -71,4 +73,27 @@ namespace Tradebook.Api;
 [JsonSerializable(typeof(SaveDashboardResponse))]
 [JsonSerializable(typeof(ProblemDetailsResponse))]
 [JsonSerializable(typeof(FastEndpoints.ErrorResponse))]
+[JsonSerializable(typeof(Guid))]
+[JsonSerializable(typeof(decimal))]
+[JsonSerializable(typeof(ContractId))]
+[JsonSerializable(typeof(DeliveryId))]
+[JsonSerializable(typeof(CapacityBookingId))]
+[JsonSerializable(typeof(TransferId))]
+[JsonSerializable(typeof(BioticketDeliveryId))]
+[JsonSerializable(typeof(CounterpartyId))]
+[JsonSerializable(typeof(CompanyId))]
+[JsonSerializable(typeof(TradingPointId))]
+[JsonSerializable(typeof(TaxTariffId))]
+[JsonSerializable(typeof(HedgeId))]
+[JsonSerializable(typeof(MarketPriceId))]
+[JsonSerializable(typeof(CapacityPriceIndexId))]
+[JsonSerializable(typeof(GooCertificateTransactionId))]
+[JsonSerializable(typeof(InvoiceLineItemId))]
+[JsonSerializable(typeof(UserId))]
+[JsonSerializable(typeof(DashboardId))]
+[JsonSerializable(typeof(Tradebook.Core.Domain.ValueObjects.Ids.EventId))]
+[JsonSerializable(typeof(AuditLogId))]
+[JsonSerializable(typeof(Price))]
+[JsonSerializable(typeof(Quantity))]
+[JsonSerializable(typeof(Amount))]
 public partial class AppJsonSerializerContext : JsonSerializerContext;

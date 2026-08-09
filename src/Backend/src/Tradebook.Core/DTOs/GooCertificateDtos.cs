@@ -1,3 +1,5 @@
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,60 +11,60 @@ public sealed record CreateGooCertificateTransactionRequest(
     [property: TsOptional] string? BatchType,
     [property: TsOptional] string? CertificateTransactionId,
     [property: TsOptional] string? CountryOfProduction,
-    [property: TsOptional] Guid? ProducerContractId,
+    [property: TsOptional] ContractId? ProducerContractId,
     [property: TsOptional] string? ProducerCompany,
-    [property: TsOptional] decimal? ProducerGooPriceEurMwh,
+    [property: TsOptional] Price? ProducerGooPriceEurMwh,
     [property: TsOptional] DateOnly? ProductionDate,
-    [property: TsOptional] Guid? CustomerContractId,
+    [property: TsOptional] ContractId? CustomerContractId,
     [property: TsOptional] string? CustomerCompany,
     [property: TsOptional] string? Register,
     [property: TsOptional] string? Status,
     [property: TsOptional] DateOnly? TransactionStartDate,
-    [property: TsOptional] decimal? TransactionVolumeMwh,
-    [property: TsOptional] decimal? VolumeMwh,
+    [property: TsOptional] Quantity? TransactionVolumeMwh,
+    [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? EnergySource,
     [property: TsOptional] string? Text);
 
 [ExportTsInterface]
 public sealed record UpdateGooCertificateTransactionRequest(
-    Guid GooCertificateTransactionId,
+    GooCertificateTransactionId GooCertificateTransactionId,
     [property: TsOptional] string? BatchType,
-    [property: TsOptional] Guid? ProducerContractId,
-    [property: TsOptional] Guid? CustomerContractId,
+    [property: TsOptional] ContractId? ProducerContractId,
+    [property: TsOptional] ContractId? CustomerContractId,
     [property: TsOptional] string? Register,
     [property: TsOptional] string? Status,
     [property: TsOptional] DateOnly? TransactionStartDate,
-    [property: TsOptional] decimal? TransactionVolumeMwh,
-    [property: TsOptional] decimal? VolumeMwh,
+    [property: TsOptional] Quantity? TransactionVolumeMwh,
+    [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? Text,
     long Version);
 
 [ExportTsInterface]
 public sealed record GooCertificateTransactionDetailsDto(
-    Guid GooCertificateTransactionId,
+    GooCertificateTransactionId GooCertificateTransactionId,
     [property: TsOptional] string? SalesforceTransactionId,
     [property: TsOptional] string? TransactionName,
     [property: TsOptional] string? BatchType,
     [property: TsOptional] string? CertificateTransactionId,
     [property: TsOptional] string? CountryOfProduction,
-    [property: TsOptional] Guid? ProducerContractId,
+    [property: TsOptional] ContractId? ProducerContractId,
     [property: TsOptional] string? ProducerCompany,
-    [property: TsOptional] decimal? ProducerGooPriceEurMwh,
+    [property: TsOptional] Price? ProducerGooPriceEurMwh,
     [property: TsOptional] DateOnly? ProductionDate,
-    [property: TsOptional] Guid? CustomerContractId,
+    [property: TsOptional] ContractId? CustomerContractId,
     [property: TsOptional] string? CustomerCompany,
     [property: TsOptional] string? Register,
     [property: TsOptional] string? Status,
     [property: TsOptional] DateOnly? TransactionStartDate,
-    [property: TsOptional] decimal? TransactionVolumeMwh,
-    [property: TsOptional] decimal? VolumeMwh,
+    [property: TsOptional] Quantity? TransactionVolumeMwh,
+    [property: TsOptional] Quantity? VolumeMwh,
     [property: TsOptional] string? EnergySource,
     [property: TsOptional] string? Text,
     long Version, DateTime CreatedAt, DateTime UpdatedAt);
 
 [ExportTsInterface]
 public sealed record GetGooCertificateHistoryRequest(
-    [property: TsOptional] Guid? ContractId,
+    [property: TsOptional] ContractId? ContractId,
     [property: TsOptional] string? Status,
     [property: TsOptional] DateOnly? FromDate,
     [property: TsOptional] DateOnly? ToDate,
@@ -75,8 +77,8 @@ public sealed record GetGooCertificateHistoryResponse(
     int TotalCount, int Page, int PageSize, bool HasNextPage);
 
 [ExportTsInterface]
-public sealed record RequestGooBatchExportRequest(Guid GooCertificateTransactionId, long Version);
+public sealed record RequestGooBatchExportRequest(GooCertificateTransactionId GooCertificateTransactionId, long Version);
 
 [ExportTsInterface]
 public sealed record DeleteGooCertificateTransactionRequest(
-    Guid GooCertificateTransactionId, string Reason, long Version);
+    GooCertificateTransactionId GooCertificateTransactionId, string Reason, long Version);
