@@ -214,7 +214,7 @@ M:System.Double.Parse(System.String);Pass CultureInfo.InvariantCulture explicitl
 | Riok.Mapperly | 4.x | Api / Core | Compile-time DTO↔domain mapping |
 | xunit.analyzers | latest | Test projects | Test authoring correctness |
 
-**Doc links**: [`docs/architecture/decision-log.md`](docs/architecture/decision-log.md) · [Options validation source generator](https://learn.microsoft.com/dotnet/core/extensions/options-validation-generator) · [BannedApiAnalyzers](https://github.com/dotnet/roslyn-analyzers) · [Mapperly](https://mapperly.riok.app) · [CSharpier](https://csharpier.com).
+**Doc links**: [`docs/architecture/decision-log.md`](../architecture/decision-log.md) · [Options validation source generator](https://learn.microsoft.com/dotnet/core/extensions/options-validation-generator) · [BannedApiAnalyzers](https://github.com/dotnet/roslyn-analyzers) · [Mapperly](https://mapperly.riok.app) · [CSharpier](https://csharpier.com).
 
 ---
 
