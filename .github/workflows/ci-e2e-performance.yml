@@ -43,7 +43,7 @@ jobs:
         working-directory: tests/e2e
       - run: npx playwright test --grep-invert @nightly
         working-directory: tests/e2e
-      - uses: grafana/setup-k6-action@v1
+      - uses: grafana/setup-k6-action@v1.2.1
       - name: Authenticate k6
         run: |
           API_JWT=$(curl -fsS -H 'Content-Type: application/json' -d '{"username":"e2e-trader","password":"Tradebook-E2E-Only-2026!"}' http://127.0.0.1:5000/api/v1/auth/login | jq -r .accessToken)
