@@ -404,7 +404,7 @@ export function DeliveriesPage() {
           aria-modal="true"
           aria-label="Create physical delivery"
         >
-          <form onSubmit={submitCreate}>
+          <form onSubmit={(event) => void submitCreate(event)}>
             <h3>Create physical delivery</h3>
             <label>
               Contract ID

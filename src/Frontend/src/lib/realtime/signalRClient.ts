@@ -15,9 +15,9 @@ export const subscribedAggregateTypes = [
   'TaxTariff',
   'Hedge',
 ] as const;
-export type SubscribedAggregateType = (typeof subscribedAggregateTypes)[number];
+type SubscribedAggregateType = (typeof subscribedAggregateTypes)[number];
 export type KnownAggregateType = SubscribedAggregateType | 'WorkspaceDashboard';
-export const dashboardSubscriptionGroups = subscribedAggregateTypes.map(
+const dashboardSubscriptionGroups = subscribedAggregateTypes.map(
   (aggregateType) => `entity:${aggregateType}` as const,
 );
 

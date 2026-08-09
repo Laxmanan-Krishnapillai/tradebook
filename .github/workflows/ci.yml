@@ -147,6 +147,8 @@ jobs:
         working-directory: src/Frontend
       - run: npm run lint
         working-directory: src/Frontend
+      - run: npm run knip
+        working-directory: src/Frontend
       - run: npm run build
         working-directory: src/Frontend
       - run: npm test -- --run

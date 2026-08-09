@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { isEditableTarget } from '../dom/keyboard';
 import { type Command, UndoRedoStack } from './UndoRedoStack';
 
@@ -14,7 +14,7 @@ const CommandStackContext = createContext<CommandStackSession | undefined>(undef
 
 export function CommandStackProvider({ children }: { children: ReactNode }) {
   const stack = useRef(new UndoRedoStack());
-  const [revision, setRevision] = useState(0);
+  const [, setRevision] = useState(0);
   const changed = useCallback(() => setRevision((value) => value + 1), []);
   const execute = useCallback(async (command: Command) => { await stack.current.pushAndExecute(command); changed(); }, [changed]);
   const undo = useCallback(async () => { const applied = await stack.current.undo(); changed(); return applied; }, [changed]);
@@ -30,14 +30,13 @@ export function CommandStackProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('keydown', listener);
   }, [redo, undo]);
 
-  const value = useMemo<CommandStackSession>(() => ({
+  const value: CommandStackSession = {
     execute,
     undo,
     redo,
     canUndo: stack.current.canUndo(),
     canRedo: stack.current.canRedo()
-  // revision deliberately refreshes the derived canUndo/canRedo flags.
-  }), [execute, redo, revision, undo]);
+  };
   return <CommandStackContext.Provider value={value}>{children}</CommandStackContext.Provider>;
 }
 

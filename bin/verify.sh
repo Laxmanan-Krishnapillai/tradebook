@@ -113,7 +113,7 @@ if [ "$DO_FRONTEND" = 1 ]; then
   (
     cd src/Frontend
     if [ ! -d node_modules ]; then npm ci; fi
-    npm run lint && npm run build && npm test -- --run
+    npm run lint && npm run knip && npm run build && npm test -- --run
   ) || fail "frontend gates"
 fi
 

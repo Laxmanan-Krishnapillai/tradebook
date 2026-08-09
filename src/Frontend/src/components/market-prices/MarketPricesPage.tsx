@@ -210,8 +210,8 @@ export function MarketPricesPage() {
           <MarketPriceEditor
             key={row.original.version}
             price={row.original}
-            onSave={save}
-            onDelete={remove}
+            onSave={(price, request) => void save(price, request)}
+            onDelete={(price) => void remove(price)}
           />
         ),
       },
