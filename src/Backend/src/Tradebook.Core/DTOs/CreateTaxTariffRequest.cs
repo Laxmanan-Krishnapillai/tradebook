@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,16 +12,16 @@ public sealed record CreateTaxTariffRequest
 
     [SetsRequiredMembers]
     public CreateTaxTariffRequest(
-        Guid ContractId,
-        Guid? CounterpartyId,
+        ContractId ContractId,
+        CounterpartyId? CounterpartyId,
         DateOnly PeriodStart,
         DateOnly PeriodEnd,
-        decimal? TaxLocalCurMwh,
-        decimal? TsoLocalCurMwh,
-        decimal? DsoLocalCurMwh,
-        decimal? DsoTariffLocalCurDay,
-        decimal? AdmFeeLocalCurMwh,
-        decimal? BalFeeLocalCurMwh,
+        Amount? TaxLocalCurMwh,
+        Amount? TsoLocalCurMwh,
+        Amount? DsoLocalCurMwh,
+        Amount? DsoTariffLocalCurDay,
+        Amount? AdmFeeLocalCurMwh,
+        Amount? BalFeeLocalCurMwh,
         string Currency
     )
     {
@@ -36,29 +38,29 @@ public sealed record CreateTaxTariffRequest
         this.Currency = Currency;
     }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
 
     [TsOptional]
-    public Guid? CounterpartyId { get; init; }
+    public CounterpartyId? CounterpartyId { get; init; }
     public required DateOnly PeriodStart { get; init; }
     public required DateOnly PeriodEnd { get; init; }
 
     [TsOptional]
-    public decimal? TaxLocalCurMwh { get; init; }
+    public Amount? TaxLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? TsoLocalCurMwh { get; init; }
+    public Amount? TsoLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? DsoLocalCurMwh { get; init; }
+    public Amount? DsoLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? DsoTariffLocalCurDay { get; init; }
+    public Amount? DsoTariffLocalCurDay { get; init; }
 
     [TsOptional]
-    public decimal? AdmFeeLocalCurMwh { get; init; }
+    public Amount? AdmFeeLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? BalFeeLocalCurMwh { get; init; }
+    public Amount? BalFeeLocalCurMwh { get; init; }
     public required string Currency { get; init; }
 }

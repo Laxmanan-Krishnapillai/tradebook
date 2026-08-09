@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,9 +12,9 @@ public sealed record CreatePhysicalDeliveryResponse
 
     [SetsRequiredMembers]
     public CreatePhysicalDeliveryResponse(
-        Guid DeliveryId,
+        DeliveryId DeliveryId,
         string ContractInstanceId,
-        decimal? InvoiceAmountEur,
+        Amount? InvoiceAmountEur,
         string Status,
         long Version,
         DateTimeOffset CreatedAt
@@ -26,12 +28,12 @@ public sealed record CreatePhysicalDeliveryResponse
         this.CreatedAt = CreatedAt;
     }
 
-    public required Guid DeliveryId { get; init; }
+    public required DeliveryId DeliveryId { get; init; }
 
     public required string ContractInstanceId { get; init; }
 
     [TsOptional]
-    public decimal? InvoiceAmountEur { get; init; }
+    public Amount? InvoiceAmountEur { get; init; }
 
     public required string Status { get; init; }
 

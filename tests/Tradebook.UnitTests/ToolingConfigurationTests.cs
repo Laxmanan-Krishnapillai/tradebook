@@ -244,6 +244,30 @@ public sealed class ToolingConfigurationTests
         }
     }
 
+    private static void AssertPinnedVersionsMatch(
+        IReadOnlyDictionary<string, string> expectedVersions,
+        XElement[] packageVersions
+    )
+    {
+        foreach (var expected in expectedVersions)
+        {
+            var entry = Assert.Single(
+                packageVersions,
+                element =>
+                    string.Equals(
+                        element.Attribute("Include")?.Value,
+                        expected.Key,
+                        StringComparison.Ordinal
+                    )
+            );
+            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
+            var expectedVersion = string.Equals(expected.Key, "TypeGen", StringComparison.Ordinal)
+                ? "7.0.0"
+                : expected.Value;
+            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
+        }
+    }
+
     [Fact]
     public void CentralPackageManifestEnablesCpmAndPinsEveryReferenceOnce()
     {
@@ -261,7 +285,12 @@ public sealed class ToolingConfigurationTests
         Assert.Equal(expectedVersions.Count + 1, packageVersions.Length);
         var vogen = Assert.Single(
             packageVersions,
-            element => element.Attribute("Include")?.Value == "Vogen"
+            element =>
+                string.Equals(
+                    element.Attribute("Include")?.Value,
+                    "Vogen",
+                    StringComparison.Ordinal
+                )
         );
         Assert.StartsWith("8.", vogen.Attribute("Version")?.Value, StringComparison.Ordinal);
         Assert.Equal(
@@ -271,21 +300,7 @@ public sealed class ToolingConfigurationTests
                 .Distinct(StringComparer.Ordinal)
                 .Count()
         );
-        foreach (var expected in expectedVersions)
-        {
-            var entry = Assert.Single(
-                packageVersions,
-                element =>
-                    string.Equals(
-                        element.Attribute("Include")?.Value,
-                        expected.Key,
-                        StringComparison.Ordinal
-                    )
-            );
-            // TypeGen 5 cannot inspect net10 assemblies; Task 15 requires 7 for Vogen contract mappings.
-            var expectedVersion = expected.Key == "TypeGen" ? "7.0.0" : expected.Value;
-            Assert.Equal(expectedVersion, entry.Attribute("Version")?.Value);
-        }
+        AssertPinnedVersionsMatch(expectedVersions, packageVersions);
 
         var referenceFiles = FindProjectFiles(repositoryRoot)
             .Append(Path.Combine(repositoryRoot, "Directory.Build.props"));

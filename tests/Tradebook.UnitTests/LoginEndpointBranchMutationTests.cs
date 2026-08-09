@@ -31,7 +31,7 @@ public sealed class LoginEndpointBranchMutationTests
         Assert.Equal(user.Id, endpoint.Response.ActorId);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(endpoint.Response.AccessToken);
         Assert.Equal(
-            user.Id.ToString(),
+            user.Id.Value.ToString(),
             token
                 .Claims.Single(claim => string.Equals(claim.Type, "sub", StringComparison.Ordinal))
                 .Value

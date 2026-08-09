@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,7 +11,7 @@ public sealed record DeleteGooCertificateTransactionRequest
 
     [SetsRequiredMembers]
     public DeleteGooCertificateTransactionRequest(
-        Guid GooCertificateTransactionId,
+        GooCertificateTransactionId GooCertificateTransactionId,
         string Reason,
         long Version
     )
@@ -20,7 +21,7 @@ public sealed record DeleteGooCertificateTransactionRequest
         this.Version = Version;
     }
 
-    public required Guid GooCertificateTransactionId { get; init; }
+    public required GooCertificateTransactionId GooCertificateTransactionId { get; init; }
     public required string Reason { get; init; }
     public required long Version { get; init; }
 }

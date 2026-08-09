@@ -61,7 +61,7 @@ public sealed class LoginEndpointUnitTests
         Assert.Equal("TestIssuer", token.Issuer);
         Assert.Contains("TestAudience", token.Audiences, StringComparer.Ordinal);
         Assert.Equal(
-            user.Id.ToString(),
+            user.Id.Value.ToString(),
             token
                 .Claims.Single(claim => string.Equals(claim.Type, "sub", StringComparison.Ordinal))
                 .Value

@@ -7,14 +7,14 @@ namespace Tradebook.ArchitectureTests;
 public sealed class DomainSurfaceArchRuleTests
 {
     [Fact]
-    public void Domain_and_dtos_expose_no_raw_guid_or_decimal_identifier_money_members()
+    public void DomainAndDtosExposeNoRawGuidOrDecimalIdentifierMoneyMembers()
     {
         var violations = typeof(CreateContractRequest)
             .Assembly.GetExportedTypes()
             .Where(type =>
                 type.Namespace?.StartsWith("Tradebook.Core.Domain", StringComparison.Ordinal)
                     == true
-                || type.Namespace == "Tradebook.Core.DTOs"
+                || string.Equals(type.Namespace, "Tradebook.Core.DTOs", StringComparison.Ordinal)
             )
             .SelectMany(type => type.GetProperties(BindingFlags.Instance | BindingFlags.Public))
             .Where(property =>
@@ -32,25 +32,26 @@ public sealed class DomainSurfaceArchRuleTests
         );
     }
 
+    private static readonly string[] GuardedValueNames =
+    [
+        "Price",
+        "Quantity",
+        "Amount",
+        "Total",
+        "Notional",
+        "Rate",
+        "Volume",
+        "Capacity",
+        "Cost",
+        "Revenue",
+        "Vat",
+        "Tariff",
+        "Fee",
+        "Eur",
+    ];
+
     private static bool IsGuardedName(string name) =>
-        name.EndsWith("Id", StringComparison.Ordinal)
-        || new[]
-        {
-            "Price",
-            "Quantity",
-            "Amount",
-            "Total",
-            "Notional",
-            "Rate",
-            "Volume",
-            "Capacity",
-            "Cost",
-            "Revenue",
-            "Vat",
-            "Tariff",
-            "Fee",
-            "Eur",
-        }.Any(name.Contains);
+        name.EndsWith("Id", StringComparison.Ordinal) || GuardedValueNames.Any(name.Contains);
 
     private static bool IsRawPrimitive(Type type) =>
         (Nullable.GetUnderlyingType(type) ?? type) is var underlying

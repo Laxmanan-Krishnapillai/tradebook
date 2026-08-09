@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,13 +12,13 @@ public sealed record CreatePhysicalDeliveryRequest
 
     [SetsRequiredMembers]
     public CreatePhysicalDeliveryRequest(
-        Guid ContractId,
+        ContractId ContractId,
         string? ContractInstanceId,
         string BookType,
         DateOnly SupplyMonth,
-        decimal? CapacityMw,
-        decimal? VolumeNominatedMwh,
-        decimal? VolumeRealisedMwh,
+        Quantity? CapacityMw,
+        Quantity? VolumeNominatedMwh,
+        Quantity? VolumeRealisedMwh,
         string? PriceMechanism,
         DateOnly? StartDay,
         DateOnly? EndDay
@@ -34,7 +36,7 @@ public sealed record CreatePhysicalDeliveryRequest
         this.EndDay = EndDay;
     }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
 
     [TsOptional]
     public string? ContractInstanceId { get; init; }
@@ -44,13 +46,13 @@ public sealed record CreatePhysicalDeliveryRequest
     public required DateOnly SupplyMonth { get; init; }
 
     [TsOptional]
-    public decimal? CapacityMw { get; init; }
+    public Quantity? CapacityMw { get; init; }
 
     [TsOptional]
-    public decimal? VolumeNominatedMwh { get; init; }
+    public Quantity? VolumeNominatedMwh { get; init; }
 
     [TsOptional]
-    public decimal? VolumeRealisedMwh { get; init; }
+    public Quantity? VolumeRealisedMwh { get; init; }
 
     [TsOptional]
     public string? PriceMechanism { get; init; }

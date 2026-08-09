@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,11 +12,11 @@ public sealed record CapacityBookingDetailsDto
 
     [SetsRequiredMembers]
     public CapacityBookingDetailsDto(
-        Guid CapacityBookingId,
-        Guid ContractId,
+        CapacityBookingId CapacityBookingId,
+        ContractId ContractId,
         string ContractInstanceId,
         DateOnly SupplyMonth,
-        Guid? CounterpartyId,
+        CounterpartyId? CounterpartyId,
         string? BalancingGroup,
         string? PriceMechanism,
         string? StartArea,
@@ -23,9 +25,9 @@ public sealed record CapacityBookingDetailsDto
         string? BorderPoint,
         DateOnly? StartDay,
         DateOnly? EndDay,
-        decimal? CapacityMw,
-        decimal? CapacityPriceEurMwh,
-        decimal? CapacityCostEur,
+        Quantity? CapacityMw,
+        Quantity? CapacityPriceEurMwh,
+        Quantity? CapacityCostEur,
         string? Comments,
         long Version,
         DateTime CreatedAt,
@@ -54,13 +56,13 @@ public sealed record CapacityBookingDetailsDto
         this.UpdatedAt = UpdatedAt;
     }
 
-    public required Guid CapacityBookingId { get; init; }
-    public required Guid ContractId { get; init; }
+    public required CapacityBookingId CapacityBookingId { get; init; }
+    public required ContractId ContractId { get; init; }
     public required string ContractInstanceId { get; init; }
     public required DateOnly SupplyMonth { get; init; }
 
     [TsOptional]
-    public Guid? CounterpartyId { get; init; }
+    public CounterpartyId? CounterpartyId { get; init; }
 
     [TsOptional]
     public string? BalancingGroup { get; init; }
@@ -87,13 +89,13 @@ public sealed record CapacityBookingDetailsDto
     public DateOnly? EndDay { get; init; }
 
     [TsOptional]
-    public decimal? CapacityMw { get; init; }
+    public Quantity? CapacityMw { get; init; }
 
     [TsOptional]
-    public decimal? CapacityPriceEurMwh { get; init; }
+    public Quantity? CapacityPriceEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? CapacityCostEur { get; init; }
+    public Quantity? CapacityCostEur { get; init; }
 
     [TsOptional]
     public string? Comments { get; init; }

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,7 +10,7 @@ public sealed record GetContractHistoryRequest
     public GetContractHistoryRequest() { }
 
     public GetContractHistoryRequest(
-        Guid? CounterpartyId,
+        CounterpartyId? CounterpartyId,
         string? ProductType,
         string? Action,
         bool? IsActive,
@@ -26,7 +27,7 @@ public sealed record GetContractHistoryRequest
     }
 
     [TsOptional]
-    public Guid? CounterpartyId { get; init; }
+    public CounterpartyId? CounterpartyId { get; init; }
 
     [TsOptional]
     public string? ProductType { get; init; }

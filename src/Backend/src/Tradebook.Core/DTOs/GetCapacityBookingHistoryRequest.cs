@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,7 +10,7 @@ public sealed record GetCapacityBookingHistoryRequest
     public GetCapacityBookingHistoryRequest() { }
 
     public GetCapacityBookingHistoryRequest(
-        Guid? ContractId,
+        ContractId? ContractId,
         DateOnly? FromMonth,
         DateOnly? ToMonth,
         int Page = 1,
@@ -24,7 +25,7 @@ public sealed record GetCapacityBookingHistoryRequest
     }
 
     [TsOptional]
-    public Guid? ContractId { get; init; }
+    public ContractId? ContractId { get; init; }
 
     [TsOptional]
     public DateOnly? FromMonth { get; init; }

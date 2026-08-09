@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,14 +10,14 @@ public sealed record DeletePhysicalDeliveryRequest
     public DeletePhysicalDeliveryRequest() { }
 
     [SetsRequiredMembers]
-    public DeletePhysicalDeliveryRequest(Guid DeliveryId, string Reason, long Version)
+    public DeletePhysicalDeliveryRequest(DeliveryId DeliveryId, string Reason, long Version)
     {
         this.DeliveryId = DeliveryId;
         this.Reason = Reason;
         this.Version = Version;
     }
 
-    public required Guid DeliveryId { get; init; }
+    public required DeliveryId DeliveryId { get; init; }
 
     public required string Reason { get; init; }
 

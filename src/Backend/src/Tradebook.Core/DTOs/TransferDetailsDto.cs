@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,22 +12,22 @@ public sealed record TransferDetailsDto
 
     [SetsRequiredMembers]
     public TransferDetailsDto(
-        Guid TransferId,
-        Guid ContractId,
+        TransferId TransferId,
+        ContractId ContractId,
         string ContractInstanceId,
         DateOnly SupplyMonth,
-        Guid? CounterpartyId,
+        CounterpartyId? CounterpartyId,
         string? BalancingGroup,
         string? TradingArea,
-        decimal? CapacityMw,
-        decimal? BookedCapacityMw,
-        decimal? VolumeMwh,
-        decimal? BalancingEffectMwh,
+        Quantity? CapacityMw,
+        Quantity? BookedCapacityMw,
+        Quantity? VolumeMwh,
+        Quantity? BalancingEffectMwh,
         DateOnly? StartDay,
         DateOnly? EndDay,
         string? PriceMechanism,
-        decimal? TransportCostEurMwh,
-        decimal? CapacityCostEurMwh,
+        Amount? TransportCostEurMwh,
+        Quantity? CapacityCostEurMwh,
         string? Status,
         string? Comments,
         long Version,
@@ -56,13 +58,13 @@ public sealed record TransferDetailsDto
         this.UpdatedAt = UpdatedAt;
     }
 
-    public required Guid TransferId { get; init; }
-    public required Guid ContractId { get; init; }
+    public required TransferId TransferId { get; init; }
+    public required ContractId ContractId { get; init; }
     public required string ContractInstanceId { get; init; }
     public required DateOnly SupplyMonth { get; init; }
 
     [TsOptional]
-    public Guid? CounterpartyId { get; init; }
+    public CounterpartyId? CounterpartyId { get; init; }
 
     [TsOptional]
     public string? BalancingGroup { get; init; }
@@ -71,16 +73,16 @@ public sealed record TransferDetailsDto
     public string? TradingArea { get; init; }
 
     [TsOptional]
-    public decimal? CapacityMw { get; init; }
+    public Quantity? CapacityMw { get; init; }
 
     [TsOptional]
-    public decimal? BookedCapacityMw { get; init; }
+    public Quantity? BookedCapacityMw { get; init; }
 
     [TsOptional]
-    public decimal? VolumeMwh { get; init; }
+    public Quantity? VolumeMwh { get; init; }
 
     [TsOptional]
-    public decimal? BalancingEffectMwh { get; init; }
+    public Quantity? BalancingEffectMwh { get; init; }
 
     [TsOptional]
     public DateOnly? StartDay { get; init; }
@@ -92,10 +94,10 @@ public sealed record TransferDetailsDto
     public string? PriceMechanism { get; init; }
 
     [TsOptional]
-    public decimal? TransportCostEurMwh { get; init; }
+    public Amount? TransportCostEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? CapacityCostEurMwh { get; init; }
+    public Quantity? CapacityCostEurMwh { get; init; }
 
     [TsOptional]
     public string? Status { get; init; }

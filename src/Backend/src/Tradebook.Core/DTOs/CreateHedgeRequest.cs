@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,10 +12,10 @@ public sealed record CreateHedgeRequest
 
     [SetsRequiredMembers]
     public CreateHedgeRequest(
-        Guid ContractId,
+        ContractId ContractId,
         DateOnly Month,
-        decimal? HedgeAmountMwh,
-        decimal? HedgePriceEurMwh
+        Quantity? HedgeAmountMwh,
+        Price? HedgePriceEurMwh
     )
     {
         this.ContractId = ContractId;
@@ -22,13 +24,13 @@ public sealed record CreateHedgeRequest
         this.HedgePriceEurMwh = HedgePriceEurMwh;
     }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
 
     public required DateOnly Month { get; init; }
 
     [TsOptional]
-    public decimal? HedgeAmountMwh { get; init; }
+    public Quantity? HedgeAmountMwh { get; init; }
 
     [TsOptional]
-    public decimal? HedgePriceEurMwh { get; init; }
+    public Price? HedgePriceEurMwh { get; init; }
 }

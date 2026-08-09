@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -11,7 +13,7 @@ public sealed record CreateContractRequest
     [SetsRequiredMembers]
     public CreateContractRequest(
         string ContractName,
-        Guid CounterpartyId,
+        CounterpartyId CounterpartyId,
         string ProductType,
         string Action,
         string? CompanyShorthand,
@@ -19,13 +21,13 @@ public sealed record CreateContractRequest
         short? CountryDialCode,
         short? ContractNumber,
         short? YearOfContract,
-        Guid? SourcingCenter,
-        Guid? SalesCenter,
+        CompanyId? SourcingCenter,
+        CompanyId? SalesCenter,
         string? BalancingGroup,
         string? GooQuality,
         string? SubsidyStatus,
         string? PriceMechanismGas,
-        decimal? FixedPriceGasEurMwh,
+        Price? FixedPriceGasEurMwh,
         string? ContractType,
         string? Comment
     )
@@ -51,7 +53,7 @@ public sealed record CreateContractRequest
     }
 
     public required string ContractName { get; init; }
-    public required Guid CounterpartyId { get; init; }
+    public required CounterpartyId CounterpartyId { get; init; }
     public required string ProductType { get; init; }
     public required string Action { get; init; }
 
@@ -71,10 +73,10 @@ public sealed record CreateContractRequest
     public short? YearOfContract { get; init; }
 
     [TsOptional]
-    public Guid? SourcingCenter { get; init; }
+    public CompanyId? SourcingCenter { get; init; }
 
     [TsOptional]
-    public Guid? SalesCenter { get; init; }
+    public CompanyId? SalesCenter { get; init; }
 
     [TsOptional]
     public string? BalancingGroup { get; init; }
@@ -89,7 +91,7 @@ public sealed record CreateContractRequest
     public string? PriceMechanismGas { get; init; }
 
     [TsOptional]
-    public decimal? FixedPriceGasEurMwh { get; init; }
+    public Price? FixedPriceGasEurMwh { get; init; }
 
     [TsOptional]
     public string? ContractType { get; init; }

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,7 +10,7 @@ public sealed record GetDeliveryHistoryRequest
     public GetDeliveryHistoryRequest() { }
 
     public GetDeliveryHistoryRequest(
-        Guid? ContractId,
+        ContractId? ContractId,
         string? ContractInstanceId,
         string? BookType,
         string? Status,
@@ -30,7 +31,7 @@ public sealed record GetDeliveryHistoryRequest
     }
 
     [TsOptional]
-    public Guid? ContractId { get; init; }
+    public ContractId? ContractId { get; init; }
 
     [TsOptional]
     public string? ContractInstanceId { get; init; }

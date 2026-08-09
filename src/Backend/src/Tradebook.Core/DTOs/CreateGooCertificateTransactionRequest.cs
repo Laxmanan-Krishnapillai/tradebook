@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -14,17 +16,17 @@ public sealed record CreateGooCertificateTransactionRequest
         string? BatchType,
         string? CertificateTransactionId,
         string? CountryOfProduction,
-        Guid? ProducerContractId,
+        ContractId? ProducerContractId,
         string? ProducerCompany,
-        decimal? ProducerGooPriceEurMwh,
+        Price? ProducerGooPriceEurMwh,
         DateOnly? ProductionDate,
-        Guid? CustomerContractId,
+        ContractId? CustomerContractId,
         string? CustomerCompany,
         string? Register,
         string? Status,
         DateOnly? TransactionStartDate,
-        decimal? TransactionVolumeMwh,
-        decimal? VolumeMwh,
+        Quantity? TransactionVolumeMwh,
+        Quantity? VolumeMwh,
         string? EnergySource,
         string? Text
     )
@@ -65,19 +67,19 @@ public sealed record CreateGooCertificateTransactionRequest
     public string? CountryOfProduction { get; init; }
 
     [TsOptional]
-    public Guid? ProducerContractId { get; init; }
+    public ContractId? ProducerContractId { get; init; }
 
     [TsOptional]
     public string? ProducerCompany { get; init; }
 
     [TsOptional]
-    public decimal? ProducerGooPriceEurMwh { get; init; }
+    public Price? ProducerGooPriceEurMwh { get; init; }
 
     [TsOptional]
     public DateOnly? ProductionDate { get; init; }
 
     [TsOptional]
-    public Guid? CustomerContractId { get; init; }
+    public ContractId? CustomerContractId { get; init; }
 
     [TsOptional]
     public string? CustomerCompany { get; init; }
@@ -92,10 +94,10 @@ public sealed record CreateGooCertificateTransactionRequest
     public DateOnly? TransactionStartDate { get; init; }
 
     [TsOptional]
-    public decimal? TransactionVolumeMwh { get; init; }
+    public Quantity? TransactionVolumeMwh { get; init; }
 
     [TsOptional]
-    public decimal? VolumeMwh { get; init; }
+    public Quantity? VolumeMwh { get; init; }
 
     [TsOptional]
     public string? EnergySource { get; init; }

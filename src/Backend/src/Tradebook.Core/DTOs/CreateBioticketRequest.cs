@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,20 +12,20 @@ public sealed record CreateBioticketRequest
 
     [SetsRequiredMembers]
     public CreateBioticketRequest(
-        Guid ContractId,
+        ContractId ContractId,
         string BookType,
         DateOnly ContractMonth,
         string? ContractInstanceId,
         DateOnly? StartDay,
         DateOnly? EndDay,
-        decimal? VolumeNominatedTon,
-        decimal? VolumeRealisedTon,
-        decimal? VolumeTon,
-        decimal? CostEurTon,
-        decimal? RevenueEur,
-        decimal? VatPct,
-        decimal? VatEur,
-        decimal? InvoiceAmountEur,
+        Quantity? VolumeNominatedTon,
+        Quantity? VolumeRealisedTon,
+        Quantity? VolumeTon,
+        Amount? CostEurTon,
+        Amount? RevenueEur,
+        Amount? VatPct,
+        Amount? VatEur,
+        Amount? InvoiceAmountEur,
         string? Status,
         string? Comment
     )
@@ -46,7 +48,7 @@ public sealed record CreateBioticketRequest
         this.Comment = Comment;
     }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
     public required string BookType { get; init; }
     public required DateOnly ContractMonth { get; init; }
 
@@ -60,28 +62,28 @@ public sealed record CreateBioticketRequest
     public DateOnly? EndDay { get; init; }
 
     [TsOptional]
-    public decimal? VolumeNominatedTon { get; init; }
+    public Quantity? VolumeNominatedTon { get; init; }
 
     [TsOptional]
-    public decimal? VolumeRealisedTon { get; init; }
+    public Quantity? VolumeRealisedTon { get; init; }
 
     [TsOptional]
-    public decimal? VolumeTon { get; init; }
+    public Quantity? VolumeTon { get; init; }
 
     [TsOptional]
-    public decimal? CostEurTon { get; init; }
+    public Amount? CostEurTon { get; init; }
 
     [TsOptional]
-    public decimal? RevenueEur { get; init; }
+    public Amount? RevenueEur { get; init; }
 
     [TsOptional]
-    public decimal? VatPct { get; init; }
+    public Amount? VatPct { get; init; }
 
     [TsOptional]
-    public decimal? VatEur { get; init; }
+    public Amount? VatEur { get; init; }
 
     [TsOptional]
-    public decimal? InvoiceAmountEur { get; init; }
+    public Amount? InvoiceAmountEur { get; init; }
 
     [TsOptional]
     public string? Status { get; init; }

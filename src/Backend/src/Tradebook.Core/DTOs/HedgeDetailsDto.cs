@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,11 +12,11 @@ public sealed record HedgeDetailsDto
 
     [SetsRequiredMembers]
     public HedgeDetailsDto(
-        Guid HedgeId,
-        Guid ContractId,
+        HedgeId HedgeId,
+        ContractId ContractId,
         DateOnly Month,
-        decimal? HedgeAmountMwh,
-        decimal? HedgePriceEurMwh,
+        Quantity? HedgeAmountMwh,
+        Price? HedgePriceEurMwh,
         long Version,
         DateTime CreatedAt,
         DateTime UpdatedAt
@@ -30,17 +32,17 @@ public sealed record HedgeDetailsDto
         this.UpdatedAt = UpdatedAt;
     }
 
-    public required Guid HedgeId { get; init; }
+    public required HedgeId HedgeId { get; init; }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
 
     public required DateOnly Month { get; init; }
 
     [TsOptional]
-    public decimal? HedgeAmountMwh { get; init; }
+    public Quantity? HedgeAmountMwh { get; init; }
 
     [TsOptional]
-    public decimal? HedgePriceEurMwh { get; init; }
+    public Price? HedgePriceEurMwh { get; init; }
 
     public required long Version { get; init; }
 

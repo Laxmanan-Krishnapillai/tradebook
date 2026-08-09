@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,13 +12,13 @@ public sealed record UpdateTaxTariffRequest
 
     [SetsRequiredMembers]
     public UpdateTaxTariffRequest(
-        Guid TaxTariffId,
-        decimal? TaxLocalCurMwh,
-        decimal? TsoLocalCurMwh,
-        decimal? DsoLocalCurMwh,
-        decimal? DsoTariffLocalCurDay,
-        decimal? AdmFeeLocalCurMwh,
-        decimal? BalFeeLocalCurMwh,
+        TaxTariffId TaxTariffId,
+        Amount? TaxLocalCurMwh,
+        Amount? TsoLocalCurMwh,
+        Amount? DsoLocalCurMwh,
+        Amount? DsoTariffLocalCurDay,
+        Amount? AdmFeeLocalCurMwh,
+        Amount? BalFeeLocalCurMwh,
         string Currency,
         long Version
     )
@@ -32,25 +34,25 @@ public sealed record UpdateTaxTariffRequest
         this.Version = Version;
     }
 
-    public required Guid TaxTariffId { get; init; }
+    public required TaxTariffId TaxTariffId { get; init; }
 
     [TsOptional]
-    public decimal? TaxLocalCurMwh { get; init; }
+    public Amount? TaxLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? TsoLocalCurMwh { get; init; }
+    public Amount? TsoLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? DsoLocalCurMwh { get; init; }
+    public Amount? DsoLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? DsoTariffLocalCurDay { get; init; }
+    public Amount? DsoTariffLocalCurDay { get; init; }
 
     [TsOptional]
-    public decimal? AdmFeeLocalCurMwh { get; init; }
+    public Amount? AdmFeeLocalCurMwh { get; init; }
 
     [TsOptional]
-    public decimal? BalFeeLocalCurMwh { get; init; }
+    public Amount? BalFeeLocalCurMwh { get; init; }
     public required string Currency { get; init; }
     public required long Version { get; init; }
 }

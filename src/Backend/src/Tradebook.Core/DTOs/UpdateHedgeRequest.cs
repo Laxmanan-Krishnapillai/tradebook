@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,9 +12,9 @@ public sealed record UpdateHedgeRequest
 
     [SetsRequiredMembers]
     public UpdateHedgeRequest(
-        Guid HedgeId,
-        decimal? HedgeAmountMwh,
-        decimal? HedgePriceEurMwh,
+        HedgeId HedgeId,
+        Quantity? HedgeAmountMwh,
+        Price? HedgePriceEurMwh,
         long Version
     )
     {
@@ -22,13 +24,13 @@ public sealed record UpdateHedgeRequest
         this.Version = Version;
     }
 
-    public required Guid HedgeId { get; init; }
+    public required HedgeId HedgeId { get; init; }
 
     [TsOptional]
-    public decimal? HedgeAmountMwh { get; init; }
+    public Quantity? HedgeAmountMwh { get; init; }
 
     [TsOptional]
-    public decimal? HedgePriceEurMwh { get; init; }
+    public Price? HedgePriceEurMwh { get; init; }
 
     public required long Version { get; init; }
 }

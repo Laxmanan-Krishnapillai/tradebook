@@ -10,7 +10,7 @@ public sealed class VogenDapperRoundTripTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Vogen_values_round_trip_through_postgresql_17_without_manual_unwrapping()
+    public async Task VogenValuesRoundTripThroughPostgresql17WithoutManualUnwrapping()
     {
         VogenTypeHandlers.RegisterAll();
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);

@@ -1,0 +1,13 @@
+using System.Data;
+using System.Globalization;
+using Dapper;
+using Tradebook.Core.Domain.ValueObjects.Money;
+
+namespace Tradebook.Infrastructure.Data;
+
+internal sealed class QuantityTypeHandler : MoneyTypeHandler<Quantity>
+{
+    protected override Quantity FromDecimal(decimal value) => Quantity.From(value);
+
+    protected override decimal ToDecimal(Quantity value) => value.Value;
+}

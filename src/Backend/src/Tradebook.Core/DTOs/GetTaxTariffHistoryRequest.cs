@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,7 +10,7 @@ public sealed record GetTaxTariffHistoryRequest
     public GetTaxTariffHistoryRequest() { }
 
     public GetTaxTariffHistoryRequest(
-        Guid? ContractId,
+        ContractId? ContractId,
         DateOnly? EffectiveOn,
         int Page = 1,
         int PageSize = 50
@@ -22,7 +23,7 @@ public sealed record GetTaxTariffHistoryRequest
     }
 
     [TsOptional]
-    public Guid? ContractId { get; init; }
+    public ContractId? ContractId { get; init; }
 
     [TsOptional]
     public DateOnly? EffectiveOn { get; init; }

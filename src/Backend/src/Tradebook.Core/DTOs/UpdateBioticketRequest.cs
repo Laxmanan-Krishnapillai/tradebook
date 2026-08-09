@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,14 +12,14 @@ public sealed record UpdateBioticketRequest
 
     [SetsRequiredMembers]
     public UpdateBioticketRequest(
-        Guid BioticketId,
-        decimal? VolumeRealisedTon,
-        decimal? VolumeTon,
-        decimal? CostEurTon,
-        decimal? RevenueEur,
-        decimal? VatPct,
-        decimal? VatEur,
-        decimal? InvoiceAmountEur,
+        BioticketDeliveryId BioticketId,
+        Quantity? VolumeRealisedTon,
+        Quantity? VolumeTon,
+        Amount? CostEurTon,
+        Amount? RevenueEur,
+        Amount? VatPct,
+        Amount? VatEur,
+        Amount? InvoiceAmountEur,
         string? Status,
         string? Comment,
         long Version
@@ -36,28 +38,28 @@ public sealed record UpdateBioticketRequest
         this.Version = Version;
     }
 
-    public required Guid BioticketId { get; init; }
+    public required BioticketDeliveryId BioticketId { get; init; }
 
     [TsOptional]
-    public decimal? VolumeRealisedTon { get; init; }
+    public Quantity? VolumeRealisedTon { get; init; }
 
     [TsOptional]
-    public decimal? VolumeTon { get; init; }
+    public Quantity? VolumeTon { get; init; }
 
     [TsOptional]
-    public decimal? CostEurTon { get; init; }
+    public Amount? CostEurTon { get; init; }
 
     [TsOptional]
-    public decimal? RevenueEur { get; init; }
+    public Amount? RevenueEur { get; init; }
 
     [TsOptional]
-    public decimal? VatPct { get; init; }
+    public Amount? VatPct { get; init; }
 
     [TsOptional]
-    public decimal? VatEur { get; init; }
+    public Amount? VatEur { get; init; }
 
     [TsOptional]
-    public decimal? InvoiceAmountEur { get; init; }
+    public Amount? InvoiceAmountEur { get; init; }
 
     [TsOptional]
     public string? Status { get; init; }

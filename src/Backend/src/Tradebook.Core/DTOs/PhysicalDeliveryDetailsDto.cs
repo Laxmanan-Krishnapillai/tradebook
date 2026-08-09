@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,20 +12,20 @@ public sealed record PhysicalDeliveryDetailsDto
 
     [SetsRequiredMembers]
     public PhysicalDeliveryDetailsDto(
-        Guid DeliveryId,
-        Guid ContractId,
+        DeliveryId DeliveryId,
+        ContractId ContractId,
         string ContractInstanceId,
         string BookType,
         DateOnly SupplyMonth,
-        decimal? CapacityMw,
-        decimal? VolumeNominatedMwh,
-        decimal? VolumeRealisedMwh,
-        decimal? VolumeMwh,
+        Quantity? CapacityMw,
+        Quantity? VolumeNominatedMwh,
+        Quantity? VolumeRealisedMwh,
+        Quantity? VolumeMwh,
         string? PriceMechanism,
-        decimal? RevenueEur,
-        decimal? SubtotalEur,
-        decimal? VatEur,
-        decimal? InvoiceAmountEur,
+        Amount? RevenueEur,
+        Amount? SubtotalEur,
+        Amount? VatEur,
+        Amount? InvoiceAmountEur,
         string Status,
         long Version,
         DateTimeOffset CreatedAt,
@@ -50,9 +52,9 @@ public sealed record PhysicalDeliveryDetailsDto
         this.UpdatedAt = UpdatedAt;
     }
 
-    public required Guid DeliveryId { get; init; }
+    public required DeliveryId DeliveryId { get; init; }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
 
     public required string ContractInstanceId { get; init; }
 
@@ -61,31 +63,31 @@ public sealed record PhysicalDeliveryDetailsDto
     public required DateOnly SupplyMonth { get; init; }
 
     [TsOptional]
-    public decimal? CapacityMw { get; init; }
+    public Quantity? CapacityMw { get; init; }
 
     [TsOptional]
-    public decimal? VolumeNominatedMwh { get; init; }
+    public Quantity? VolumeNominatedMwh { get; init; }
 
     [TsOptional]
-    public decimal? VolumeRealisedMwh { get; init; }
+    public Quantity? VolumeRealisedMwh { get; init; }
 
     [TsOptional]
-    public decimal? VolumeMwh { get; init; }
+    public Quantity? VolumeMwh { get; init; }
 
     [TsOptional]
     public string? PriceMechanism { get; init; }
 
     [TsOptional]
-    public decimal? RevenueEur { get; init; }
+    public Amount? RevenueEur { get; init; }
 
     [TsOptional]
-    public decimal? SubtotalEur { get; init; }
+    public Amount? SubtotalEur { get; init; }
 
     [TsOptional]
-    public decimal? VatEur { get; init; }
+    public Amount? VatEur { get; init; }
 
     [TsOptional]
-    public decimal? InvoiceAmountEur { get; init; }
+    public Amount? InvoiceAmountEur { get; init; }
 
     public required string Status { get; init; }
 

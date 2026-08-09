@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,21 +12,21 @@ public sealed record UpdateContractRequest
 
     [SetsRequiredMembers]
     public UpdateContractRequest(
-        Guid ContractId,
+        ContractId ContractId,
         string ContractName,
-        Guid CounterpartyId,
+        CounterpartyId CounterpartyId,
         string ProductType,
         string Action,
         string? CompanyShorthand,
         string? CountryCode,
         short? CountryDialCode,
-        Guid? SourcingCenter,
-        Guid? SalesCenter,
+        CompanyId? SourcingCenter,
+        CompanyId? SalesCenter,
         string? BalancingGroup,
         string? GooQuality,
         string? SubsidyStatus,
         string? PriceMechanismGas,
-        decimal? FixedPriceGasEurMwh,
+        Price? FixedPriceGasEurMwh,
         string? ContractType,
         string? Comment,
         bool? IsActive,
@@ -52,9 +54,9 @@ public sealed record UpdateContractRequest
         this.Version = Version;
     }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
     public required string ContractName { get; init; }
-    public required Guid CounterpartyId { get; init; }
+    public required CounterpartyId CounterpartyId { get; init; }
     public required string ProductType { get; init; }
     public required string Action { get; init; }
 
@@ -68,10 +70,10 @@ public sealed record UpdateContractRequest
     public short? CountryDialCode { get; init; }
 
     [TsOptional]
-    public Guid? SourcingCenter { get; init; }
+    public CompanyId? SourcingCenter { get; init; }
 
     [TsOptional]
-    public Guid? SalesCenter { get; init; }
+    public CompanyId? SalesCenter { get; init; }
 
     [TsOptional]
     public string? BalancingGroup { get; init; }
@@ -86,7 +88,7 @@ public sealed record UpdateContractRequest
     public string? PriceMechanismGas { get; init; }
 
     [TsOptional]
-    public decimal? FixedPriceGasEurMwh { get; init; }
+    public Price? FixedPriceGasEurMwh { get; init; }
 
     [TsOptional]
     public string? ContractType { get; init; }

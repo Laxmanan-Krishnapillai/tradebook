@@ -72,7 +72,7 @@ public sealed class MapperlyMappingTests
 
         var response = LoginMapper.ToResponse(user, "signed-token", expiresAt);
 
-        Assert.Equal(actorId, response.ActorId);
+        Assert.Equal(actorId, response.ActorId.Value);
         Assert.Equal("signed-token", response.AccessToken);
         Assert.Equal(expiresAt, response.ExpiresAtUtc);
     }
@@ -98,7 +98,7 @@ public sealed class MapperlyMappingTests
 
         var response = PhysicalDeliveryMapper.ToResponse(details);
 
-        Assert.Equal(deliveryId, response.DeliveryId);
+        Assert.Equal(deliveryId, response.DeliveryId.Value);
         Assert.Equal(details.ContractInstanceId, response.ContractInstanceId);
         Assert.Equal(details.InvoiceAmountEur, response.InvoiceAmountEur);
         Assert.Equal(details.Status, response.Status);
@@ -114,7 +114,7 @@ public sealed class MapperlyMappingTests
 
         var response = DashboardMapper.ToResponse(row, dashboardId);
 
-        Assert.Equal(dashboardId, response.DashboardId);
+        Assert.Equal(dashboardId, response.DashboardId.Value);
         Assert.Equal(4, response.Version);
         Assert.Equal(JsonValueKind.Object, response.Layout.ValueKind);
         Assert.Equal(4, response.Layout.GetProperty("version").GetInt64());

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,7 +10,7 @@ public sealed record GetBioticketHistoryRequest
     public GetBioticketHistoryRequest() { }
 
     public GetBioticketHistoryRequest(
-        Guid? ContractId,
+        ContractId? ContractId,
         string? BookType,
         string? Status,
         DateOnly? FromMonth,
@@ -28,7 +29,7 @@ public sealed record GetBioticketHistoryRequest
     }
 
     [TsOptional]
-    public Guid? ContractId { get; init; }
+    public ContractId? ContractId { get; init; }
 
     [TsOptional]
     public string? BookType { get; init; }

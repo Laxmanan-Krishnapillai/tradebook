@@ -218,7 +218,7 @@ public sealed class DeliveryRepository(INpgsqlConnectionFactory connections) : I
                     connection,
                     transaction,
                     OutboxAggregateTypes.PhysicalDelivery,
-                    request.DeliveryId.ToString(),
+                    request.DeliveryId.Value.ToString(),
                     "Updated",
                     details.Version,
                     null,

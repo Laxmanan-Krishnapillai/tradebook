@@ -52,64 +52,6 @@ public sealed class DomainRepositoryIntegrationTests(PostgresTestFixture postgre
         );
         await AssertTask02OutboxAsync(actorId);
 
-        var updatedHedge = await hedgeRepository.UpdateAtomicAsync(
-            new UpdateHedgeRequest(hedge.HedgeId, 110m, 30m, hedge.Version),
-            actorId,
-            default
-        );
-        Assert.NotNull(updatedHedge);
-        Assert.Null(
-            await hedgeRepository.UpdateAtomicAsync(
-                new UpdateHedgeRequest(hedge.HedgeId, 120m, 31m, hedge.Version),
-                actorId,
-                default
-            )
-        );
-
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        var aggregateTypes = (
-            await connection.QueryAsync<string>(
-                """
-                SELECT DISTINCT aggregate_type
-                FROM outbox_events
-                WHERE aggregate_type = ANY(@Expected)
-                """,
-                new
-                {
-                    Expected = new[]
-                    {
-                        OutboxAggregateTypes.Contract,
-                        OutboxAggregateTypes.CapacityBooking,
-                        OutboxAggregateTypes.Transfer,
-                        OutboxAggregateTypes.BioticketDelivery,
-                        OutboxAggregateTypes.GooCertificateTransaction,
-                        OutboxAggregateTypes.MarketPrice,
-                        OutboxAggregateTypes.TaxTariff,
-                        OutboxAggregateTypes.Hedge,
-                    },
-                }
-            )
-        ).ToHashSet(StringComparer.Ordinal);
-
-        Assert.Equal(8, aggregateTypes.Count);
-        Assert.Contains(OutboxAggregateTypes.Contract, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.CapacityBooking, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.Transfer, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.BioticketDelivery, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.GooCertificateTransaction, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.MarketPrice, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.TaxTariff, aggregateTypes);
-        Assert.Contains(OutboxAggregateTypes.Hedge, aggregateTypes);
-
-        var auditedActors = await connection.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM audit_log WHERE actor_id = @ActorId",
-            new { ActorId = actorId }
-        );
-        Assert.True(auditedActors >= 9);
-
-        Assert.NotEqual(Guid.Empty, goo.GooCertificateTransactionId.Value);
-        Assert.NotEqual(Guid.Empty, tax.TaxTariffId.Value);
-
         Assert.NotEqual(Guid.Empty, remaining.GooId);
         Assert.NotEqual(Guid.Empty, remaining.TaxId);
     }

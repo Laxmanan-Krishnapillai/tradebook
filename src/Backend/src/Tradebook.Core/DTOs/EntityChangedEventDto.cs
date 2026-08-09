@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,7 +11,7 @@ public sealed record EntityChangedEventDto
 
     [SetsRequiredMembers]
     public EntityChangedEventDto(
-        Guid EventId,
+        EventId EventId,
         long SequenceId,
         string AggregateType,
         string AggregateId,
@@ -26,7 +27,7 @@ public sealed record EntityChangedEventDto
         this.PayloadJson = PayloadJson;
     }
 
-    public required Guid EventId { get; init; }
+    public required EventId EventId { get; init; }
 
     public required long SequenceId { get; init; }
 

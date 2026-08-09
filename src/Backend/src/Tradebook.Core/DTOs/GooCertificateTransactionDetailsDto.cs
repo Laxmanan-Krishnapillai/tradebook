@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,23 +12,23 @@ public sealed record GooCertificateTransactionDetailsDto
 
     [SetsRequiredMembers]
     public GooCertificateTransactionDetailsDto(
-        Guid GooCertificateTransactionId,
+        GooCertificateTransactionId GooCertificateTransactionId,
         string? SalesforceTransactionId,
         string? TransactionName,
         string? BatchType,
         string? CertificateTransactionId,
         string? CountryOfProduction,
-        Guid? ProducerContractId,
+        ContractId? ProducerContractId,
         string? ProducerCompany,
-        decimal? ProducerGooPriceEurMwh,
+        Price? ProducerGooPriceEurMwh,
         DateOnly? ProductionDate,
-        Guid? CustomerContractId,
+        ContractId? CustomerContractId,
         string? CustomerCompany,
         string? Register,
         string? Status,
         DateOnly? TransactionStartDate,
-        decimal? TransactionVolumeMwh,
-        decimal? VolumeMwh,
+        Quantity? TransactionVolumeMwh,
+        Quantity? VolumeMwh,
         string? EnergySource,
         string? Text,
         long Version,
@@ -58,7 +60,7 @@ public sealed record GooCertificateTransactionDetailsDto
         this.UpdatedAt = UpdatedAt;
     }
 
-    public required Guid GooCertificateTransactionId { get; init; }
+    public required GooCertificateTransactionId GooCertificateTransactionId { get; init; }
 
     [TsOptional]
     public string? SalesforceTransactionId { get; init; }
@@ -76,19 +78,19 @@ public sealed record GooCertificateTransactionDetailsDto
     public string? CountryOfProduction { get; init; }
 
     [TsOptional]
-    public Guid? ProducerContractId { get; init; }
+    public ContractId? ProducerContractId { get; init; }
 
     [TsOptional]
     public string? ProducerCompany { get; init; }
 
     [TsOptional]
-    public decimal? ProducerGooPriceEurMwh { get; init; }
+    public Price? ProducerGooPriceEurMwh { get; init; }
 
     [TsOptional]
     public DateOnly? ProductionDate { get; init; }
 
     [TsOptional]
-    public Guid? CustomerContractId { get; init; }
+    public ContractId? CustomerContractId { get; init; }
 
     [TsOptional]
     public string? CustomerCompany { get; init; }
@@ -103,10 +105,10 @@ public sealed record GooCertificateTransactionDetailsDto
     public DateOnly? TransactionStartDate { get; init; }
 
     [TsOptional]
-    public decimal? TransactionVolumeMwh { get; init; }
+    public Quantity? TransactionVolumeMwh { get; init; }
 
     [TsOptional]
-    public decimal? VolumeMwh { get; init; }
+    public Quantity? VolumeMwh { get; init; }
 
     [TsOptional]
     public string? EnergySource { get; init; }

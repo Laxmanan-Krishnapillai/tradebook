@@ -13,7 +13,7 @@ namespace Tradebook.UnitTests;
 public sealed class DomainPrimitiveTests
 {
     [Fact]
-    public void Price_rejects_negative_values_and_scale_above_four()
+    public void PriceRejectsNegativeValuesAndScaleAboveFour()
     {
         Assert.Throws<TradebookDomainException>(() => Price.From(-0.0001m));
         Assert.Throws<TradebookDomainException>(() => Price.From(1.00001m));
@@ -21,21 +21,21 @@ public sealed class DomainPrimitiveTests
     }
 
     [Fact]
-    public void Quantity_rejects_scale_above_eight_but_allows_negative_corrections()
+    public void QuantityRejectsScaleAboveEightButAllowsNegativeCorrections()
     {
         Assert.Throws<TradebookDomainException>(() => Quantity.From(1.000000001m));
         Assert.Equal(-1.00000001m, Quantity.From(-1.00000001m).Value);
     }
 
     [Fact]
-    public void Amount_rejects_scale_above_four()
+    public void AmountRejectsScaleAboveFour()
     {
         Assert.Throws<TradebookDomainException>(() => Amount.From(0.00001m));
         Assert.Equal(-12.3456m, Amount.From(-12.3456m).Value);
     }
 
     [Fact]
-    public void Identifier_types_reject_empty_and_are_not_assignment_compatible()
+    public void IdentifierTypesRejectEmptyAndAreNotAssignmentCompatible()
     {
         Assert.Throws<TradebookDomainException>(() => ContractId.From(Guid.Empty));
         Assert.NotEqual(typeof(ContractId), typeof(CounterpartyId));
@@ -70,7 +70,7 @@ public sealed class DomainPrimitiveTests
 
     [Theory]
     [MemberData(nameof(ValueObjects))]
-    public void Every_value_object_round_trips_as_its_primitive_with_source_generated_json(
+    public void EveryValueObjectRoundTripsAsItsPrimitiveWithSourceGeneratedJson(
         object value,
         Type type
     )
@@ -87,7 +87,7 @@ public sealed class DomainPrimitiveTests
     }
 
     [Fact]
-    public void Every_value_object_has_a_registered_dapper_handler()
+    public void EveryValueObjectHasARegisteredDapperHandler()
     {
         VogenTypeHandlers.RegisterAll();
 
@@ -102,7 +102,7 @@ public sealed class DomainPrimitiveTests
     }
 
     [Fact]
-    public void MessagePack_resolver_round_trips_identifier_money_and_quantity_primitives()
+    public void MessagePackResolverRoundTripsIdentifierMoneyAndQuantityPrimitives()
     {
         var options = MessagePackSerializerOptions.Standard.WithResolver(
             CompositeResolver.Create(VogenMessagePackResolver.Instance, StandardResolver.Instance)

@@ -31,8 +31,8 @@ public static class VogenTypeHandlers
         SqlMapper.AddTypeHandler(new DashboardId.DapperTypeHandler());
         SqlMapper.AddTypeHandler(new EventId.DapperTypeHandler());
         SqlMapper.AddTypeHandler(new AuditLogId.DapperTypeHandler());
-        SqlMapper.AddTypeHandler(new Price.DapperTypeHandler());
-        SqlMapper.AddTypeHandler(new Quantity.DapperTypeHandler());
-        SqlMapper.AddTypeHandler(new Amount.DapperTypeHandler());
+        SqlMapper.AddTypeHandler(new PriceTypeHandler());
+        SqlMapper.AddTypeHandler(new QuantityTypeHandler());
+        SqlMapper.AddTypeHandler(new AmountTypeHandler());
     }
 }

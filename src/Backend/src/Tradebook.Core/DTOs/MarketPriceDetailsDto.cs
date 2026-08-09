@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -11,18 +12,18 @@ public sealed record MarketPriceDetailsDto
     [SetsRequiredMembers]
     public MarketPriceDetailsDto(
         DateOnly PriceDate,
-        decimal? TtfEurMwh,
-        decimal? EgsiEtfEurMwh,
-        decimal? TheEurMwh,
-        decimal? BgoEurMwh,
-        decimal? PgoEurMwh,
-        decimal? EuaEurMwh,
-        decimal? WithinDayMktEurMwh,
-        decimal? EurSek,
-        decimal? EurChf,
-        decimal? EurGbp,
-        decimal? EurUsd,
-        decimal? EurDkk,
+        Price? TtfEurMwh,
+        Price? EgsiEtfEurMwh,
+        Price? TheEurMwh,
+        Price? BgoEurMwh,
+        Price? PgoEurMwh,
+        Price? EuaEurMwh,
+        Price? WithinDayMktEurMwh,
+        Amount? EurSek,
+        Amount? EurChf,
+        Amount? EurGbp,
+        Amount? EurUsd,
+        Amount? EurDkk,
         long Version,
         DateTime CreatedAt
     )
@@ -47,40 +48,40 @@ public sealed record MarketPriceDetailsDto
     public required DateOnly PriceDate { get; init; }
 
     [TsOptional]
-    public decimal? TtfEurMwh { get; init; }
+    public Price? TtfEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? EgsiEtfEurMwh { get; init; }
+    public Price? EgsiEtfEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? TheEurMwh { get; init; }
+    public Price? TheEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? BgoEurMwh { get; init; }
+    public Price? BgoEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? PgoEurMwh { get; init; }
+    public Price? PgoEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? EuaEurMwh { get; init; }
+    public Price? EuaEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? WithinDayMktEurMwh { get; init; }
+    public Price? WithinDayMktEurMwh { get; init; }
 
     [TsOptional]
-    public decimal? EurSek { get; init; }
+    public Amount? EurSek { get; init; }
 
     [TsOptional]
-    public decimal? EurChf { get; init; }
+    public Amount? EurChf { get; init; }
 
     [TsOptional]
-    public decimal? EurGbp { get; init; }
+    public Amount? EurGbp { get; init; }
 
     [TsOptional]
-    public decimal? EurUsd { get; init; }
+    public Amount? EurUsd { get; init; }
 
     [TsOptional]
-    public decimal? EurDkk { get; init; }
+    public Amount? EurDkk { get; init; }
 
     public required long Version { get; init; }
 

@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,7 +10,7 @@ public sealed record GetGooCertificateHistoryRequest
     public GetGooCertificateHistoryRequest() { }
 
     public GetGooCertificateHistoryRequest(
-        Guid? ContractId,
+        ContractId? ContractId,
         string? Status,
         DateOnly? FromDate,
         DateOnly? ToDate,
@@ -26,7 +27,7 @@ public sealed record GetGooCertificateHistoryRequest
     }
 
     [TsOptional]
-    public Guid? ContractId { get; init; }
+    public ContractId? ContractId { get; init; }
 
     [TsOptional]
     public string? Status { get; init; }

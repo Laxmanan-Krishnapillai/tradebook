@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,9 +12,9 @@ public sealed record ContractDetailsDto
 
     [SetsRequiredMembers]
     public ContractDetailsDto(
-        Guid ContractId,
+        ContractId ContractId,
         string ContractName,
-        Guid CounterpartyId,
+        CounterpartyId CounterpartyId,
         string ProductType,
         string Action,
         string? CompanyShorthand,
@@ -20,13 +22,13 @@ public sealed record ContractDetailsDto
         short? CountryDialCode,
         short? ContractNumber,
         short? YearOfContract,
-        Guid? SourcingCenter,
-        Guid? SalesCenter,
+        CompanyId? SourcingCenter,
+        CompanyId? SalesCenter,
         string? BalancingGroup,
         string? GooQuality,
         string? SubsidyStatus,
         string? PriceMechanismGas,
-        decimal? FixedPriceGasEurMwh,
+        Price? FixedPriceGasEurMwh,
         string ContractType,
         string? Comment,
         bool IsActive,
@@ -60,9 +62,9 @@ public sealed record ContractDetailsDto
         this.UpdatedAt = UpdatedAt;
     }
 
-    public required Guid ContractId { get; init; }
+    public required ContractId ContractId { get; init; }
     public required string ContractName { get; init; }
-    public required Guid CounterpartyId { get; init; }
+    public required CounterpartyId CounterpartyId { get; init; }
     public required string ProductType { get; init; }
     public required string Action { get; init; }
 
@@ -82,10 +84,10 @@ public sealed record ContractDetailsDto
     public short? YearOfContract { get; init; }
 
     [TsOptional]
-    public Guid? SourcingCenter { get; init; }
+    public CompanyId? SourcingCenter { get; init; }
 
     [TsOptional]
-    public Guid? SalesCenter { get; init; }
+    public CompanyId? SalesCenter { get; init; }
 
     [TsOptional]
     public string? BalancingGroup { get; init; }
@@ -100,7 +102,7 @@ public sealed record ContractDetailsDto
     public string? PriceMechanismGas { get; init; }
 
     [TsOptional]
-    public decimal? FixedPriceGasEurMwh { get; init; }
+    public Price? FixedPriceGasEurMwh { get; init; }
     public required string ContractType { get; init; }
 
     [TsOptional]

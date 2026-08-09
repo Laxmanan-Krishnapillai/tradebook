@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
+using Tradebook.Core.Domain.ValueObjects.Money;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -10,15 +12,15 @@ public sealed record UpdateGooCertificateTransactionRequest
 
     [SetsRequiredMembers]
     public UpdateGooCertificateTransactionRequest(
-        Guid GooCertificateTransactionId,
+        GooCertificateTransactionId GooCertificateTransactionId,
         string? BatchType,
-        Guid? ProducerContractId,
-        Guid? CustomerContractId,
+        ContractId? ProducerContractId,
+        ContractId? CustomerContractId,
         string? Register,
         string? Status,
         DateOnly? TransactionStartDate,
-        decimal? TransactionVolumeMwh,
-        decimal? VolumeMwh,
+        Quantity? TransactionVolumeMwh,
+        Quantity? VolumeMwh,
         string? Text,
         long Version
     )
@@ -36,16 +38,16 @@ public sealed record UpdateGooCertificateTransactionRequest
         this.Version = Version;
     }
 
-    public required Guid GooCertificateTransactionId { get; init; }
+    public required GooCertificateTransactionId GooCertificateTransactionId { get; init; }
 
     [TsOptional]
     public string? BatchType { get; init; }
 
     [TsOptional]
-    public Guid? ProducerContractId { get; init; }
+    public ContractId? ProducerContractId { get; init; }
 
     [TsOptional]
-    public Guid? CustomerContractId { get; init; }
+    public ContractId? CustomerContractId { get; init; }
 
     [TsOptional]
     public string? Register { get; init; }
@@ -57,10 +59,10 @@ public sealed record UpdateGooCertificateTransactionRequest
     public DateOnly? TransactionStartDate { get; init; }
 
     [TsOptional]
-    public decimal? TransactionVolumeMwh { get; init; }
+    public Quantity? TransactionVolumeMwh { get; init; }
 
     [TsOptional]
-    public decimal? VolumeMwh { get; init; }
+    public Quantity? VolumeMwh { get; init; }
 
     [TsOptional]
     public string? Text { get; init; }

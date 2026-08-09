@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Tradebook.Core.Domain.ValueObjects.Ids;
 using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
@@ -9,14 +10,14 @@ public sealed record DeleteHedgeRequest
     public DeleteHedgeRequest() { }
 
     [SetsRequiredMembers]
-    public DeleteHedgeRequest(Guid HedgeId, string Reason, long Version)
+    public DeleteHedgeRequest(HedgeId HedgeId, string Reason, long Version)
     {
         this.HedgeId = HedgeId;
         this.Reason = Reason;
         this.Version = Version;
     }
 
-    public required Guid HedgeId { get; init; }
+    public required HedgeId HedgeId { get; init; }
 
     public required string Reason { get; init; }
 

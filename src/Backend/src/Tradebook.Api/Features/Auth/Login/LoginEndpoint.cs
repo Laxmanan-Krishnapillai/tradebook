@@ -40,7 +40,7 @@ public sealed class LoginEndpoint(
         }
 
         var expiresAt = timeProvider.GetUtcNow().Add(TokenLifetime);
-        var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, user.Id.ToString()) };
+        var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, user.Id.Value.ToString()) };
         claims.AddRange(user.Roles.Select(role => new Claim("role", role)));
 
         var jwt = options.Value;
