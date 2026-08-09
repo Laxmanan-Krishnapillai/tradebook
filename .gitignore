@@ -13,3 +13,5 @@ reports/
 
 # codex CLI writes error.log debris into the cwd on some runs
 error.log
+
+docs/api/typespec/tsp-output/

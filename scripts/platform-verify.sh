@@ -111,13 +111,8 @@ dotnet test tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj
 echo " -> Realtime and architecture verification PASSED."
 
 echo "[5/8] Verifying generated contracts have zero drift..."
-generated_status="$(git status --porcelain -- src/Frontend/src/api/generated)"
-[[ -z "$generated_status" ]] || fail "generated contracts were already dirty before TypeGen"
-dotnet typegen generate --project-folder .
-git diff --exit-code -- src/Frontend/src/api/generated
-generated_status="$(git status --porcelain -- src/Frontend/src/api/generated)"
-[[ -z "$generated_status" ]] || fail "TypeGen produced untracked generated contract files"
-echo " -> TypeGen synchronization PASSED."
+scripts/check-contract-drift.sh
+echo " -> TypeSpec contract synchronization PASSED."
 
 echo "[6/8] Verifying frontend build, tests, and lint..."
 npm --prefix src/Frontend run build

@@ -103,14 +103,7 @@ fi
 
 if [ "$DO_CONTRACTS" = 1 ]; then
   step "contract generation + drift check"
-  dotnet build src/Backend/src/Tradebook.Core/Tradebook.Core.csproj -c Debug || fail "build Tradebook.Core"
-  dotnet typegen generate --project-folder . || fail "typegen generate"
-  drift="$(git status --porcelain -- src/Frontend/src/api/generated)"
-  if [ -n "$drift" ]; then
-    printf '%s\n' "$drift"
-    git --no-pager diff -- src/Frontend/src/api/generated
-    fail "generated contracts drifted — regenerate & commit (never hand-edit generated/)"
-  fi
+  bash scripts/check-contract-drift.sh || fail "TypeSpec, generated client, or runtime contract drift"
 fi
 
 if [ "$DO_FRONTEND" = 1 ]; then

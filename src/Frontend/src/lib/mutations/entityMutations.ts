@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import type { CreatePhysicalDeliveryRequest } from '../../api/generated/create-physical-delivery-request';
-import type { CreatePhysicalDeliveryResponse } from '../../api/generated/create-physical-delivery-response';
-import type { GetDeliveryHistoryResponse } from '../../api/generated/get-delivery-history-response';
-import type { PhysicalDeliveryDetailsDto } from '../../api/generated/physical-delivery-details-dto';
-import type { UpdatePhysicalDeliveryRequest } from '../../api/generated/update-physical-delivery-request';
+import type { CreatePhysicalDeliveryRequest } from '../../api/generated/types.gen';
+import type { CreatePhysicalDeliveryResponse } from '../../api/generated/types.gen';
+import type { GetDeliveryHistoryResponse } from '../../api/generated/types.gen';
+import type { PhysicalDeliveryDetailsDto } from '../../api/generated/types.gen';
+import type { UpdatePhysicalDeliveryRequest } from '../../api/generated/types.gen';
 import { ApiError, apiFetch } from '../api/client';
 import { isFirstListPage, isUnfilteredList, queryKeys } from '../query/queryKeys';
 import { getAuthSession } from '../state/useAuthStore';

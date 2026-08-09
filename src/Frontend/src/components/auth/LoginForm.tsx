@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
-import type { LoginRequest } from '../../api/generated/login-request';
-import type { LoginResponse } from '../../api/generated/login-response';
+import type { LoginRequest } from '../../api/generated/types.gen';
+import type { LoginResponse } from '../../api/generated/types.gen';
 import { ApiError, apiFetch } from '../../lib/api/client';
 import { beginSession } from '../../lib/session/sessionController';
 

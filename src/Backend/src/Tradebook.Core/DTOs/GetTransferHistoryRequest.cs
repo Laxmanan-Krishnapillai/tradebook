@@ -1,10 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Ids;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record GetTransferHistoryRequest
 {
     public GetTransferHistoryRequest() { }
@@ -26,16 +24,12 @@ public sealed record GetTransferHistoryRequest
         this.PageSize = PageSize;
     }
 
-    [TsOptional]
     public ContractId? ContractId { get; init; }
 
-    [TsOptional]
     public string? Status { get; init; }
 
-    [TsOptional]
     public DateOnly? FromMonth { get; init; }
 
-    [TsOptional]
     public DateOnly? ToMonth { get; init; }
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 50;

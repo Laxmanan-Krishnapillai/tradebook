@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Ids;
 using Tradebook.Core.Domain.ValueObjects.Money;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record UpdateCapacityBookingRequest
 {
     public UpdateCapacityBookingRequest() { }
@@ -42,34 +40,24 @@ public sealed record UpdateCapacityBookingRequest
 
     public required CapacityBookingId CapacityBookingId { get; init; }
 
-    [TsOptional]
     public string? BalancingGroup { get; init; }
 
-    [TsOptional]
     public string? PriceMechanism { get; init; }
 
-    [TsOptional]
     public string? StartArea { get; init; }
 
-    [TsOptional]
     public string? EndArea { get; init; }
 
-    [TsOptional]
     public DateOnly? StartDay { get; init; }
 
-    [TsOptional]
     public DateOnly? EndDay { get; init; }
 
-    [TsOptional]
     public Quantity? CapacityMw { get; init; }
 
-    [TsOptional]
     public Quantity? CapacityPriceEurMwh { get; init; }
 
-    [TsOptional]
     public Quantity? CapacityCostEur { get; init; }
 
-    [TsOptional]
     public string? Comments { get; init; }
     public required long Version { get; init; }
 }

@@ -1,10 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Money;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record UpsertMarketPriceRequest
 {
     public UpsertMarketPriceRequest() { }
@@ -45,40 +43,28 @@ public sealed record UpsertMarketPriceRequest
 
     public required DateOnly PriceDate { get; init; }
 
-    [TsOptional]
     public Price? TtfEurMwh { get; init; }
 
-    [TsOptional]
     public Price? EgsiEtfEurMwh { get; init; }
 
-    [TsOptional]
     public Price? TheEurMwh { get; init; }
 
-    [TsOptional]
     public Price? BgoEurMwh { get; init; }
 
-    [TsOptional]
     public Price? PgoEurMwh { get; init; }
 
-    [TsOptional]
     public Price? EuaEurMwh { get; init; }
 
-    [TsOptional]
     public Price? WithinDayMktEurMwh { get; init; }
 
-    [TsOptional]
     public Amount? EurSek { get; init; }
 
-    [TsOptional]
     public Amount? EurChf { get; init; }
 
-    [TsOptional]
     public Amount? EurGbp { get; init; }
 
-    [TsOptional]
     public Amount? EurUsd { get; init; }
 
-    [TsOptional]
     public Amount? EurDkk { get; init; }
 
     public long Version { get; init; }
