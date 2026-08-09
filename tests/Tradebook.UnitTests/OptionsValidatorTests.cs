@@ -35,7 +35,7 @@ public sealed class OptionsValidatorTests
         );
         var backendSource = string.Join(Environment.NewLine, sourceFiles.Select(File.ReadAllText));
         Assert.Contains(
-            "AddSingleton<IValidateOptions<JwtOptions>, JwtSecurityOptionsValidator>()",
+            "AddSingleton<IValidateOptions<EntraOptions>, EntraOptionsValidator>()",
             backendSource,
             StringComparison.Ordinal
         );
@@ -50,9 +50,20 @@ public sealed class OptionsValidatorTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["DatabaseOptions", "JwtOptions", "OutboxOptions"], optionTypes);
+        Assert.Equal(["DatabaseOptions", "EntraOptions", "OutboxOptions"], optionTypes);
         foreach (var optionType in optionTypes)
         {
+            // EntraOptions uses a hand-written sealed IValidateOptions with custom
+            // tenant/placeholder rules - compiled validation, no reflection (Task 12).
+            if (string.Equals(optionType, "EntraOptions", StringComparison.Ordinal))
+            {
+                Assert.Matches(
+                    @"internal\s+sealed\s+class\s+EntraOptionsValidator\s*:\s*IValidateOptions<EntraOptions>",
+                    backendSource
+                );
+                continue;
+            }
+
             Assert.Matches(
                 $@"\[OptionsValidator\]\s+(?:public|internal)\s+sealed\s+partial\s+class\s+{optionType}Validator\b",
                 backendSource
