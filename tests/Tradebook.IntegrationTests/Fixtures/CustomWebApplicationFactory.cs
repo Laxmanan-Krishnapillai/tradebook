@@ -1,14 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.Migrations;
-using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests.Fixtures;
 
@@ -34,27 +31,19 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         _connection = new NpgsqlConnection(ConnectionString);
         await _connection.OpenAsync().ConfigureAwait(false);
 
-        var connections = new NpgsqlConnectionFactory(
-            Options.Create(new DatabaseOptions { ConnectionString = ConnectionString })
-        );
-        await using (connections.ConfigureAwait(false))
-        {
-            await new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance)
-                .MigrateAsync()
-                .ConfigureAwait(false);
+        MigrationRunner.Run(ConnectionString);
 
-            _respawner = await Respawner
-                .CreateAsync(
-                    _connection,
-                    new RespawnerOptions
-                    {
-                        DbAdapter = DbAdapter.Postgres,
-                        SchemasToInclude = ["public"],
-                        TablesToIgnore = ["schema_migrations"],
-                    }
-                )
-                .ConfigureAwait(false);
-        }
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_journal"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
     public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);

@@ -1,10 +1,7 @@
 using Dapper;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.Migrations;
-using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests;
 
@@ -12,83 +9,49 @@ public sealed class Task01IntegrityIntegrationTests(PostgresTestFixture postgres
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task EmbeddedMigrationsAreChecksumTrackedAndIdempotent()
+    public async Task DbUpJournalsAllEmbeddedMigrationsAndIsIdempotent()
     {
-        await using var connections = new NpgsqlConnectionFactory(
-            Options.Create(new DatabaseOptions { ConnectionString = Postgres.ConnectionString })
-        );
-        var migrator = new DatabaseMigrator(connections, NullLogger<DatabaseMigrator>.Instance);
-
-        await migrator.MigrateAsync();
-        await migrator.MigrateAsync();
+        var first = MigrationRunner.Run(Postgres.ConnectionString);
+        var second = MigrationRunner.Run(Postgres.ConnectionString);
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         var rows = (
-            await connection.QueryAsync<MigrationRow>(
-                "SELECT version AS Version, checksum_sha256 AS Checksum FROM schema_migrations ORDER BY version"
+            await connection.QueryAsync<string>(
+                "SELECT scriptname FROM schema_journal ORDER BY scriptname"
             )
         ).ToArray();
-        var embeddedCount = typeof(DatabaseMigrator)
+        var embeddedCount = typeof(MigrationRunner)
             .Assembly.GetManifestResourceNames()
             .Count(name =>
                 name.StartsWith("Tradebook.Database.Migrations.", StringComparison.Ordinal)
                 && name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
             );
+
+        Assert.True(first.Successful);
+        Assert.True(second.Successful);
         Assert.Equal(embeddedCount, rows.Length);
-        Assert.All(rows, row => Assert.Matches("^[0-9a-f]{64}$", row.Checksum));
-        Assert.Equal(
-            rows.Length,
-            rows.Select(row => row.Version).Distinct(StringComparer.Ordinal).Count()
-        );
+        Assert.Equal(rows.Length, rows.Distinct(StringComparer.Ordinal).Count());
+        Assert.StartsWith("Tradebook.Database.Migrations.001_", rows[0], StringComparison.Ordinal);
+        Assert.StartsWith("Tradebook.Database.Migrations.013_", rows[^1], StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task LegacyShellMigrationLedgerIsUpgradedAndReused()
+    public async Task DbUpJournalHasTheStandardScriptAndAppliedColumns()
     {
-        await using (var connection = new NpgsqlConnection(Postgres.ConnectionString))
-        {
-            await connection.OpenAsync();
-            await connection.ExecuteAsync(
-                """
-                ALTER TABLE schema_migrations RENAME COLUMN version TO name;
-                ALTER TABLE schema_migrations RENAME COLUMN checksum_sha256 TO sha256;
-                """
-            );
-        }
-
-        await using var connections = new NpgsqlConnectionFactory(
-            Options.Create(new DatabaseOptions { ConnectionString = Postgres.ConnectionString })
-        );
-        await new DatabaseMigrator(
-            connections,
-            NullLogger<DatabaseMigrator>.Instance
-        ).MigrateAsync();
-
-        await using var verified = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         var columns = (
-            await verified.QueryAsync<string>(
+            await connection.QueryAsync<string>(
                 """
                 SELECT column_name
                 FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'schema_migrations'
+                WHERE table_schema = 'public' AND table_name = 'schema_journal'
                 ORDER BY column_name
                 """
             )
         ).ToArray();
-        Assert.Contains("version", columns, StringComparer.Ordinal);
-        Assert.Contains("checksum_sha256", columns, StringComparer.Ordinal);
-        Assert.DoesNotContain("name", columns, StringComparer.Ordinal);
-        Assert.DoesNotContain("sha256", columns, StringComparer.Ordinal);
-        var embeddedCount = typeof(DatabaseMigrator)
-            .Assembly.GetManifestResourceNames()
-            .Count(name =>
-                name.StartsWith("Tradebook.Database.Migrations.", StringComparison.Ordinal)
-                && name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
-            );
-        Assert.Equal(
-            embeddedCount,
-            await verified.ExecuteScalarAsync<int>("SELECT count(*) FROM schema_migrations")
-        );
+
+        Assert.Contains("scriptname", columns, StringComparer.Ordinal);
+        Assert.Contains("applied", columns, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -544,8 +507,6 @@ public sealed class Task01IntegrityIntegrationTests(PostgresTestFixture postgres
             "[]",
             new string(commitHashCharacter, 64)
         );
-
-    private sealed record MigrationRow(string Version, string Checksum);
 
     private sealed record AuditInsertParameters(
         string EntityName,

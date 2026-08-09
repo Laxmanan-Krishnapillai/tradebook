@@ -39,9 +39,9 @@ builder.Services.AddFastEndpoints();
 builder.Services.AddDashboardPush();
 builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services.AddHostedService<Tradebook.Infrastructure.Migrations.MigrationHostedService>();
 
 var app = builder.Build();
-
 try
 {
     var connection = await app

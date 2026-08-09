@@ -7,11 +7,13 @@ RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
-COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props BannedSymbols.txt .editorconfig ./
+COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props BannedSymbols.txt .editorconfig .csharpierignore ./
 COPY src/Backend/ ./src/Backend/
+COPY src/Database/ ./src/Database/
 COPY tests/ ./tests/
 RUN dotnet restore src/Backend/Tradebook.sln
 RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/Backend/src/Tradebook.Migrations/Tradebook.Migrations.csproj -c Release -o /app/migrator --no-restore
 
 FROM postgres:17-bookworm AS database-ops
 ARG AZCOPY_VERSION=10.32.4
@@ -27,9 +29,11 @@ RUN apt-get update \
     && tar --extract --gzip --file /tmp/azcopy.tar.gz --directory /tmp/azcopy --strip-components=1 \
     && install --mode 0555 /tmp/azcopy/azcopy /usr/local/bin/azcopy \
     && rm -rf /tmp/azcopy /tmp/azcopy.tar.gz /var/lib/apt/lists/*
-COPY src/Database/Migrations/ /opt/tradebook/migrations/
+COPY --from=backend /app/migrator/ /opt/tradebook/migrator/
+COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0 /usr/share/dotnet/ /usr/share/dotnet/
 COPY infra/database-ops/ /opt/tradebook/database-ops/
-RUN chmod 0555 /opt/tradebook/database-ops/*.sh
+RUN ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
+    && chmod 0555 /opt/tradebook/database-ops/*.sh
 USER postgres
 ENTRYPOINT ["/bin/bash"]
 CMD ["/opt/tradebook/database-ops/run-migrations.sh"]

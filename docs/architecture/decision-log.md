@@ -192,3 +192,19 @@ DTO/domain mapping uses Riok.Mapperly 4.3.1 source-generated partial mappers. Op
 Microsoft.Extensions.Options 10.0.10 source-generated `[OptionsValidator]` validators and
 startup `.ValidateOnStart()` checks. These choices keep mapping and configuration
 validation compile-time generated, with no reflection-based mapping or validation path.
+
+## D18 — DbUp and schema-checked SQL safety gates (2026-08-09)
+
+Database migrations are forward-only embedded SQL applied exclusively by DbUp, one
+transaction per ordered script, with the standard journal stored as
+`public.schema_journal`. Startup and the out-of-band migration executable call the same
+runner. Recovery from an applied migration is always a later numbered script.
+
+Authored static application queries are checked by sqlc against
+`src/Database/Migrations`; the pinned `sqlc-gen-csharp` WASM output is committed and must
+regenerate without drift. Dynamic identifier-whitelisted analytics SQL, binary COPY,
+runtime-arity filters, and administrative tooling remain the only hand-written Dapper
+fallbacks. Squawk owns migration lock/rewrite safety and sqlfluff owns PostgreSQL SQL
+linting. If the pre-1.0 C# plugin cannot represent a PostgreSQL construct, the narrow
+fallback is an enumerated hand-written Dapper query rather than changing the schema or
+introducing an ORM.
