@@ -91,12 +91,12 @@ function conflictDashboard(error: unknown): DashboardSpecification | undefined {
 
 export function DashboardPage() {
   const dashboardId = useAuthStore((state) => state.actorId)!;
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const accountKey = useAuthStore((state) => state.accountKey);
   const lastEvent = useLastRealtimeEvent();
   const queryClient = useQueryClient();
   const fallback = useMemo(() => defaultDashboard(dashboardId), [dashboardId]);
   const dashboardQueryKey = useMemo(() => queryKeys.dashboards.detail(dashboardId), [dashboardId]);
-  const sessionIdentity = `${dashboardId}\u0000${accessToken}`;
+  const sessionIdentity = `${dashboardId}\u0000${accountKey}`;
   const [draft, setDraft] = useState<DashboardSpecification>(fallback);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | undefined>(fallback.widgets[0]?.id);
   const [conflict, setConflict] = useState<{ serverState?: DashboardSpecification; attempted: DashboardSpecification }>();
@@ -116,7 +116,7 @@ export function DashboardPage() {
       const mutationSessionIdentity = sessionIdentity;
       await queryClient.cancelQueries({ queryKey: dashboardQueryKey });
       const auth = useAuthStore.getState();
-      if (`${auth.actorId}\u0000${auth.accessToken}` !== mutationSessionIdentity) {
+      if (`${auth.actorId}\u0000${auth.accountKey}` !== mutationSessionIdentity) {
         throw new Error('The authenticated session changed before the dashboard save started.');
       }
       const snapshot = queryClient.getQueryData<DashboardSpecification>(dashboardQueryKey);
@@ -125,14 +125,14 @@ export function DashboardPage() {
     },
     onSuccess: (saved, _attempted, context) => {
       const auth = useAuthStore.getState();
-      if (context?.sessionIdentity !== `${auth.actorId}\u0000${auth.accessToken}`) return;
+      if (context?.sessionIdentity !== `${auth.actorId}\u0000${auth.accountKey}`) return;
       queryClient.setQueryData(dashboardQueryKey, saved);
       setDraft(saved);
       setConflict(undefined);
     },
     onError: async (error, attempted, context) => {
       const auth = useAuthStore.getState();
-      if (context?.sessionIdentity !== `${auth.actorId}\u0000${auth.accessToken}`) return;
+      if (context?.sessionIdentity !== `${auth.actorId}\u0000${auth.accountKey}`) return;
       const current = conflictDashboard(error);
       if (error instanceof ApiError && error.status === 409) {
         if (current) {

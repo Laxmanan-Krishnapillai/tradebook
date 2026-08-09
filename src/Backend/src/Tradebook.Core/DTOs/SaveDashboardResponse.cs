@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Tradebook.Core.Domain.ValueObjects.Ids;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record SaveDashboardResponse
 {
     public SaveDashboardResponse() { }
@@ -22,6 +20,5 @@ public sealed record SaveDashboardResponse
 
     public required long Version { get; init; }
 
-    [TsType("DashboardSpecification", "../../types/visualizations")]
     public required JsonElement Layout { get; init; }
 }

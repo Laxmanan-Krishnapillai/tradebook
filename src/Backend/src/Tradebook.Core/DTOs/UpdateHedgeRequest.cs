@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Ids;
 using Tradebook.Core.Domain.ValueObjects.Money;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record UpdateHedgeRequest
 {
     public UpdateHedgeRequest() { }
@@ -26,10 +24,8 @@ public sealed record UpdateHedgeRequest
 
     public required HedgeId HedgeId { get; init; }
 
-    [TsOptional]
     public Quantity? HedgeAmountMwh { get; init; }
 
-    [TsOptional]
     public Price? HedgePriceEurMwh { get; init; }
 
     public required long Version { get; init; }

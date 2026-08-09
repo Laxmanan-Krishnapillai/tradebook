@@ -37,7 +37,7 @@ export default tseslint.config(
         { type: 'feature-deliveries', pattern: 'src/components/deliveries/**/*', mode: 'full' },
         { type: 'feature-domain', pattern: 'src/components/domain/**/*', mode: 'full' },
         { type: 'feature-market-prices', pattern: 'src/components/market-prices/**/*', mode: 'full' },
-        { type: 'shared-ui', pattern: 'src/components/{canvas,grid,layout,ui,visualizations}/**/*', mode: 'full' },
+        { type: 'shared-ui', pattern: 'src/components/{canvas,grid,kpi,layout,ui,visualizations}/**/*', mode: 'full' },
         { type: 'hook', pattern: 'src/hooks/**/*', mode: 'full' },
         { type: 'lib', pattern: 'src/lib/**/*', mode: 'full' },
         { type: 'generated-contract', pattern: 'src/api/generated/**/*', mode: 'full' },

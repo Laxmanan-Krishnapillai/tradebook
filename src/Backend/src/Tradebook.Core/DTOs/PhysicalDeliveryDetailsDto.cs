@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Ids;
 using Tradebook.Core.Domain.ValueObjects.Money;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record PhysicalDeliveryDetailsDto
 {
     public PhysicalDeliveryDetailsDto() { }
@@ -62,31 +60,22 @@ public sealed record PhysicalDeliveryDetailsDto
 
     public required DateOnly SupplyMonth { get; init; }
 
-    [TsOptional]
     public Quantity? CapacityMw { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeNominatedMwh { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeRealisedMwh { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeMwh { get; init; }
 
-    [TsOptional]
     public string? PriceMechanism { get; init; }
 
-    [TsOptional]
     public Amount? RevenueEur { get; init; }
 
-    [TsOptional]
     public Amount? SubtotalEur { get; init; }
 
-    [TsOptional]
     public Amount? VatEur { get; init; }
 
-    [TsOptional]
     public Amount? InvoiceAmountEur { get; init; }
 
     public required string Status { get; init; }

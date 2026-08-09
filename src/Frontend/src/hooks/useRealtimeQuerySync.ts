@@ -1,7 +1,7 @@
 import { createContext, createElement, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type QueryClient, type QueryKey, useQueryClient } from '@tanstack/react-query';
-import type { GetDeliveryHistoryResponse } from '../api/generated/get-delivery-history-response';
-import type { PhysicalDeliveryDetailsDto } from '../api/generated/physical-delivery-details-dto';
+import type { GetDeliveryHistoryResponse, PhysicalDeliveryDetailsDto } from '../api/generated/types.gen';
+import { zEntityChangedEventDto } from '../api/generated/zod.gen';
 import { ApiError, apiFetch } from '../lib/api/client';
 import { queryKeys } from '../lib/query/queryKeys';
 import {
@@ -136,7 +136,8 @@ export async function reconcileRealtimeBatch(
   options: ReconciliationOptions = {},
 ): Promise<void> {
   const roots = new Map<string, QueryKey>();
-  for (const event of events) {
+  for (const rawEvent of events) {
+    const event = zEntityChangedEventDto.parse(rawEvent);
     if (options.signal?.aborted) return;
     if (!isKnownAggregateType(event.aggregateType)) continue;
     if (event.aggregateType === 'PhysicalDelivery') {

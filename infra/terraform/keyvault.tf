@@ -18,10 +18,6 @@ resource "azurerm_role_assignment" "terraform_key_vault_secrets_officer" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
-ephemeral "random_password" "jwt_signing_key" {
-  length  = 64
-  special = false
-}
 
 resource "azurerm_key_vault_secret" "postgres_password" {
   name             = "pg-admin-password"
@@ -34,14 +30,6 @@ resource "azurerm_key_vault_secret" "postgres_password" {
 ephemeral "azurerm_key_vault_secret" "postgres_password" {
   name         = azurerm_key_vault_secret.postgres_password.name
   key_vault_id = azurerm_key_vault.this.id
-}
-
-resource "azurerm_key_vault_secret" "jwt_signing_key" {
-  name             = "jwt-signing-key"
-  value_wo         = ephemeral.random_password.jwt_signing_key.result
-  value_wo_version = var.secret_version
-  key_vault_id     = azurerm_key_vault.this.id
-  depends_on       = [azurerm_role_assignment.terraform_key_vault_secrets_officer]
 }
 
 resource "azurerm_key_vault_secret" "database_connection_string" {

@@ -10,13 +10,7 @@ import { endSession, isSessionCurrent } from '../../lib/session/sessionControlle
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ context, location }) => {
     if (isSessionCurrent(Date.now(), context.session.get())) return;
-    const expiredSession = context.session.get();
-    if (expiredSession) {
-      await endSession('expired', {
-        navigate: false,
-        expectedAccessToken: expiredSession.accessToken,
-      });
-    }
+    if (context.session.get()) await endSession('expired', { navigate: false });
     throw redirect({
       to: '/login',
       search: { redirect: location.pathname },
@@ -30,7 +24,7 @@ function AuthenticatedLayout() {
   const { realtimeEnabled, session } = Route.useRouteContext();
   const currentSession = session.get();
   if (!currentSession) return null;
-  const sessionKey = `${currentSession.actorId}:${currentSession.accessToken}`;
+  const sessionKey = currentSession.accountKey;
   return <SessionScopedAuthenticatedLayout key={sessionKey} realtimeEnabled={realtimeEnabled} sessionKey={sessionKey} />;
 }
 

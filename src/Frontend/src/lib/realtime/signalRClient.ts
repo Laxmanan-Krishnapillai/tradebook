@@ -1,9 +1,16 @@
 import * as signalR from '@microsoft/signalr';
 import { MessagePackHubProtocol } from '@microsoft/signalr-protocol-msgpack';
+import type { EntityChangedEventDto, GetEventsSinceResponse } from '../../api/generated/types.gen';
+import { zEntityChangedEventDto, zGetEventsSinceResponse } from '../../api/generated/zod.gen';
 import { apiFetch } from '../api/client';
+import { tokenProvider } from '../auth/tokenProvider';
 import { useAuthStore } from '../state/useAuthStore';
-export interface EntityChangedEvent { eventId: string; sequenceId: number; aggregateType: string; aggregateId: string; eventType: string; payloadJson: string; }
-export interface CatchUpResponse { events: EntityChangedEvent[]; latestSequence: number; }
+export type EntityChangedEvent = EntityChangedEventDto;
+export type CatchUpResponse = GetEventsSinceResponse;
+
+function parseEntityChangedEvent(value: unknown): EntityChangedEvent {
+  return zEntityChangedEventDto.parse(value);
+}
 export const subscribedAggregateTypes = [
   'PhysicalDelivery',
   'Contract',
@@ -61,17 +68,23 @@ export class DashboardStreamClient {
 
   constructor(private readonly onEvent: (event: EntityChangedEvent) => void, dependencies: DashboardStreamDependencies = {}) {
     this.connection = dependencies.connection ?? new signalR.HubConnectionBuilder()
-      .withUrl('/hubs/dashboard', { accessTokenFactory: () => useAuthStore.getState().accessToken })
+      .withUrl('/hubs/dashboard', { accessTokenFactory: async () => {
+        const result = await tokenProvider.acquireForApi();
+        if (result.kind === 'interaction-required') throw new Error('Reauthentication required.');
+        return result.accessToken;
+      } })
       .withHubProtocol(new MessagePackHubProtocol())
       .withAutomaticReconnect()
       .build();
-    this.fetchPage = dependencies.fetchPage ?? ((afterSequence) => apiFetch<CatchUpResponse>(`/api/v1/events?afterSequence=${afterSequence}&limit=500`));
+    this.fetchPage = dependencies.fetchPage ?? (async (afterSequence) => zGetEventsSinceResponse.parse(
+      await apiFetch<unknown>(`/api/v1/events?afterSequence=${afterSequence}&limit=500`),
+    ));
     const actorId = useAuthStore.getState().actorId;
     this.groups = dependencies.groups ?? (actorId ? [...dashboardSubscriptionGroups, `dashboard:${actorId}`] : dashboardSubscriptionGroups);
     this.onError = dependencies.onError ?? (() => undefined);
     this.initialRetryDelayMs = dependencies.initialRetryDelayMs ?? 500;
     this.maximumInitialRetryDelayMs = dependencies.maximumInitialRetryDelayMs ?? 10_000;
-    this.connection.on('EntityChanged', (eventId: string, sequenceId: number, aggregateType: string, aggregateId: string, eventType: string, payloadJson: string) => this.receiveLive({ eventId, sequenceId, aggregateType, aggregateId, eventType, payloadJson }));
+    this.connection.on('EntityChanged', (eventId: string, sequenceId: number, aggregateType: string, aggregateId: string, eventType: string, payloadJson: string) => this.receiveLive(parseEntityChangedEvent({ eventId, sequenceId, aggregateType, aggregateId, eventType, payloadJson })));
     this.connection.onreconnected(() => {
       this.reconnectRecovery = this.reconnectRecovery.then(() => this.restoreAfterReconnect()).catch((error) => this.onError(error));
     });

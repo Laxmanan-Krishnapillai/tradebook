@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
-  type FormEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import type { GetDeliveryHistoryResponse } from "../../api/generated/get-delivery-history-response";
-import type { PhysicalDeliveryDetailsDto } from "../../api/generated/physical-delivery-details-dto";
+import { z } from 'zod';
+import type { GetDeliveryHistoryResponse } from "../../api/generated/types.gen";
+import type { PhysicalDeliveryDetailsDto } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
@@ -24,6 +24,7 @@ import { queryKeys } from '../../lib/query/queryKeys';
 import { useUiStore } from '../../lib/state/useUiStore';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
+import { ValidatedForm } from '../ui/validated-form';
 
 const statuses = [
   "Completed - Payment Received/Sent",
@@ -109,6 +110,14 @@ const initialCreate: CreateDeliveryVariables = {
   bookType: "Sourcing",
   supplyMonth: new Date().toISOString().slice(0, 7) + "-01",
 };
+const createDeliverySchema = z.custom<CreateDeliveryVariables>((candidate): candidate is CreateDeliveryVariables => {
+  const value = candidate as Partial<CreateDeliveryVariables>;
+  return (
+  typeof value.contractId === 'string' && value.contractId.trim().length > 0
+  && typeof value.supplyMonth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.supplyMonth)
+  && (value.volumeRealisedMwh === undefined || (typeof value.volumeRealisedMwh === 'number' && Number.isFinite(value.volumeRealisedMwh) && value.volumeRealisedMwh >= 0))
+  );
+}, { error: 'Complete the delivery with valid values.' });
 
 export function DeliveriesPage() {
   const [page, setPage] = useState(1);
@@ -285,13 +294,12 @@ export function DeliveriesPage() {
     [cancelDelivery, saveDelivery],
   );
 
-  const submitCreate = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitCreate = async (validatedRequest: CreateDeliveryVariables) => {
     setError("");
     let createdId = "";
     let version = 0;
     let createdStatus = "Pending - No Invoice";
-    const request = { ...createRequest };
+    const request = { ...validatedRequest };
     const command: Command = {
       id: crypto.randomUUID(),
       description: `Create ${request.contractInstanceId ?? request.contractId}`,
@@ -404,7 +412,7 @@ export function DeliveriesPage() {
           aria-modal="true"
           aria-label="Create physical delivery"
         >
-          <form onSubmit={(event) => void submitCreate(event)}>
+          <ValidatedForm schema={createDeliverySchema} values={createRequest} onValid={submitCreate}>
             <h3>Create physical delivery</h3>
             <label>
               Contract ID
@@ -472,9 +480,7 @@ export function DeliveriesPage() {
                   setCreateRequest((value) => ({
                     ...value,
                     volumeRealisedMwh:
-                      event.target.value === ""
-                        ? undefined
-                        : Number(event.target.value),
+                      event.target.value === "" ? undefined : event.target.value,
                   }))
                 }
               />
@@ -491,7 +497,7 @@ export function DeliveriesPage() {
                 Create
               </button>
             </div>
-          </form>
+          </ValidatedForm>
         </section>
       )}
       {conflict && (

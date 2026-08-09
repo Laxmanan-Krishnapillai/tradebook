@@ -221,6 +221,19 @@ Vogen value-object round-trip and validation invariants.
 TUnit was rejected because xUnit v3 preserves the existing fixture and assertion model
 while carrying lower integration risk for Testcontainers, ArchUnitNET, and Stryker.
 
+## D20 — TypeSpec governs the API contract (2026-08-09)
+
+TypeSpec is the single source of truth for every REST endpoint and transport DTO. It emits
+OpenAPI 3.1, from which Hey API generates TypeScript types, Zod runtime validators, a fetch
+client, and TanStack Query v5 options. FastEndpoints remains the server implementation;
+the authenticated ASP.NET OpenAPI document and the TypeSpec document are compared by the
+blocking contract-drift gate. The alpha TypeSpec C# emitter is not used.
+
+This supersedes D12/D13's TypeGen ownership statements and Task 08's types-only pipeline.
+TypeGen is removed because assembly reflection produced no runtime validation, client, or
+query integration and made C# rather than the cross-stack contract authoritative. Money is
+represented as a decimal-formatted JSON string and enums use string wire values.
+
 ## D21 — Aspire development orchestration and deployment artifacts (2026-08-09)
 
 .NET Aspire 13.4.6 is the local application orchestrator for PostgreSQL 17, the API,
