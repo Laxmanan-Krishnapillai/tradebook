@@ -31,12 +31,6 @@ resource "azurerm_container_app" "api" {
     identity            = azurerm_user_assigned_identity.workload["api"].id
   }
 
-  secret {
-    name                = "jwt-signing-key"
-    key_vault_secret_id = azurerm_key_vault_secret.jwt_signing_key.versionless_id
-    identity            = azurerm_user_assigned_identity.workload["api"].id
-  }
-
   template {
     min_replicas = 1
     max_replicas = 2
@@ -52,16 +46,16 @@ resource "azurerm_container_app" "api" {
         secret_name = "database-connection-string"
       }
       env {
-        name  = "Jwt__Issuer"
-        value = "Tradebook"
+        name  = "Entra__Instance"
+        value = "https://login.microsoftonline.com/"
       }
       env {
-        name  = "Jwt__Audience"
-        value = "Tradebook"
+        name  = "Entra__TenantId"
+        value = var.entra_tenant_id
       }
       env {
-        name        = "Jwt__SigningKey"
-        secret_name = "jwt-signing-key"
+        name  = "Entra__ClientId"
+        value = azuread_application.api.client_id
       }
 
       startup_probe {

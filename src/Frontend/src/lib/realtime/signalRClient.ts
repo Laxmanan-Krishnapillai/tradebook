@@ -1,6 +1,7 @@
 import * as signalR from '@microsoft/signalr';
 import { MessagePackHubProtocol } from '@microsoft/signalr-protocol-msgpack';
 import { apiFetch } from '../api/client';
+import { tokenProvider } from '../auth/tokenProvider';
 import { useAuthStore } from '../state/useAuthStore';
 export interface EntityChangedEvent { eventId: string; sequenceId: number; aggregateType: string; aggregateId: string; eventType: string; payloadJson: string; }
 export interface CatchUpResponse { events: EntityChangedEvent[]; latestSequence: number; }
@@ -61,7 +62,11 @@ export class DashboardStreamClient {
 
   constructor(private readonly onEvent: (event: EntityChangedEvent) => void, dependencies: DashboardStreamDependencies = {}) {
     this.connection = dependencies.connection ?? new signalR.HubConnectionBuilder()
-      .withUrl('/hubs/dashboard', { accessTokenFactory: () => useAuthStore.getState().accessToken })
+      .withUrl('/hubs/dashboard', { accessTokenFactory: async () => {
+        const result = await tokenProvider.acquireForApi();
+        if (result.kind === 'interaction-required') throw new Error('Reauthentication required.');
+        return result.accessToken;
+      } })
       .withHubProtocol(new MessagePackHubProtocol())
       .withAutomaticReconnect()
       .build();

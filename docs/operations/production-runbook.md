@@ -143,3 +143,13 @@ mismatch fails. Retain its terminal output with the release evidence.
 
 Record the failing command, exact exit code, release commit, image digest, Azure
 subscription, UTC timestamp, and relevant logs in the incident record.
+
+## Microsoft Entra identity operations (Task 12)
+
+Identity application owners must review the Terraform-managed single-tenant API and SPA registrations quarterly. The API exposes only `access_as_user`; its enterprise application requires assignment and defines `Trader`, `BackOffice`, and `Admin`. A tenant administrator owns admin consent and role assignment. The SPA is public and must never have a credential. Redirect URIs are exact environment origins.
+
+Conditional Access and MFA remain tenant policy. Monitor Entra sign-in logs, service-principal/app-role audit logs, API 401/403 rates, and claims-validation failures; alerts and incident artifacts must never contain authorization headers, MSAL caches, authorization codes, or `access_token` query values.
+
+Before cutover, inventory `users.id`, `workspace_dashboards.actor_id`, and distinct `audit_log.actor_id`; obtain an application-owner-approved local-ID to Entra `oid` mapping; abort for every unmapped active dashboard owner. Migrate mutable dashboard ownership in one reviewed transaction. Never update historical `audit_log` rows. Store the approved mapping or signed zero-row query output with release evidence, not in source control.
+
+Use a maintenance window. Validate least-privilege staging sign-in, MFA/Conditional Access return, all three roles, denial without assignment, actor attribution, and SignalR renewal/logout before production. Rollback requires incident-commander approval and restores the prior immutable image and configuration together. Never leave both issuers enabled. Registration recovery uses Terraform import/plan plus tenant-owner approval; because validation uses public metadata, there is no API authentication secret to rotate. Rotate only normal workload/database credentials through their existing process.

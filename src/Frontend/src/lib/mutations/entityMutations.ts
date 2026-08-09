@@ -34,7 +34,7 @@ export const deliveryQueryKey = queryKeys.deliveries.all;
 
 function sessionIdentity(): string | undefined {
   const session = getAuthSession();
-  return session ? `${session.actorId}\u0000${session.accessToken}` : undefined;
+  return session ? `${session.actorId}\u0000${session.accountKey}` : undefined;
 }
 
 function isCurrentSession<T extends MutationContext>(context: T | undefined): context is T {

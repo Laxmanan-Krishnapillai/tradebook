@@ -144,7 +144,7 @@ public sealed class ToolingConfigurationTests
         Assert.Equal("true", manifest.Descendants("CentralPackageTransitivePinningEnabled").Single().Value);
 
         var packageVersions = manifest.Descendants("PackageVersion").ToArray();
-        Assert.Equal(expectedVersions.Count + 1, packageVersions.Length);
+        Assert.Equal(expectedVersions.Count + 2, packageVersions.Length);
         var vogen = Assert.Single(packageVersions, element => element.Attribute("Include")?.Value == "Vogen");
         Assert.StartsWith("8.", vogen.Attribute("Version")?.Value, StringComparison.Ordinal);
         Assert.Equal(
@@ -173,7 +173,7 @@ public sealed class ToolingConfigurationTests
         // No project references it directly, so it is exempt from the reference check below.
         var transitiveOnlyPins = new[] { "Microsoft.OpenApi" };
 
-        Assert.Empty(referencedPackages.Except(expectedVersions.Keys.Append("Vogen"), StringComparer.Ordinal));
+        Assert.Empty(referencedPackages.Except(expectedVersions.Keys.Append("Vogen").Append("Microsoft.Identity.Web"), StringComparer.Ordinal));
         Assert.Empty(
             expectedVersions.Keys
                 .Except(referencedPackages, StringComparer.Ordinal)

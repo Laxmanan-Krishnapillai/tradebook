@@ -29,7 +29,7 @@ builder.Services.AddSingleton<ICacheService, HybridCacheService>();
 var semanticModels = new SemanticModelLoader();
 builder.Services.AddSingleton(semanticModels);
 builder.Services.AddSingleton<SemanticQueryCompiler>();
-builder.Services.AddTradebookAuthentication(builder.Configuration);
+builder.Services.AddTradebookAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddTradebookHealthChecks();
 builder.Services.AddFastEndpoints();
 builder.Services.AddDashboardPush();

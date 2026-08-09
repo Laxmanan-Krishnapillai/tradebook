@@ -10,7 +10,7 @@ internal static class DomainEndpointTestData
     private static readonly DateTime UpdatedAt = new(2026, 1, 3, 11, 30, 0, DateTimeKind.Utc);
 
     public static ClaimsPrincipal Principal(Guid actorId) =>
-        new(new ClaimsIdentity([new Claim("sub", actorId.ToString())], "test"));
+        new(new ClaimsIdentity([new Claim("oid", actorId.ToString()), new("tid", "11111111-1111-1111-1111-111111111111"), new("tradebook_tenant", "11111111-1111-1111-1111-111111111111")], "test"));
 
     public static BioticketDetailsDto Bioticket(Guid? id = null, long version = 4, string status = "Awaiting") => new(
         id ?? Guid.NewGuid(),

@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "3.7.0"
+    }
   }
 
   # Production supplies these values with `terraform init -backend-config=...`.
@@ -20,6 +24,8 @@ terraform {
 provider "azurerm" {
   features {}
 }
+
+provider "azuread" { tenant_id = var.entra_tenant_id }
 
 resource "azurerm_resource_group" "this" {
   name     = "rg-${var.name_prefix}-${var.environment}"

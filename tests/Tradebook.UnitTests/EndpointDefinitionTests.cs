@@ -3,7 +3,6 @@ using System.Reflection;
 using FastEndpoints;
 using Microsoft.Extensions.DependencyInjection;
 using Tradebook.Api.Features.Analytics;
-using Tradebook.Api.Features.Auth.Login;
 using Tradebook.Api.Features.Biotickets;
 using Tradebook.Api.Features.CapacityBookings;
 using Tradebook.Api.Features.Contracts;
@@ -129,15 +128,6 @@ public sealed class EndpointDefinitionTests
         {
             AssertDefinition(endpoint, verb, route, policy);
         }
-    }
-
-    [Fact]
-    public void Login_is_anonymous_POST_auth_login()
-    {
-        var endpoint = Factory.Create<LoginEndpoint>(new FakeUserRepository(), null!);
-        Assert.Equal(["/api/v1/auth/login"], endpoint.Definition.Routes!);
-        Assert.Equal(["POST"], endpoint.Definition.Verbs!);
-        Assert.True(IsAnonymous(endpoint.Definition), "login must stay the sole anonymous API route");
     }
 
     private static void AssertDefinition(BaseEndpoint endpoint, string verb, string route, string policy)
