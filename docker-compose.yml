@@ -16,6 +16,7 @@ services:
       retries: 10
 
   migrations:
+    profiles: ["ops"]
     build:
       context: .
       target: database-ops
