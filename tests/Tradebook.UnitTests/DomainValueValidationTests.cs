@@ -8,27 +8,27 @@ public sealed class DomainValueValidationTests
     [InlineData(null)]
     [InlineData("Awaiting")]
     [InlineData("Issue")]
-    public void Report_status_accepts_only_authoritative_values(string? value) =>
+    public void ReportStatusAcceptsOnlyAuthoritativeValues(string? value) =>
         Assert.True(DomainValueValidation.ReportStatus(value));
 
     [Theory]
     [InlineData("")]
     [InlineData("Deleted")]
     [InlineData("awaiting")]
-    public void Report_status_rejects_unknown_or_noncanonical_values(string value) =>
+    public void ReportStatusRejectsUnknownOrNoncanonicalValues(string value) =>
         Assert.False(DomainValueValidation.ReportStatus(value));
 
     [Theory]
     [InlineData(null)]
     [InlineData("TTF")]
     [InlineData("WITHIN-DAY MKT")]
-    public void Gas_price_mechanism_accepts_authoritative_values(string? value) =>
+    public void GasPriceMechanismAcceptsAuthoritativeValues(string? value) =>
         Assert.True(DomainValueValidation.GasPriceMechanism(value));
 
     [Theory]
     [InlineData("")]
     [InlineData("Fixed")]
     [InlineData("SPOT")]
-    public void Gas_price_mechanism_rejects_unknown_or_noncanonical_values(string value) =>
+    public void GasPriceMechanismRejectsUnknownOrNoncanonicalValues(string value) =>
         Assert.False(DomainValueValidation.GasPriceMechanism(value));
 }

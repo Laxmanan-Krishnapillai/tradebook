@@ -1,9 +1,10 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Tradebook.Core.Interfaces;
-using Tradebook.Infrastructure.Outbox;
 using MessagePack;
 using MessagePack.Resolvers;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Tradebook.Core.Interfaces;
+using Tradebook.Infrastructure.Outbox;
 
 namespace Tradebook.Api.RealTime;
 
@@ -11,13 +12,18 @@ public static class SignalRRegistration
 {
     public static IServiceCollection AddDashboardPush(this IServiceCollection services)
     {
-        services.AddSignalR().AddMessagePackProtocol(options =>
-            options.SerializerOptions = MessagePackSerializerOptions.Standard.WithResolver(
-                CompositeResolver.Create(VogenMessagePackResolver.Instance, StandardResolver.Instance)));
-        services.AddOptions<OutboxOptions>()
-            .BindConfiguration("Outbox")
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
+        services
+            .AddSignalR()
+            .AddMessagePackProtocol(options =>
+                options.SerializerOptions = MessagePackSerializerOptions.Standard.WithResolver(
+                    CompositeResolver.Create(
+                        VogenMessagePackResolver.Instance,
+                        StandardResolver.Instance
+                    )
+                )
+            );
+        services.AddSingleton<IValidateOptions<OutboxOptions>, OutboxOptionsValidator>();
+        services.AddOptions<OutboxOptions>().BindConfiguration("Outbox").ValidateOnStart();
         services.AddScoped<IOutboxEventReader, PostgresOutboxEventReader>();
         services.AddSingleton<IOutboxEventFanout, DashboardPushFanout>();
         services.AddHostedService<OutboxDispatcher>();

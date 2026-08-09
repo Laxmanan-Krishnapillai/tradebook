@@ -1,4 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- sqlc-generated sources annotate nullability without a #nullable directive. -->
+    <NoWarn>$(NoWarn);CS8669</NoWarn>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Tradebook.Core\Tradebook.Core.csproj" />
@@ -14,11 +18,14 @@
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Riok.Mapperly" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\..\..\Database\Migrations\*.sql"
-                      LogicalName="Tradebook.Database.Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource
+      Include="..\..\..\Database\Migrations\*.sql"
+      LogicalName="Tradebook.Database.Migrations.%(Filename)%(Extension)"
+    />
   </ItemGroup>
-
 </Project>

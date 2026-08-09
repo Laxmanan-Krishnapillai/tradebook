@@ -11,7 +11,7 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public void Host_starts_when_the_semantic_model_matches_the_database_schema()
+    public void HostStartsWhenTheSemanticModelMatchesTheDatabaseSchema()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -20,7 +20,7 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
     }
 
     [Fact]
-    public async Task Host_startup_fails_when_a_declared_semantic_column_is_missing()
+    public async Task HostStartupFailsWhenADeclaredSemanticColumnIsMissing()
     {
         await RenameVolumeColumnAsync("volume_mwh", "volume_mwh_drifted");
         try
@@ -39,14 +39,19 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Database:ConnectionString"] = Postgres.ConnectionString,
-                    ["Jwt:Issuer"] = "Tradebook",
-                    ["Jwt:Audience"] = "Tradebook",
-                    ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-                })));
+            builder.ConfigureAppConfiguration(
+                (_, configuration) =>
+                    configuration.AddInMemoryCollection(
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
+                        {
+                            ["Database:ConnectionString"] = Postgres.ConnectionString,
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        }
+                    )
+            )
+        );
 
     private async Task RenameVolumeColumnAsync(string from, string to)
     {
@@ -56,11 +61,20 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
                 "ALTER TABLE physical_deliveries RENAME COLUMN volume_mwh TO volume_mwh_drifted",
             ("volume_mwh_drifted", "volume_mwh") =>
                 "ALTER TABLE physical_deliveries RENAME COLUMN volume_mwh_drifted TO volume_mwh",
-            _ => throw new ArgumentOutOfRangeException(nameof(from), "Unrecognized test column rename.")
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(from),
+                "Unrecognized test column rename."
+            ),
         };
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync();
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
+            var command = new NpgsqlCommand(sql, connection);
+            await using (command.ConfigureAwait(false))
+            {
+                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+        }
     }
 }

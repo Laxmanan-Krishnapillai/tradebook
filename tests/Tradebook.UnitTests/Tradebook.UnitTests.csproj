@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
@@ -13,6 +12,7 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.analyzers" PrivateAssets="all" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
@@ -24,5 +24,4 @@
     <ProjectReference Include="..\..\src\Backend\src\Tradebook.Api\Tradebook.Api.csproj" />
     <ProjectReference Include="..\..\src\Backend\src\Tradebook.Core\Tradebook.Core.csproj" />
   </ItemGroup>
-
 </Project>

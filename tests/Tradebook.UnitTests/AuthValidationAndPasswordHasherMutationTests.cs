@@ -12,13 +12,14 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [Theory]
     [InlineData(1, 1)]
     [InlineData(100, 200)]
-    public void Login_validator_accepts_inclusive_username_and_password_length_boundaries(
+    public void LoginValidatorAcceptsInclusiveUsernameAndPasswordLengthBoundaries(
         int usernameLength,
-        int passwordLength)
+        int passwordLength
+    )
     {
-        var result = _validator.Validate(new LoginRequest(
-            new string('u', usernameLength),
-            new string('p', passwordLength)));
+        var result = _validator.Validate(
+            new LoginRequest(new string('u', usernameLength), new string('p', passwordLength))
+        );
 
         result.IsValid.Should().BeTrue();
         result.Errors.Should().BeEmpty();
@@ -31,9 +32,10 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [InlineData("null-password", "Password")]
     [InlineData("empty-password", "Password")]
     [InlineData("blank-password", "Password")]
-    public void Login_validator_rejects_each_missing_or_blank_credential(
+    public void LoginValidatorRejectsEachMissingOrBlankCredential(
         string scenario,
-        string expectedProperty)
+        string expectedProperty
+    )
     {
         var request = scenario switch
         {
@@ -43,7 +45,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
             "null-password" => new LoginRequest("username", null!),
             "empty-password" => new LoginRequest("username", string.Empty),
             "blank-password" => new LoginRequest("username", " \t "),
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
 
         var result = _validator.Validate(request);
@@ -55,21 +57,22 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [Theory]
     [InlineData(101, 1, "Username")]
     [InlineData(1, 201, "Password")]
-    public void Login_validator_rejects_the_first_length_above_each_maximum(
+    public void LoginValidatorRejectsTheFirstLengthAboveEachMaximum(
         int usernameLength,
         int passwordLength,
-        string expectedProperty)
+        string expectedProperty
+    )
     {
-        var result = _validator.Validate(new LoginRequest(
-            new string('u', usernameLength),
-            new string('p', passwordLength)));
+        var result = _validator.Validate(
+            new LoginRequest(new string('u', usernameLength), new string('p', passwordLength))
+        );
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().ContainSingle(error => error.PropertyName == expectedProperty);
     }
 
     [Fact]
-    public void Hash_emits_the_exact_documented_scheme_iteration_salt_and_key_format()
+    public void HashEmitsTheExactDocumentedSchemeIterationSaltAndKeyFormat()
     {
         const string password = "correct horse battery staple";
 
@@ -85,7 +88,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     }
 
     [Fact]
-    public void Verify_accepts_the_exact_iteration_floor_and_required_salt_and_key_sizes()
+    public void VerifyAcceptsTheExactIterationFloorAndRequiredSaltAndKeySizes()
     {
         const string password = "format-boundary-password";
         var encoded = EncodePbkdf2(password, 210_000, saltLength: 16, hashLength: 32);
@@ -98,8 +101,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [InlineData("0")]
     [InlineData("-1")]
     [InlineData("not-an-integer")]
-    public void Verify_rejects_each_iteration_value_below_the_floor_or_outside_the_format(
-        string iterationText)
+    public void VerifyRejectsEachIterationValueBelowTheFloorOrOutsideTheFormat(string iterationText)
     {
         const string password = "format-boundary-password";
         var valid = EncodePbkdf2(password, 210_000, saltLength: 16, hashLength: 32).Split('.');
@@ -111,7 +113,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [Theory]
     [InlineData(15)]
     [InlineData(17)]
-    public void Verify_rejects_each_neighboring_salt_length_even_when_the_hash_matches(int saltLength)
+    public void VerifyRejectsEachNeighboringSaltLengthEvenWhenTheHashMatches(int saltLength)
     {
         const string password = "format-boundary-password";
         var encoded = EncodePbkdf2(password, 210_000, saltLength, hashLength: 32);
@@ -122,7 +124,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [Theory]
     [InlineData(31)]
     [InlineData(33)]
-    public void Verify_rejects_each_neighboring_key_length_even_when_the_hash_matches(int hashLength)
+    public void VerifyRejectsEachNeighboringKeyLengthEvenWhenTheHashMatches(int hashLength)
     {
         const string password = "format-boundary-password";
         var encoded = EncodePbkdf2(password, 210_000, saltLength: 16, hashLength);
@@ -131,7 +133,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     }
 
     [Fact]
-    public void Repeated_hashes_use_independent_salts_and_both_verify()
+    public void RepeatedHashesUseIndependentSaltsAndBothVerify()
     {
         const string password = "same-password";
 
@@ -155,7 +157,7 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
     [InlineData("invalid-iterations")]
     [InlineData("invalid-salt-base64")]
     [InlineData("invalid-hash-base64")]
-    public void Verify_rejects_each_independently_malformed_hash_component(string scenario)
+    public void VerifyRejectsEachIndependentlyMalformedHashComponent(string scenario)
     {
         const string password = "S3cure!passphrase";
         var parts = PasswordHasher.Hash(password).Split('.');
@@ -165,17 +167,23 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
             "extra-segment" => string.Join('.', parts.Append("extra")),
             "wrong-scheme" => string.Join('.', "argon2id", parts[1], parts[2], parts[3]),
             "wrong-scheme-case" => string.Join('.', "PBKDF2-SHA256", parts[1], parts[2], parts[3]),
-            "invalid-iterations" => string.Join('.', parts[0], "two-hundred-thousand", parts[2], parts[3]),
+            "invalid-iterations" => string.Join(
+                '.',
+                parts[0],
+                "two-hundred-thousand",
+                parts[2],
+                parts[3]
+            ),
             "invalid-salt-base64" => string.Join('.', parts[0], parts[1], "!!", parts[3]),
             "invalid-hash-base64" => string.Join('.', parts[0], parts[1], parts[2], "!!"),
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
         };
 
         PasswordHasher.Verify(password, encoded).Should().BeFalse();
     }
 
     [Fact]
-    public void Verify_rejects_wrong_password_iteration_salt_and_hash_independently()
+    public void VerifyRejectsWrongPasswordIterationSaltAndHashIndependently()
     {
         const string password = "S3cure!passphrase";
         var encoded = PasswordHasher.Hash(password);
@@ -188,17 +196,29 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
 
         var salt = Convert.FromBase64String(parts[2]);
         salt[0] ^= 0x01;
-        var changedSalt = string.Join('.', parts[0], parts[1], Convert.ToBase64String(salt), parts[3]);
+        var changedSalt = string.Join(
+            '.',
+            parts[0],
+            parts[1],
+            Convert.ToBase64String(salt),
+            parts[3]
+        );
         PasswordHasher.Verify(password, changedSalt).Should().BeFalse();
 
         var expected = Convert.FromBase64String(parts[3]);
         expected[^1] ^= 0x01;
-        var changedHash = string.Join('.', parts[0], parts[1], parts[2], Convert.ToBase64String(expected));
+        var changedHash = string.Join(
+            '.',
+            parts[0],
+            parts[1],
+            parts[2],
+            Convert.ToBase64String(expected)
+        );
         PasswordHasher.Verify(password, changedHash).Should().BeFalse();
     }
 
     [Fact]
-    public void Hash_output_matches_an_independent_pbkdf2_sha256_derivation()
+    public void HashOutputMatchesAnIndependentPbkdf2Sha256Derivation()
     {
         const string password = "independent-derivation-check";
         var encoded = PasswordHasher.Hash(password);
@@ -211,7 +231,8 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
             salt,
             210_000,
             HashAlgorithmName.SHA256,
-            32);
+            32
+        );
 
         CryptographicOperations.FixedTimeEquals(independentlyDerived, expected).Should().BeTrue();
     }
@@ -220,7 +241,8 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
         string password,
         int iterations,
         int saltLength,
-        int hashLength)
+        int hashLength
+    )
     {
         var salt = Enumerable.Range(1, saltLength).Select(value => (byte)value).ToArray();
         var hash = Rfc2898DeriveBytes.Pbkdf2(
@@ -228,7 +250,8 @@ public sealed class AuthValidationAndPasswordHasherMutationTests
             salt,
             iterations,
             HashAlgorithmName.SHA256,
-            hashLength);
+            hashLength
+        );
         return $"pbkdf2-sha256.{iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
     }
 }

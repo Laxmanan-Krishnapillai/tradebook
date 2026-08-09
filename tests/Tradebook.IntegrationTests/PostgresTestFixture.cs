@@ -1,12 +1,14 @@
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
 using Tradebook.Infrastructure.Data;
 using Tradebook.Infrastructure.Migrations;
+using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.IntegrationTests;
 
-public sealed class PostgresTestFixture : IAsyncLifetime
+public sealed class PostgresTestFixture : IAsyncLifetime, IDisposable
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:17")
@@ -22,46 +24,35 @@ public sealed class PostgresTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
+        await _container.StartAsync().ConfigureAwait(false);
         MigrationRunner.Run(ConnectionString);
 
         _connection = new NpgsqlConnection(ConnectionString);
-        await _connection.OpenAsync();
-        _respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"],
-            TablesToIgnore = ["schema_journal"]
-        });
+        await _connection.OpenAsync().ConfigureAwait(false);
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_journal"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
     public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
 
     public async Task DisposeAsync()
     {
-        await _connection.DisposeAsync();
-        await _container.DisposeAsync();
+        await _connection.DisposeAsync().ConfigureAwait(false);
+        await _container.DisposeAsync().ConfigureAwait(false);
     }
 
-}
-
-public abstract class PostgresDatabaseTestBase(PostgresTestFixture fixture)
-    : IClassFixture<PostgresTestFixture>, IAsyncLifetime
-{
-    static PostgresDatabaseTestBase()
+    public void Dispose()
     {
-        // Deterministic Dapper handler registration for every derived test class;
-        // production registers the same set in NpgsqlConnectionFactory.
-        Tradebook.Infrastructure.Data.VogenTypeHandlers.RegisterAll();
+        _connection?.Dispose();
+        GC.SuppressFinalize(this);
     }
-
-    protected PostgresTestFixture Postgres { get; } = fixture;
-
-    protected virtual bool ResetDatabaseBeforeEachTest => true;
-
-    public virtual Task InitializeAsync() =>
-        ResetDatabaseBeforeEachTest ? Postgres.ResetDatabaseAsync() : Task.CompletedTask;
-
-    public virtual Task DisposeAsync() => Task.CompletedTask;
-
 }

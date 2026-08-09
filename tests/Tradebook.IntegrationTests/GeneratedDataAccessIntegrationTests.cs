@@ -10,23 +10,27 @@ public sealed class GeneratedDataAccessIntegrationTests(PostgresTestFixture post
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Generated_query_maps_contract_id_and_price_value_objects()
+    public async Task GeneratedQueryMapsContractIdAndPriceValueObjects()
     {
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
         var counterpartyId = Guid.NewGuid();
         var contractId = ContractId.New();
-        await connection.ExecuteAsync("""
+        await connection.ExecuteAsync(
+            """
             INSERT INTO counterparties (id, shorthand, name) VALUES (@CounterpartyId, 'SQLC', 'sqlc counterparty');
             INSERT INTO contracts (
                 id, contract_name, counterparty_id, product_type, action,
                 fixed_price_gas_eur_mwh)
             VALUES (@ContractId, 'sqlc contract', @CounterpartyId, 'Gas', 'Buy', 42.125);
-            """, new { CounterpartyId = counterpartyId, ContractId = contractId.Value });
+            """,
+            new { CounterpartyId = counterpartyId, ContractId = contractId.Value }
+        );
 
         using var queries = new ContractsSql(Postgres.ConnectionString);
         var result = await queries.GetContractPersistenceProbeAsync(
-            new ContractsSql.GetContractPersistenceProbeArgs { Id = contractId });
+            new ContractsSql.GetContractPersistenceProbeArgs { Id = contractId }
+        );
 
         Assert.NotNull(result);
         Assert.Equal(contractId, result.Id);

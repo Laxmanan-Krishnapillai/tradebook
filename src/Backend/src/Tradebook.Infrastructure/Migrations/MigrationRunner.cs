@@ -12,12 +12,14 @@ public static class MigrationRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        var upgrader = DeployChanges.To
-            .PostgresqlDatabase(connectionString)
+        var upgrader = DeployChanges
+            .To.PostgresqlDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(
                 typeof(MigrationRunner).Assembly,
-                resourceName => resourceName.StartsWith(ResourcePrefix, StringComparison.Ordinal)
-                    && resourceName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+                resourceName =>
+                    resourceName.StartsWith(ResourcePrefix, StringComparison.Ordinal)
+                    && resourceName.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)
+            )
             .WithTransactionPerScript()
             .JournalToPostgresqlTable("public", "schema_journal")
             .LogToConsole()
@@ -26,7 +28,8 @@ public static class MigrationRunner
         if (upgrader.GetDiscoveredScripts().Count == 0)
         {
             throw new InvalidOperationException(
-                "No embedded migration scripts were discovered; the build is missing src/Database/Migrations.");
+                "No embedded migration scripts were discovered; the build is missing src/Database/Migrations."
+            );
         }
 
         EnsureDatabase.For.PostgresqlDatabase(connectionString);

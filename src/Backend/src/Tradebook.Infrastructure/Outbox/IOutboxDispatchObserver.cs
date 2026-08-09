@@ -7,5 +7,8 @@ namespace Tradebook.Infrastructure.Outbox;
 /// </summary>
 public interface IOutboxDispatchObserver
 {
-    Task BeforeMarkProcessedAsync(IReadOnlyList<OutboxEventRecord> batch, CancellationToken cancellationToken);
+    Task BeforeMarkProcessedAsync(
+        IReadOnlyList<OutboxEventRecord> batch,
+        CancellationToken cancellationToken
+    );
 }

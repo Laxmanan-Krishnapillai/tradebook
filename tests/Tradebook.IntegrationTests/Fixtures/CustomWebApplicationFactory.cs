@@ -27,18 +27,23 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public async Task InitializeAsync()
     {
-        await _container.StartAsync();
+        await _container.StartAsync().ConfigureAwait(false);
         _connection = new NpgsqlConnection(ConnectionString);
-        await _connection.OpenAsync();
+        await _connection.OpenAsync().ConfigureAwait(false);
 
         MigrationRunner.Run(ConnectionString);
 
-        _respawner = await Respawner.CreateAsync(_connection, new RespawnerOptions
-        {
-            DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public"],
-            TablesToIgnore = ["schema_journal"]
-        });
+        _respawner = await Respawner
+            .CreateAsync(
+                _connection,
+                new RespawnerOptions
+                {
+                    DbAdapter = DbAdapter.Postgres,
+                    SchemasToInclude = ["public"],
+                    TablesToIgnore = ["schema_journal"],
+                }
+            )
+            .ConfigureAwait(false);
     }
 
     public Task ResetDatabaseAsync() => _respawner.ResetAsync(_connection);
@@ -46,23 +51,26 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Database:ConnectionString"] = ConnectionString,
-                ["Jwt:Issuer"] = "Tradebook",
-                ["Jwt:Audience"] = "Tradebook",
-                ["Jwt:SigningKey"] = JwtSigningKey
-            }));
+        builder.ConfigureAppConfiguration(
+            (_, configuration) =>
+                configuration.AddInMemoryCollection(
+                    new Dictionary<string, string?>(StringComparer.Ordinal)
+                    {
+                        ["Database:ConnectionString"] = ConnectionString,
+                        ["Jwt:Issuer"] = "Tradebook",
+                        ["Jwt:Audience"] = "Tradebook",
+                        ["Jwt:SigningKey"] = JwtSigningKey,
+                    }
+                )
+        );
     }
 
     public override async ValueTask DisposeAsync()
     {
-        await _connection.DisposeAsync();
-        await _container.DisposeAsync();
-        await base.DisposeAsync();
+        await _connection.DisposeAsync().ConfigureAwait(false);
+        await _container.DisposeAsync().ConfigureAwait(false);
+        await base.DisposeAsync().ConfigureAwait(false);
     }
 
     Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
-
 }

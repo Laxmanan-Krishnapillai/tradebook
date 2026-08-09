@@ -14,21 +14,27 @@ using Tradebook.IntegrationTests.Fixtures;
 namespace Tradebook.IntegrationTests.RealTime;
 
 [Trait("Category", "RealTime")]
-public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : PostgresDatabaseTestBase(postgres)
+public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
+    : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Returns_ordered_pages_and_the_latest_sequence_from_real_postgres()
+    public async Task ReturnsOrderedPagesAndTheLatestSequenceFromRealPostgres()
     {
         await ResetOutboxAsync();
         await InsertEventsAsync(25);
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken());
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken()
+        );
 
         var sequences = new List<long>();
-        for (var afterSequence = 0L; ;)
+        for (var afterSequence = 0L; ; )
         {
-            var response = await client.GetFromJsonAsync<CatchUpResponse>($"/api/v1/events?afterSequence={afterSequence}&limit=10");
+            var response = await client.GetFromJsonAsync<CatchUpResponse>(
+                $"/api/v1/events?afterSequence={afterSequence}&limit=10"
+            );
             Assert.NotNull(response);
             sequences.AddRange(response.Events.Select(static e => e.SequenceId));
             if (response.Events.Count < 10)
@@ -43,14 +49,15 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
         Assert.Equal(Enumerable.Range(1, 25).Select(static value => (long)value), sequences);
 
         var firstPage = await client.GetFromJsonAsync<CatchUpResponse>(
-            "/api/v1/events?afterSequence=0&limit=1");
+            "/api/v1/events?afterSequence=0&limit=1"
+        );
         Assert.NotNull(firstPage);
         Assert.Equal("MarketPrice", firstPage.Events[0].AggregateType);
         Assert.Equal("2026-08-07", firstPage.Events[0].AggregateId);
     }
 
     [Fact]
-    public async Task Catch_up_requires_a_jwt()
+    public async Task CatchUpRequiresAJwt()
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -61,7 +68,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
     }
 
     [Fact]
-    public async Task Catch_up_excludes_other_actors_private_dashboard_events()
+    public async Task CatchUpExcludesOtherActorsPrivateDashboardEvents()
     {
         await ResetOutboxAsync();
         var actorId = Guid.NewGuid();
@@ -69,13 +76,16 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
         await using (var connection = new NpgsqlConnection(Postgres.ConnectionString))
         {
             await connection.OpenAsync();
-            await using var command = new NpgsqlCommand("""
+            await using var command = new NpgsqlCommand(
+                """
                 INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
                 VALUES
                     ('WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @otherActorId::text)),
                     ('WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @actorId::text)),
                     ('MarketPrice', '2026-08-08', 'Updated', '{}'::jsonb);
-                """, connection);
+                """,
+                connection
+            );
             command.Parameters.AddWithValue("actorId", actorId);
             command.Parameters.AddWithValue("otherActorId", otherActorId);
             await command.ExecuteNonQueryAsync();
@@ -83,13 +93,25 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
 
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(actorId));
-        var response = await client.GetFromJsonAsync<CatchUpResponse>("/api/v1/events?afterSequence=0&limit=10");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(actorId)
+        );
+        var response = await client.GetFromJsonAsync<CatchUpResponse>(
+            "/api/v1/events?afterSequence=0&limit=10"
+        );
 
         Assert.NotNull(response);
         Assert.Equal(2, response.Events.Count);
-        Assert.Contains(response.Events, item => item.AggregateType == "WorkspaceDashboard");
-        Assert.Contains(response.Events, item => item.AggregateType == "MarketPrice");
+        Assert.Contains(
+            response.Events,
+            item =>
+                string.Equals(item.AggregateType, "WorkspaceDashboard", StringComparison.Ordinal)
+        );
+        Assert.Contains(
+            response.Events,
+            item => string.Equals(item.AggregateType, "MarketPrice", StringComparison.Ordinal)
+        );
         Assert.Equal(3, response.LatestSequence);
     }
 
@@ -97,75 +119,103 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres) : Postgre
     [InlineData("afterSequence=-1&limit=10")]
     [InlineData("afterSequence=0&limit=0")]
     [InlineData("afterSequence=0&limit=501")]
-    public async Task Invalid_cursor_parameters_are_rejected(string query)
+    public async Task InvalidCursorParametersAreRejected(string query)
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", CreateToken());
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken()
+        );
 
         var response = await client.GetAsync($"/api/v1/events?{query}");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private WebApplicationFactory<Program> CreateFactory() => new WebApplicationFactory<Program>()
-        .WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Database:ConnectionString"] = Postgres.ConnectionString,
-                ["Jwt:Issuer"] = "Tradebook",
-                ["Jwt:Audience"] = "Tradebook",
-                ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey
-            })));
+    private WebApplicationFactory<Program> CreateFactory() =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration(
+                (_, configuration) =>
+                    configuration.AddInMemoryCollection(
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
+                        {
+                            ["Database:ConnectionString"] = Postgres.ConnectionString,
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        }
+                    )
+            )
+        );
 
     private async Task ResetOutboxAsync()
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand(
-            "TRUNCATE TABLE outbox_events RESTART IDENTITY",
-            connection);
-        await command.ExecuteNonQueryAsync();
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
+            var command = new NpgsqlCommand(
+                "TRUNCATE TABLE outbox_events RESTART IDENTITY",
+                connection
+            );
+            await using (command.ConfigureAwait(false))
+            {
+                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+        }
     }
 
     private async Task InsertEventsAsync(int count)
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("""
-            INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-            SELECT CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
-                   CASE WHEN value = 1 THEN '2026-08-07' ELSE gen_random_uuid()::text END,
-                   'Created',
-                   jsonb_build_object('ordinal', value)
-            FROM generate_series(1, @count) AS value;
-            """, connection);
-        command.Parameters.AddWithValue("count", count);
-        await command.ExecuteNonQueryAsync();
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using (connection.ConfigureAwait(false))
+        {
+            await connection.OpenAsync().ConfigureAwait(false);
+            var command = new NpgsqlCommand(
+                """
+                INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
+                SELECT CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
+                       CASE WHEN value = 1 THEN '2026-08-07' ELSE gen_random_uuid()::text END,
+                       'Created',
+                       jsonb_build_object('ordinal', value)
+                FROM generate_series(1, @count) AS value;
+                """,
+                connection
+            );
+            await using (command.ConfigureAwait(false))
+            {
+                command.Parameters.AddWithValue("count", count);
+                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+        }
     }
 
     private static string CreateToken(Guid? actorId = null)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey));
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)
+        );
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = "Tradebook",
             Audience = "Tradebook",
-            Subject = new ClaimsIdentity(new[]
-            {
-                new Claim("sub", (actorId ?? Guid.NewGuid()).ToString()),
-                new Claim(ClaimTypes.Role, "Trader")
-            }),
-            Expires = DateTime.UtcNow.AddMinutes(5),
-            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+            Subject = new ClaimsIdentity(
+                new[]
+                {
+                    new Claim("sub", (actorId ?? Guid.NewGuid()).ToString()),
+                    new Claim(ClaimTypes.Role, "Trader"),
+                }
+            ),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         };
-        return new JwtSecurityTokenHandler().WriteToken(new JwtSecurityTokenHandler().CreateToken(descriptor));
+        return new JwtSecurityTokenHandler().WriteToken(
+            new JwtSecurityTokenHandler().CreateToken(descriptor)
+        );
     }
 
-    private sealed record CatchUpEvent(
-        long SequenceId,
-        string AggregateType,
-        string AggregateId);
+    private sealed record CatchUpEvent(long SequenceId, string AggregateType, string AggregateId);
+
     private sealed record CatchUpResponse(IReadOnlyList<CatchUpEvent> Events, long LatestSequence);
 }

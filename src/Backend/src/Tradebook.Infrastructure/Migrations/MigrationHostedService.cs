@@ -28,15 +28,12 @@ public sealed class MigrationHostedService(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                logger.LogWarning(
-                    exception,
-                    "Database migration deferred because PostgreSQL is unavailable; retrying."
-                );
+                MigrationLog.MigrationDeferred(logger, exception);
             }
 
             try
             {
-                await Task.Delay(RetryDelay, stoppingToken);
+                await Task.Delay(RetryDelay, stoppingToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
