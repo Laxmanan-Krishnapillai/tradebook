@@ -85,7 +85,8 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var endpoint = Factory.Create<SaveDashboardEndpoint>(
             connections,
             new SemanticQueryCompiler(new SemanticModelLoader()),
-            DashboardJsonOptions()
+            DashboardJsonOptions(),
+            new UnitTestNoopPublisher()
         );
         var request = new SaveDashboardRequest(
             Guid.NewGuid(),
@@ -114,7 +115,8 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
             context => context.User = DomainEndpointTestData.Principal(actorId),
             connections,
             new SemanticQueryCompiler(new SemanticModelLoader()),
-            DashboardJsonOptions()
+            DashboardJsonOptions(),
+            new UnitTestNoopPublisher()
         );
 
         var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() =>

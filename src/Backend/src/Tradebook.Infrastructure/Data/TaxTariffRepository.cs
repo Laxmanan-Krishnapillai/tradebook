@@ -125,8 +125,8 @@ public sealed class TaxTariffRepository(
                         )
                     )
                     .ConfigureAwait(false);
-                await publisher.FlushAsync().ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return created;
             }
         }
@@ -188,8 +188,8 @@ public sealed class TaxTariffRepository(
                         )
                     )
                     .ConfigureAwait(false);
-                await publisher.FlushAsync().ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return updated;
             }
         }
@@ -240,8 +240,8 @@ public sealed class TaxTariffRepository(
                             )
                         )
                         .ConfigureAwait(false);
-                    await publisher.FlushAsync().ConfigureAwait(false);
                     await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                    await publisher.FlushAsync().ConfigureAwait(false);
                     return null;
                 }
                 await (transaction.RollbackAsync(ct)).ConfigureAwait(false);

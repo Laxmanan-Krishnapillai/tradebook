@@ -177,8 +177,8 @@ public sealed class DeliveryRepository(
                     )
                 )
                 .ConfigureAwait(false);
-            await publisher.FlushAsync().ConfigureAwait(false);
             await (transaction.CommitAsync(cancellationToken)).ConfigureAwait(false);
+            await publisher.FlushAsync().ConfigureAwait(false);
             return details;
         }
     }
@@ -238,8 +238,8 @@ public sealed class DeliveryRepository(
                     )
                 )
                 .ConfigureAwait(false);
-            await publisher.FlushAsync().ConfigureAwait(false);
             await (transaction.CommitAsync(cancellationToken)).ConfigureAwait(false);
+            await publisher.FlushAsync().ConfigureAwait(false);
             return details;
         }
     }
@@ -301,8 +301,8 @@ public sealed class DeliveryRepository(
                         )
                     )
                     .ConfigureAwait(false);
-                await publisher.FlushAsync().ConfigureAwait(false);
                 await (transaction.CommitAsync(cancellationToken)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return null;
             }
             await (transaction.RollbackAsync(cancellationToken)).ConfigureAwait(false);

@@ -368,6 +368,7 @@ public sealed class EndpointDefinitionTests
             Factory.Create<SaveDashboardEndpoint>(
                 default(object)!,
                 default(object)!,
+                default(object)!,
                 default(object)!
             ),
             "PUT",
