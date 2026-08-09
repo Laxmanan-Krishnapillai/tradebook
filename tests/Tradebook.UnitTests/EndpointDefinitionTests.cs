@@ -111,361 +111,284 @@ public sealed class EndpointDefinitionTests
             "ReadPolicy"
         );
 
-    [Fact]
-    public void AllDomainEndpointRoutesVerbsAndPoliciesArePinned()
-    {
-        var definitions = ContractDefinitions()
-            .Concat(BioticketDefinitions())
-            .Concat(CapacityBookingDefinitions())
-            .Concat(TransferDefinitions())
-            .Concat(GooCertificateDefinitions())
-            .Concat(HedgeDefinitions())
-            .Concat(MarketPriceDefinitions())
-            .Concat(TaxTariffDefinitions())
-            .Concat(DashboardDefinitions());
+    private static readonly (
+        BaseEndpoint Endpoint,
+        string Verb,
+        string Route,
+        string Policy
+    )[] DomainEndpointDefinitions =
+    [
+        (
+            Factory.Create<CreateContractEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/contracts",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<GetContractByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/contracts/{contractId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetContractHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/contracts",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateContractEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/contracts/{contractId}",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<DeactivateContractEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/contracts/{contractId}",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<CreateBioticketEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/biotickets",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<GetBioticketByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/biotickets/{bioticketId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetBioticketHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/biotickets",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateBioticketEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/biotickets/{bioticketId}",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<CancelBioticketEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/biotickets/{bioticketId}",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<CreateCapacityBookingEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/capacity-bookings",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<GetCapacityBookingByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/capacity-bookings/{capacityBookingId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetCapacityBookingHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/capacity-bookings",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateCapacityBookingEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/capacity-bookings/{capacityBookingId}",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<DeleteCapacityBookingEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/capacity-bookings/{capacityBookingId}",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<CreateTransferEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/transfers",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<GetTransferByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/transfers/{transferId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetTransferHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/transfers",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateTransferEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/transfers/{transferId}",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<CancelTransferEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/transfers/{transferId}",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<CreateGooCertificateEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/goo-certificates",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<GetGooCertificateByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/goo-certificates/{gooCertificateTransactionId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetGooCertificateHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/goo-certificates",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateGooCertificateEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/goo-certificates/{gooCertificateTransactionId}",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<RequestGooBatchExportEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/goo-certificates/{gooCertificateTransactionId}/request-batch-export",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<DeleteGooCertificateEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/goo-certificates/{gooCertificateTransactionId}",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<CreateHedgeEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/hedges",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<GetHedgeByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/hedges/{hedgeId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetHedgeHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/hedges",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateHedgeEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/hedges/{hedgeId}",
+            "TraderPolicy"
+        ),
+        (
+            Factory.Create<DeleteHedgeEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/hedges/{hedgeId}",
+            "BackOfficePolicy"
+        ),
+        (
+            Factory.Create<UpsertMarketPriceEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/market-prices/{priceDate}",
+            "AdminPolicy"
+        ),
+        (
+            Factory.Create<GetMarketPriceByDateEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/market-prices/{priceDate}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetMarketPriceHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/market-prices",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<DeleteMarketPriceEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/market-prices/{priceDate}",
+            "AdminPolicy"
+        ),
+        (
+            Factory.Create<CreateTaxTariffEndpoint>(default(object)!),
+            "POST",
+            "/api/v1/tax-tariffs",
+            "AdminPolicy"
+        ),
+        (
+            Factory.Create<GetTaxTariffByIdEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/tax-tariffs/{taxTariffId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<GetTaxTariffHistoryEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/tax-tariffs",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<UpdateTaxTariffEndpoint>(default(object)!),
+            "PUT",
+            "/api/v1/tax-tariffs/{taxTariffId}",
+            "AdminPolicy"
+        ),
+        (
+            Factory.Create<DeleteTaxTariffEndpoint>(default(object)!),
+            "DELETE",
+            "/api/v1/tax-tariffs/{taxTariffId}",
+            "AdminPolicy"
+        ),
+        (
+            Factory.Create<GetDashboardEndpoint>(default(object)!),
+            "GET",
+            "/api/v1/dashboards/{dashboardId}",
+            "ReadPolicy"
+        ),
+        (
+            Factory.Create<SaveDashboardEndpoint>(
+                default(object)!,
+                default(object)!,
+                default(object)!
+            ),
+            "PUT",
+            "/api/v1/dashboards/{dashboardId}",
+            "ReadPolicy"
+        ),
+    ];
 
+    [Fact]
+    public void AllDomainEndpointRoutesVerbsAndPoliciesArePinned() =>
+        AssertDefinitions(DomainEndpointDefinitions);
+
+    private static void AssertDefinitions(
+        IEnumerable<(BaseEndpoint Endpoint, string Verb, string Route, string Policy)> definitions
+    )
+    {
         foreach (var (endpoint, verb, route, policy) in definitions)
         {
             AssertDefinition(endpoint, verb, route, policy);
         }
     }
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] ContractDefinitions() =>
-        [
-            (
-                Factory.Create<CreateContractEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/contracts",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<GetContractByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/contracts/{contractId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetContractHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/contracts",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateContractEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/contracts/{contractId}",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<DeactivateContractEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/contracts/{contractId}",
-                "BackOfficePolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] BioticketDefinitions() =>
-        [
-            (
-                Factory.Create<CreateBioticketEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/biotickets",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<GetBioticketByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/biotickets/{bioticketId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetBioticketHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/biotickets",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateBioticketEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/biotickets/{bioticketId}",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<CancelBioticketEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/biotickets/{bioticketId}",
-                "BackOfficePolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] CapacityBookingDefinitions() =>
-        [
-            (
-                Factory.Create<CreateCapacityBookingEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/capacity-bookings",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<GetCapacityBookingByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/capacity-bookings/{capacityBookingId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetCapacityBookingHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/capacity-bookings",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateCapacityBookingEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/capacity-bookings/{capacityBookingId}",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<DeleteCapacityBookingEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/capacity-bookings/{capacityBookingId}",
-                "BackOfficePolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] TransferDefinitions() =>
-        [
-            (
-                Factory.Create<CreateTransferEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/transfers",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<GetTransferByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/transfers/{transferId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetTransferHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/transfers",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateTransferEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/transfers/{transferId}",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<CancelTransferEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/transfers/{transferId}",
-                "BackOfficePolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] GooCertificateDefinitions() =>
-        [
-            (
-                Factory.Create<CreateGooCertificateEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/goo-certificates",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<GetGooCertificateByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/goo-certificates/{gooCertificateTransactionId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetGooCertificateHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/goo-certificates",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateGooCertificateEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/goo-certificates/{gooCertificateTransactionId}",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<RequestGooBatchExportEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/goo-certificates/{gooCertificateTransactionId}/request-batch-export",
-                "BackOfficePolicy"
-            ),
-            (
-                Factory.Create<DeleteGooCertificateEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/goo-certificates/{gooCertificateTransactionId}",
-                "BackOfficePolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] HedgeDefinitions() =>
-        [
-            (
-                Factory.Create<CreateHedgeEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/hedges",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<GetHedgeByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/hedges/{hedgeId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetHedgeHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/hedges",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateHedgeEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/hedges/{hedgeId}",
-                "TraderPolicy"
-            ),
-            (
-                Factory.Create<DeleteHedgeEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/hedges/{hedgeId}",
-                "BackOfficePolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] MarketPriceDefinitions() =>
-        [
-            (
-                Factory.Create<UpsertMarketPriceEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/market-prices/{priceDate}",
-                "AdminPolicy"
-            ),
-            (
-                Factory.Create<GetMarketPriceByDateEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/market-prices/{priceDate}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetMarketPriceHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/market-prices",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<DeleteMarketPriceEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/market-prices/{priceDate}",
-                "AdminPolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] TaxTariffDefinitions() =>
-        [
-            (
-                Factory.Create<CreateTaxTariffEndpoint>(default(object)!),
-                "POST",
-                "/api/v1/tax-tariffs",
-                "AdminPolicy"
-            ),
-            (
-                Factory.Create<GetTaxTariffByIdEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/tax-tariffs/{taxTariffId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<GetTaxTariffHistoryEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/tax-tariffs",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<UpdateTaxTariffEndpoint>(default(object)!),
-                "PUT",
-                "/api/v1/tax-tariffs/{taxTariffId}",
-                "AdminPolicy"
-            ),
-            (
-                Factory.Create<DeleteTaxTariffEndpoint>(default(object)!),
-                "DELETE",
-                "/api/v1/tax-tariffs/{taxTariffId}",
-                "AdminPolicy"
-            ),
-        ];
-
-    private static (
-        BaseEndpoint Endpoint,
-        string Verb,
-        string Route,
-        string Policy
-    )[] DashboardDefinitions() =>
-        [
-            (
-                Factory.Create<GetDashboardEndpoint>(default(object)!),
-                "GET",
-                "/api/v1/dashboards/{dashboardId}",
-                "ReadPolicy"
-            ),
-            (
-                Factory.Create<SaveDashboardEndpoint>(
-                    default(object)!,
-                    default(object)!,
-                    default(object)!
-                ),
-                "PUT",
-                "/api/v1/dashboards/{dashboardId}",
-                "ReadPolicy"
-            ),
-        ];
 
     private static void AssertDefinition(
         BaseEndpoint endpoint,

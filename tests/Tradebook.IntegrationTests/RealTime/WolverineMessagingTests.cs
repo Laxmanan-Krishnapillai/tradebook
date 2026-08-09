@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -33,6 +34,9 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
     private static readonly Guid TestActorId = Guid.Parse("3c7280d0-ab9e-48d1-87e9-848244111320");
+    private static readonly JsonSerializerOptions WebJsonSerializerOptions = new(
+        JsonSerializerDefaults.Web
+    );
 
     private sealed record PushedEvent(
         Guid EventId,
@@ -55,121 +59,59 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     );
 
     [Fact]
-    public async Task Rolled_back_command_persists_no_row_audit_outgoing_message_or_realtime_effect()
+    public async Task RolledBackCommandPersistsNoRowAuditOutgoingMessageOrRealtimeEffect()
     {
-        await using var factory = CreateFactory();
-        await ResetWolverineAsync(factory);
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        await ResetWolverineAsync(factory).ConfigureAwait(true);
         var priceDate = new DateOnly(2081, 1, 17);
-        var aggregateId = priceDate.ToString("yyyy-MM-dd");
-        var (hub, events) = await ConnectAsync(factory, CreateToken());
-        await using (hub)
+        var aggregateId = priceDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var (hub, events) = await ConnectAsync(factory, CreateToken()).ConfigureAwait(true);
+        await using (hub.ConfigureAwait(true))
         {
-            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.MarketPrice}");
+            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.MarketPrice}")
+                .ConfigureAwait(true);
 
-            await ExecuteMarketPriceCommandAsync(factory, priceDate, TestActorId, commit: false);
-            await Task.Delay(250);
-            Assert.DoesNotContain(events, item => item.AggregateId == aggregateId);
+            await ExecuteMarketPriceCommandAsync(factory, priceDate, TestActorId, commit: false)
+                .ConfigureAwait(true);
+            await Task.Delay(250).ConfigureAwait(true);
+            Assert.DoesNotContain(
+                events,
+                item => string.Equals(item.AggregateId, aggregateId, StringComparison.Ordinal)
+            );
         }
 
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
-                new { PriceDate = priceDate }
-            )
-        );
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM audit_log WHERE entity_name = 'market_prices' AND entity_id = @EntityId",
-                new { EntityId = priceDate.ToString("yyyy-MM-dd") }
-            )
-        );
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM wolverine.wolverine_outgoing_envelopes"
-            )
-        );
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes"
-            )
-        );
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
-                new { AggregateId = aggregateId }
-            )
-        );
+        await AssertRolledBackStateAsync(priceDate, aggregateId).ConfigureAwait(true);
     }
 
     [Fact]
-    public async Task Database_audit_trigger_commits_with_the_command_and_rolls_back_with_it()
+    public async Task DatabaseAuditTriggerCommitsWithTheCommandAndRollsBackWithIt()
     {
-        await using var factory = CreateFactory();
-        await ResetWolverineAsync(factory);
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        await ResetWolverineAsync(factory).ConfigureAwait(true);
         var committedDate = new DateOnly(2081, 2, 17);
         var rolledBackDate = new DateOnly(2081, 2, 18);
 
-        await ExecuteMarketPriceCommandAsync(factory, committedDate, TestActorId, commit: true);
-        await WaitForRealtimeLogAsync(committedDate.ToString("yyyy-MM-dd"));
-        await ExecuteMarketPriceCommandAsync(factory, rolledBackDate, TestActorId, commit: false);
+        await ExecuteMarketPriceCommandAsync(factory, committedDate, TestActorId, commit: true)
+            .ConfigureAwait(true);
+        await WaitForRealtimeLogAsync(
+                committedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            )
+            .ConfigureAwait(true);
+        await ExecuteMarketPriceCommandAsync(factory, rolledBackDate, TestActorId, commit: false)
+            .ConfigureAwait(true);
 
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        var auditRows = (
-            await connection.QueryAsync<(string EntityId, Guid ActorId)>(
-                """
-                SELECT entity_id AS EntityId, actor_id AS ActorId
-                FROM audit_log
-                WHERE entity_name = 'market_prices'
-                  AND entity_id = ANY(@EntityIds)
-                """,
-                new
-                {
-                    EntityIds = new[]
-                    {
-                        committedDate.ToString("yyyy-MM-dd"),
-                        rolledBackDate.ToString("yyyy-MM-dd"),
-                    },
-                }
-            )
-        ).ToList();
-
-        var audit = Assert.Single(auditRows);
-        Assert.Equal(committedDate.ToString("yyyy-MM-dd"), audit.EntityId);
-        Assert.Equal(TestActorId, audit.ActorId);
-        Assert.Equal(
-            1,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
-                new { PriceDate = committedDate }
-            )
-        );
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
-                new { PriceDate = rolledBackDate }
-            )
-        );
-        Assert.Equal(
-            0,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
-                new { AggregateId = rolledBackDate.ToString("yyyy-MM-dd") }
-            )
-        );
+        await AssertAuditCommitAndRollbackStateAsync(committedDate, rolledBackDate)
+            .ConfigureAwait(true);
     }
 
     [Fact]
-    public async Task Duplicate_envelope_id_produces_one_realtime_effect_and_is_discarded_by_the_inbox()
+    public async Task DuplicateEnvelopeIdProducesOneRealtimeEffectAndIsDiscardedByTheInbox()
     {
-        await using var factory = CreateFactory();
-        await ResetWolverineAsync(factory);
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        await ResetWolverineAsync(factory).ConfigureAwait(true);
         var aggregateId = Guid.NewGuid().ToString();
         var message = EntityChangedDomainEvent.Create(
             RealtimeAggregateTypes.PhysicalDelivery,
@@ -178,216 +120,469 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             version: 1
         );
         var envelopeId = Guid.Empty;
-        var (hub, events) = await ConnectAsync(factory, CreateToken());
-        await using (hub)
+        var (hub, events) = await ConnectAsync(factory, CreateToken()).ConfigureAwait(true);
+        await using (hub.ConfigureAwait(true))
         {
-            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.PhysicalDelivery}");
+            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.PhysicalDelivery}")
+                .ConfigureAwait(true);
 
-            var firstDispatch = await factory.Services.SendMessageAndWaitAsync(
-                message,
-                timeoutInMilliseconds: 15_000
-            );
+            var firstDispatch = await factory
+                .Services.SendMessageAndWaitAsync(message, timeoutInMilliseconds: 15_000)
+                .ConfigureAwait(true);
             var sentEnvelope = firstDispatch.Executed.SingleEnvelope<EntityChangedDomainEvent>();
             envelopeId = sentEnvelope.Id;
             Assert.Equal(
                 message.EventId,
                 Assert.IsType<EntityChangedDomainEvent>(sentEnvelope.Message).EventId
             );
-            await WaitForAsync(events, item => item.EventId == message.EventId);
-
-            var runtime = factory.Services.GetRequiredService<IWolverineRuntime>();
-            var destination =
-                sentEnvelope.Destination
-                ?? throw new InvalidOperationException("Tracked envelope has no destination.");
-            var data =
-                sentEnvelope.Data
-                ?? throw new InvalidOperationException("Tracked envelope has no payload.");
-            var duplicateEnvelope = new Envelope(message)
-            {
-                Id = sentEnvelope.Id,
-                Destination = destination,
-                MessageType = sentEnvelope.MessageType,
-                ContentType = sentEnvelope.ContentType,
-                Data = data.ToArray(),
-            };
-            foreach (var header in sentEnvelope.Headers)
-            {
-                duplicateEnvelope.Headers[header.Key] = header.Value;
-            }
-
-            var agent = runtime.Endpoints.AgentForLocalQueue(destination);
-            Assert.NotNull(agent);
-            var circuit = runtime.Endpoints.FindListenerCircuit(destination);
-            Assert.NotNull(circuit);
-            Assert.Equal(1, circuit.Endpoint.MaxDegreeOfParallelism);
-            var receiver = Assert.IsAssignableFrom<IReceiver>(agent);
-            var duplicateListener = new DuplicateDeliveryListener(destination);
-            await receiver.ReceivedAsync(duplicateListener, duplicateEnvelope);
-            var completed = await duplicateListener.Completed.Task.WaitAsync(
-                TimeSpan.FromSeconds(10)
-            );
-
-            Assert.Same(duplicateEnvelope, completed);
-            Assert.False(duplicateEnvelope.WasPersistedInInbox);
-            Assert.False(duplicateListener.Deferred.Task.IsCompleted);
-            await Task.Delay(250);
+            await WaitForAsync(events, item => item.EventId == message.EventId)
+                .ConfigureAwait(true);
+            await DeliverDuplicateEnvelopeAsync(factory, message, sentEnvelope)
+                .ConfigureAwait(true);
+            await Task.Delay(250).ConfigureAwait(true);
             Assert.Single(events, item => item.EventId == message.EventId);
         }
 
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        Assert.Equal(
-            1,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM realtime_event_log WHERE event_id = @EventId",
-                new { message.EventId }
-            )
-        );
-        Assert.Equal(
-            1,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
-                new { EnvelopeId = envelopeId }
-            )
-        );
-        Assert.Equal(
-            "Handled",
-            await connection.QuerySingleAsync<string>(
-                "SELECT status FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
-                new { EnvelopeId = envelopeId }
-            )
-        );
+        await AssertDuplicateEnvelopeStateAsync(message.EventId, envelopeId).ConfigureAwait(true);
     }
 
     [Fact]
-    public async Task Domain_write_reaches_a_MessagePack_client_and_catch_up_resumes_after_its_sequence()
+    public async Task DomainWriteReachesAMessagePackClientAndCatchUpResumesAfterItsSequence()
     {
-        await using var factory = CreateFactory();
-        await ResetWolverineAsync(factory);
-        var contractId = await SeedContractAsync();
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        await ResetWolverineAsync(factory).ConfigureAwait(true);
+        var contractId = await SeedContractAsync().ConfigureAwait(true);
         var token = CreateToken();
-        var (hub, events) = await ConnectAsync(factory, token);
+        var (hub, events) = await ConnectAsync(factory, token).ConfigureAwait(true);
         long lastSeenSequence;
         Guid firstDeliveryId;
-        await using (hub)
+        await using (hub.ConfigureAwait(true))
         {
-            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.PhysicalDelivery}");
-            using var client = AuthenticatedClient(factory, token);
-
-            var first = await CreateDeliveryAsync(client, contractId, new DateOnly(2082, 1, 1));
-            firstDeliveryId = first.DeliveryId;
-            var pushed = await WaitForAsync(
-                events,
-                item => item.AggregateId == first.DeliveryId.ToString()
-            );
-            Assert.Equal(RealtimeAggregateTypes.PhysicalDelivery, pushed.AggregateType);
-            Assert.Equal("Created", pushed.EventType);
-            using (var payload = JsonDocument.Parse(pushed.PayloadJson))
-            {
-                Assert.Equal(
-                    first.DeliveryId.ToString(),
-                    payload.RootElement.GetProperty("aggregateId").GetString()
-                );
-                Assert.Equal(first.Version, payload.RootElement.GetProperty("version").GetInt64());
-            }
-
-            lastSeenSequence = pushed.SequenceId;
+            (lastSeenSequence, firstDeliveryId) = await CreateFirstDeliveryAndCaptureSequenceAsync(
+                    factory,
+                    hub,
+                    events,
+                    token,
+                    contractId
+                )
+                .ConfigureAwait(true);
         }
 
-        using var reconnectingClient = AuthenticatedClient(factory, token);
-        var second = await CreateDeliveryAsync(
-            reconnectingClient,
-            contractId,
-            new DateOnly(2082, 2, 1)
-        );
-        await WaitForRealtimeLogAsync(second.DeliveryId.ToString());
-        var (reconnectedHub, _) = await ConnectAsync(factory, token);
-        await using (reconnectedHub)
-        {
-            await reconnectedHub.InvokeAsync(
-                "Subscribe",
-                $"entity:{RealtimeAggregateTypes.PhysicalDelivery}"
-            );
-            var catchUp = await reconnectingClient.GetFromJsonAsync<GetEventsSinceResponse>(
-                $"/api/v1/events?afterSequence={lastSeenSequence}&limit=500"
-            );
-
-            Assert.NotNull(catchUp);
-            var replayed = Assert.Single(
-                catchUp.Events,
-                item => item.AggregateId == second.DeliveryId.ToString()
-            );
-            Assert.True(replayed.SequenceId > lastSeenSequence);
-            Assert.DoesNotContain(
-                catchUp.Events,
-                item => item.AggregateId == firstDeliveryId.ToString()
-            );
-            Assert.True(catchUp.LatestSequence >= replayed.SequenceId);
-        }
+        await AssertCatchUpAfterSequenceAsync(
+                factory,
+                token,
+                contractId,
+                lastSeenSequence,
+                firstDeliveryId
+            )
+            .ConfigureAwait(true);
     }
 
     [Fact]
-    public async Task Unauthenticated_hub_connections_are_rejected()
+    public async Task UnauthenticatedHubConnectionsAreRejected()
     {
-        await using var factory = CreateFactory();
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
         var hub = BuildHubConnection(factory, token: null, out _);
-        await using (hub)
+        await using (hub.ConfigureAwait(true))
         {
-            await Assert.ThrowsAsync<HttpRequestException>(() => hub.StartAsync());
+            await Assert
+                .ThrowsAsync<HttpRequestException>(() => hub.StartAsync())
+                .ConfigureAwait(true);
         }
     }
 
     [Fact]
-    public async Task Unknown_entity_groups_are_rejected()
+    public async Task UnknownEntityGroupsAreRejected()
     {
-        await using var factory = CreateFactory();
-        var (hub, _) = await ConnectAsync(factory, CreateToken());
-        await using (hub)
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        var (hub, _) = await ConnectAsync(factory, CreateToken()).ConfigureAwait(true);
+        await using (hub.ConfigureAwait(true))
         {
-            await Assert.ThrowsAsync<HubException>(() =>
-                hub.InvokeAsync("Subscribe", "entity:Nope")
-            );
+            await Assert
+                .ThrowsAsync<HubException>(() => hub.InvokeAsync("Subscribe", "entity:Nope"))
+                .ConfigureAwait(true);
         }
     }
 
     [Fact]
-    public async Task Another_actors_dashboard_group_is_rejected()
+    public async Task AnotherActorsDashboardGroupIsRejected()
     {
-        await using var factory = CreateFactory();
-        var (hub, _) = await ConnectAsync(factory, CreateToken());
-        await using (hub)
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        var (hub, _) = await ConnectAsync(factory, CreateToken()).ConfigureAwait(true);
+        await using (hub.ConfigureAwait(true))
         {
-            await Assert.ThrowsAsync<HubException>(() =>
-                hub.InvokeAsync("Subscribe", $"dashboard:{Guid.NewGuid()}")
-            );
+            await Assert
+                .ThrowsAsync<HubException>(() =>
+                    hub.InvokeAsync("Subscribe", $"dashboard:{Guid.NewGuid()}")
+                )
+                .ConfigureAwait(true);
         }
     }
 
     [Fact]
-    public async Task Dispatch_latency_p99_does_not_regress_more_than_twenty_percent_from_the_measured_baseline()
+    public async Task DispatchLatencyP99DoesNotRegressMoreThanTwentyPercentFromTheMeasuredBaseline()
     {
         var recordBaseline = string.Equals(
             Environment.GetEnvironmentVariable("TRADEBOOK_RECORD_DISPATCH_BASELINE"),
             "1",
             StringComparison.Ordinal
         );
-        var baseline = recordBaseline ? null : await ReadDispatchLatencyBaselineAsync();
+        var baseline = recordBaseline
+            ? null
+            : await ReadDispatchLatencyBaselineAsync().ConfigureAwait(true);
         var sampleCount = baseline?.SampleCount ?? 20;
 
-        await using var factory = CreateFactory();
-        await ResetWolverineAsync(factory);
-        var token = CreateToken();
-        var (hub, events) = await ConnectAsync(factory, token);
-        await using (hub)
+        var factory = CreateFactory();
+        await using var configuredFactory = factory.ConfigureAwait(true);
+        var samples = await MeasureDispatchLatenciesAsync(factory, sampleCount)
+            .ConfigureAwait(true);
+        var measuredP99 = Percentile99(samples);
+        if (recordBaseline)
         {
-            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.MarketPrice}");
+            Console.WriteLine(
+                "TASK17_DISPATCH_BASELINE="
+                    + JsonSerializer.Serialize(
+                        new
+                        {
+                            sampleCount,
+                            p99Milliseconds = measuredP99,
+                            samplesMilliseconds = samples,
+                        },
+                        WebJsonSerializerOptions
+                    )
+            );
+            Assert.Fail(
+                "Captured the Task 17 dispatch baseline. Commit the emitted measured "
+                    + "samples and provenance before running the regression gate."
+            );
+            return;
+        }
+
+        Assert.NotNull(baseline);
+        AssertDispatchLatencyWithinBaseline(baseline, measuredP99, samples);
+    }
+
+    private async Task AssertRolledBackStateAsync(DateOnly priceDate, string aggregateId)
+    {
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
+                    new { PriceDate = priceDate }
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM audit_log WHERE entity_name = 'market_prices' AND entity_id = @EntityId",
+                    new { EntityId = aggregateId }
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM wolverine.wolverine_outgoing_envelopes"
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes"
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
+                    new { AggregateId = aggregateId }
+                )
+                .ConfigureAwait(false)
+        );
+    }
+
+    private async Task AssertAuditCommitAndRollbackStateAsync(
+        DateOnly committedDate,
+        DateOnly rolledBackDate
+    )
+    {
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await AssertAuditLogStateAsync(connection, committedDate, rolledBackDate)
+            .ConfigureAwait(false);
+        await AssertMarketPriceStateAsync(connection, committedDate, rolledBackDate)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task AssertAuditLogStateAsync(
+        NpgsqlConnection connection,
+        DateOnly committedDate,
+        DateOnly rolledBackDate
+    )
+    {
+        var auditRows = (
+            await connection
+                .QueryAsync<(string EntityId, Guid ActorId)>(
+                    """
+                    SELECT entity_id AS EntityId, actor_id AS ActorId
+                    FROM audit_log
+                    WHERE entity_name = 'market_prices'
+                      AND entity_id = ANY(@EntityIds)
+                    """,
+                    new
+                    {
+                        EntityIds = new[]
+                        {
+                            committedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                            rolledBackDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        },
+                    }
+                )
+                .ConfigureAwait(false)
+        ).ToList();
+
+        var audit = Assert.Single(auditRows);
+        Assert.Equal(
+            committedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            audit.EntityId
+        );
+        Assert.Equal(TestActorId, audit.ActorId);
+    }
+
+    private static async Task AssertMarketPriceStateAsync(
+        NpgsqlConnection connection,
+        DateOnly committedDate,
+        DateOnly rolledBackDate
+    )
+    {
+        Assert.Equal(
+            1,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
+                    new { PriceDate = committedDate }
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM market_prices WHERE price_date = @PriceDate",
+                    new { PriceDate = rolledBackDate }
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            0,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM realtime_event_log WHERE aggregate_id = @AggregateId",
+                    new
+                    {
+                        AggregateId = rolledBackDate.ToString(
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture
+                        ),
+                    }
+                )
+                .ConfigureAwait(false)
+        );
+    }
+
+    private async Task AssertDuplicateEnvelopeStateAsync(Guid eventId, Guid envelopeId)
+    {
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        Assert.Equal(
+            1,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM realtime_event_log WHERE event_id = @EventId",
+                    new { EventId = eventId }
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            1,
+            await connection
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
+                    new { EnvelopeId = envelopeId }
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.Equal(
+            "Handled",
+            await connection
+                .QuerySingleAsync<string>(
+                    "SELECT status FROM wolverine.wolverine_incoming_envelopes WHERE id = @EnvelopeId",
+                    new { EnvelopeId = envelopeId }
+                )
+                .ConfigureAwait(false)
+        );
+    }
+
+    private static async Task DeliverDuplicateEnvelopeAsync(
+        WebApplicationFactory<Program> factory,
+        EntityChangedDomainEvent message,
+        Envelope sentEnvelope
+    )
+    {
+        var runtime = factory.Services.GetRequiredService<IWolverineRuntime>();
+        var destination =
+            sentEnvelope.Destination
+            ?? throw new InvalidOperationException("Tracked envelope has no destination.");
+        var data =
+            sentEnvelope.Data
+            ?? throw new InvalidOperationException("Tracked envelope has no payload.");
+        var duplicateEnvelope = new Envelope(message)
+        {
+            Id = sentEnvelope.Id,
+            Destination = destination,
+            MessageType = sentEnvelope.MessageType,
+            ContentType = sentEnvelope.ContentType,
+            Data = data.ToArray(),
+        };
+        foreach (var header in sentEnvelope.Headers)
+        {
+            duplicateEnvelope.Headers[header.Key] = header.Value;
+        }
+
+        var agent = runtime.Endpoints.AgentForLocalQueue(destination);
+        Assert.NotNull(agent);
+        var circuit = runtime.Endpoints.FindListenerCircuit(destination);
+        Assert.NotNull(circuit);
+        Assert.Equal(1, circuit.Endpoint.MaxDegreeOfParallelism);
+        var receiver = Assert.IsAssignableFrom<IReceiver>(agent);
+        var duplicateListener = new DuplicateDeliveryListener(destination);
+        await receiver.ReceivedAsync(duplicateListener, duplicateEnvelope).ConfigureAwait(false);
+        var completed = await duplicateListener
+            .Completed.Task.WaitAsync(TimeSpan.FromSeconds(10))
+            .ConfigureAwait(false);
+
+        Assert.Same(duplicateEnvelope, completed);
+        Assert.False(duplicateEnvelope.WasPersistedInInbox);
+        Assert.False(duplicateListener.Deferred.Task.IsCompleted);
+    }
+
+    private static async Task<(
+        long SequenceId,
+        Guid DeliveryId
+    )> CreateFirstDeliveryAndCaptureSequenceAsync(
+        WebApplicationFactory<Program> factory,
+        HubConnection hub,
+        ConcurrentQueue<PushedEvent> events,
+        string token,
+        Guid contractId
+    )
+    {
+        await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.PhysicalDelivery}")
+            .ConfigureAwait(false);
+        using var client = AuthenticatedClient(factory, token);
+        var first = await CreateDeliveryAsync(client, contractId, new DateOnly(2082, 1, 1))
+            .ConfigureAwait(false);
+        var firstDeliveryId = first.DeliveryId.Value;
+        var aggregateId = firstDeliveryId.ToString();
+        var pushed = await WaitForAsync(
+                events,
+                item => string.Equals(item.AggregateId, aggregateId, StringComparison.Ordinal)
+            )
+            .ConfigureAwait(false);
+        Assert.Equal(RealtimeAggregateTypes.PhysicalDelivery, pushed.AggregateType);
+        Assert.Equal("Created", pushed.EventType);
+        using (var payload = JsonDocument.Parse(pushed.PayloadJson))
+        {
+            Assert.Equal(aggregateId, payload.RootElement.GetProperty("aggregateId").GetString());
+            Assert.Equal(first.Version, payload.RootElement.GetProperty("version").GetInt64());
+        }
+
+        return (pushed.SequenceId, firstDeliveryId);
+    }
+
+    private async Task AssertCatchUpAfterSequenceAsync(
+        WebApplicationFactory<Program> factory,
+        string token,
+        Guid contractId,
+        long lastSeenSequence,
+        Guid firstDeliveryId
+    )
+    {
+        using var reconnectingClient = AuthenticatedClient(factory, token);
+        var second = await CreateDeliveryAsync(
+                reconnectingClient,
+                contractId,
+                new DateOnly(2082, 2, 1)
+            )
+            .ConfigureAwait(false);
+        var secondDeliveryId = second.DeliveryId.Value.ToString();
+        await WaitForRealtimeLogAsync(secondDeliveryId).ConfigureAwait(false);
+        var (reconnectedHub, _) = await ConnectAsync(factory, token).ConfigureAwait(false);
+        await using (reconnectedHub.ConfigureAwait(false))
+        {
+            await reconnectedHub
+                .InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.PhysicalDelivery}")
+                .ConfigureAwait(false);
+            var catchUp = await reconnectingClient
+                .GetFromJsonAsync<GetEventsSinceResponse>(
+                    $"/api/v1/events?afterSequence={lastSeenSequence}&limit=500"
+                )
+                .ConfigureAwait(false);
+
+            Assert.NotNull(catchUp);
+            var replayed = Assert.Single(
+                catchUp.Events,
+                item => string.Equals(item.AggregateId, secondDeliveryId, StringComparison.Ordinal)
+            );
+            Assert.True(replayed.SequenceId > lastSeenSequence);
+            Assert.DoesNotContain(
+                catchUp.Events,
+                item =>
+                    string.Equals(
+                        item.AggregateId,
+                        firstDeliveryId.ToString(),
+                        StringComparison.Ordinal
+                    )
+            );
+            Assert.True(catchUp.LatestSequence >= replayed.SequenceId);
+        }
+    }
+
+    private static async Task<List<double>> MeasureDispatchLatenciesAsync(
+        WebApplicationFactory<Program> factory,
+        int sampleCount
+    )
+    {
+        await ResetWolverineAsync(factory).ConfigureAwait(false);
+        var token = CreateToken();
+        var (hub, events) = await ConnectAsync(factory, token).ConfigureAwait(false);
+        await using (hub.ConfigureAwait(false))
+        {
+            await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.MarketPrice}")
+                .ConfigureAwait(false);
             using var client = AuthenticatedClient(factory, token);
             for (var index = 0; index < 3; index++)
             {
                 await UpsertMarketPriceAndWaitAsync(
-                    client,
-                    events,
-                    new DateOnly(2083, 1, 1).AddDays(index)
-                );
+                        client,
+                        events,
+                        new DateOnly(2083, 1, 1).AddDays(index)
+                    )
+                    .ConfigureAwait(false);
             }
 
             var samples = new List<double>(sampleCount);
@@ -395,54 +590,42 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             {
                 var priceDate = new DateOnly(2083, 2, 1).AddDays(index);
                 var stopwatch = Stopwatch.StartNew();
-                await UpsertMarketPriceAndWaitAsync(client, events, priceDate);
+                await UpsertMarketPriceAndWaitAsync(client, events, priceDate)
+                    .ConfigureAwait(false);
                 stopwatch.Stop();
                 samples.Add(stopwatch.Elapsed.TotalMilliseconds);
             }
 
-            var measuredP99 = Percentile99(samples);
-            if (recordBaseline)
-            {
-                Console.WriteLine(
-                    "TASK17_DISPATCH_BASELINE="
-                        + JsonSerializer.Serialize(
-                            new
-                            {
-                                sampleCount,
-                                p99Milliseconds = measuredP99,
-                                samplesMilliseconds = samples,
-                            },
-                            new JsonSerializerOptions(JsonSerializerDefaults.Web)
-                        )
-                );
-                Assert.Fail(
-                    "Captured the Task 17 dispatch baseline. Commit the emitted measured "
-                        + "samples and provenance before running the regression gate."
-                );
-                return;
-            }
-
-            Assert.NotNull(baseline);
-            var regressionLimit = baseline.P99Milliseconds * 1.20;
-            Console.WriteLine(
-                $"Task 17 dispatch latency: measured p99={measuredP99:F2} ms; "
-                    + $"baseline={baseline.P99Milliseconds:F2} ms; 20% limit={regressionLimit:F2} ms; "
-                    + $"samples=[{string.Join(", ", samples.Select(value => value.ToString("F2")))}]"
-            );
-            Assert.True(
-                measuredP99 <= regressionLimit,
-                $"Dispatch p99 {measuredP99:F2} ms regressed more than 20% from "
-                    + $"the measured {baseline.P99Milliseconds:F2} ms baseline."
-            );
+            return samples;
         }
+    }
+
+    private static void AssertDispatchLatencyWithinBaseline(
+        DispatchLatencyBaseline baseline,
+        double measuredP99,
+        IReadOnlyCollection<double> samples
+    )
+    {
+        var regressionLimit = baseline.P99Milliseconds * 1.20;
+        Console.WriteLine(
+            $"Task 17 dispatch latency: measured p99={measuredP99:F2} ms; "
+                + $"baseline={baseline.P99Milliseconds:F2} ms; 20% limit={regressionLimit:F2} ms; "
+                + $"samples=[{string.Join(", ", samples.Select(value => value.ToString("F2", CultureInfo.InvariantCulture)))}]"
+        );
+        Assert.True(
+            measuredP99 <= regressionLimit,
+            $"Dispatch p99 {measuredP99:F2} ms regressed more than 20% from "
+                + $"the measured {baseline.P99Milliseconds:F2} ms baseline."
+        );
     }
 
     private static async Task<DispatchLatencyBaseline> ReadDispatchLatencyBaselineAsync()
     {
         var baselinePath = FindRepositoryFile("docs/baselines/task-17-dispatch-latency.json");
+        var baselineJson = await File.ReadAllTextAsync(baselinePath).ConfigureAwait(false);
         var baseline = JsonSerializer.Deserialize<DispatchLatencyBaseline>(
-            await File.ReadAllTextAsync(baselinePath),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            baselineJson,
+            WebJsonSerializerOptions
         );
         Assert.NotNull(baseline);
         Assert.True(baseline.P99Milliseconds > 0);
@@ -456,79 +639,91 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         return baseline;
     }
 
-    private async Task ExecuteMarketPriceCommandAsync(
+    private static async Task ExecuteMarketPriceCommandAsync(
         WebApplicationFactory<Program> factory,
         DateOnly priceDate,
         Guid actorId,
         bool commit
     )
     {
-        await using var scope = factory.Services.CreateAsyncScope();
+        var scope = factory.Services.CreateAsyncScope();
+        await using var configuredScope = scope.ConfigureAwait(false);
         var connections = scope.ServiceProvider.GetRequiredService<INpgsqlConnectionFactory>();
         var publisher = scope.ServiceProvider.GetRequiredService<ITransactionalEventPublisher>();
-        await using var connection = await connections.OpenConnectionAsync(default);
-        await using var transaction = await connection.BeginTransactionAsync();
+        var connection = await connections.OpenConnectionAsync(default).ConfigureAwait(false);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        var transaction = await connection.BeginTransactionAsync().ConfigureAwait(false);
+        await using var configuredTransaction = transaction.ConfigureAwait(false);
         try
         {
-            await connection.ExecuteAsync(
-                new CommandDefinition(
-                    "SELECT set_config('app.actor_id', @ActorId, true)",
-                    new { ActorId = actorId.ToString() },
-                    transaction
+            await connection
+                .ExecuteAsync(
+                    new CommandDefinition(
+                        "SELECT set_config('app.actor_id', @ActorId, true)",
+                        new { ActorId = actorId.ToString() },
+                        transaction
+                    )
                 )
-            );
-            var version = await connection.ExecuteScalarAsync<long>(
-                new CommandDefinition(
-                    """
-                    INSERT INTO market_prices (price_date, ttf_eur_mwh)
-                    VALUES (@PriceDate, 31.5)
-                    RETURNING version
-                    """,
-                    new { PriceDate = priceDate },
-                    transaction
+                .ConfigureAwait(false);
+            var version = await connection
+                .ExecuteScalarAsync<long>(
+                    new CommandDefinition(
+                        """
+                        INSERT INTO market_prices (price_date, ttf_eur_mwh)
+                        VALUES (@PriceDate, 31.5)
+                        RETURNING version
+                        """,
+                        new { PriceDate = priceDate },
+                        transaction
+                    )
                 )
-            );
-            await publisher.EnlistAsync(transaction, default);
-            await publisher.PublishAsync(
-                EntityChangedDomainEvent.Create(
-                    RealtimeAggregateTypes.MarketPrice,
-                    priceDate.ToString("yyyy-MM-dd"),
-                    "Created",
-                    version
+                .ConfigureAwait(false);
+            await publisher.EnlistAsync(transaction, default).ConfigureAwait(false);
+            await publisher
+                .PublishAsync(
+                    EntityChangedDomainEvent.Create(
+                        RealtimeAggregateTypes.MarketPrice,
+                        priceDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        "Created",
+                        version
+                    )
                 )
-            );
+                .ConfigureAwait(false);
 
             if (!commit)
             {
                 throw new InjectedCommandFailureException();
             }
 
-            await transaction.CommitAsync();
-            await publisher.FlushAsync();
+            await transaction.CommitAsync().ConfigureAwait(false);
+            await publisher.FlushAsync().ConfigureAwait(false);
         }
         catch (InjectedCommandFailureException)
         {
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync().ConfigureAwait(false);
         }
     }
 
     private async Task WaitForRealtimeLogAsync(string aggregateId)
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
-        while (DateTime.UtcNow < deadline)
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        var deadline = TimeProvider.System.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds(15);
+        while (TimeProvider.System.GetUtcNow().UtcDateTime < deadline)
         {
             if (
-                await connection.ExecuteScalarAsync<bool>(
-                    "SELECT EXISTS(SELECT 1 FROM realtime_event_log WHERE aggregate_id = @AggregateId)",
-                    new { AggregateId = aggregateId }
-                )
+                await connection
+                    .ExecuteScalarAsync<bool>(
+                        "SELECT EXISTS(SELECT 1 FROM realtime_event_log WHERE aggregate_id = @AggregateId)",
+                        new { AggregateId = aggregateId }
+                    )
+                    .ConfigureAwait(false)
             )
             {
                 return;
             }
 
-            await Task.Delay(50);
+            await Task.Delay(50).ConfigureAwait(false);
         }
 
         throw new TimeoutException(
@@ -538,30 +733,35 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
 
     private async Task<Guid> SeedContractAsync()
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         var counterpartyId = Guid.NewGuid();
-        await connection.ExecuteAsync(
-            "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
-            new
-            {
-                Id = counterpartyId,
-                Name = $"Counterparty-{counterpartyId}",
-                Shorthand = $"CP{counterpartyId:N}"[..20],
-            }
-        );
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
+                new
+                {
+                    Id = counterpartyId,
+                    Name = $"Counterparty-{counterpartyId}",
+                    Shorthand = $"CP{counterpartyId:N}"[..20],
+                }
+            )
+            .ConfigureAwait(false);
         var contractId = Guid.NewGuid();
-        await connection.ExecuteAsync(
-            """
-            INSERT INTO contracts (id, contract_name, counterparty_id, product_type, action)
-            VALUES (@Id, @Name, @CounterpartyId, 'Gas', 'Sell')
-            """,
-            new
-            {
-                Id = contractId,
-                Name = $"TEST45.SG.{contractId:N}"[..40],
-                CounterpartyId = counterpartyId,
-            }
-        );
+        await connection
+            .ExecuteAsync(
+                """
+                INSERT INTO contracts (id, contract_name, counterparty_id, product_type, action)
+                VALUES (@Id, @Name, @CounterpartyId, 'Gas', 'Sell')
+                """,
+                new
+                {
+                    Id = contractId,
+                    Name = $"TEST45.SG.{contractId:N}"[..40],
+                    CounterpartyId = counterpartyId,
+                }
+            )
+            .ConfigureAwait(false);
         return contractId;
     }
 
@@ -571,20 +771,26 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         DateOnly supplyMonth
     )
     {
-        using var response = await client.PostAsJsonAsync(
-            "/api/v1/deliveries",
-            new
-            {
-                contractId,
-                bookType = "Sales",
-                supplyMonth = supplyMonth.ToString("yyyy-MM-dd"),
-                volumeNominatedMwh = 10m,
-                volumeRealisedMwh = 9m,
-                priceMechanism = "TTF",
-            }
-        );
+        using var response = await client
+            .PostAsJsonAsync(
+                "/api/v1/deliveries",
+                new
+                {
+                    contractId,
+                    bookType = "Sales",
+                    supplyMonth = supplyMonth.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    volumeNominatedMwh = 10m,
+                    volumeRealisedMwh = 9m,
+                    priceMechanism = "TTF",
+                }
+            )
+            .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<CreatePhysicalDeliveryResponse>())!;
+        return (
+            await response
+                .Content.ReadFromJsonAsync<CreatePhysicalDeliveryResponse>()
+                .ConfigureAwait(false)
+        )!;
     }
 
     private static async Task UpsertMarketPriceAndWaitAsync(
@@ -593,18 +799,24 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         DateOnly priceDate
     )
     {
-        var aggregateId = priceDate.ToString("yyyy-MM-dd");
-        using var response = await client.PutAsJsonAsync(
-            $"/api/v1/market-prices/{aggregateId}",
-            new
-            {
-                priceDate = aggregateId,
-                ttfEurMwh = 31.5m,
-                version = 0,
-            }
-        );
+        var aggregateId = priceDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        using var response = await client
+            .PutAsJsonAsync(
+                $"/api/v1/market-prices/{aggregateId}",
+                new
+                {
+                    priceDate = aggregateId,
+                    ttfEurMwh = 31.5m,
+                    version = 0,
+                }
+            )
+            .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        await WaitForAsync(events, item => item.AggregateId == aggregateId);
+        await WaitForAsync(
+                events,
+                item => string.Equals(item.AggregateId, aggregateId, StringComparison.Ordinal)
+            )
+            .ConfigureAwait(false);
     }
 
     private static double Percentile99(IReadOnlyCollection<double> samples)
@@ -624,7 +836,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
                             ["Jwt:Issuer"] = "Tradebook",
@@ -638,7 +850,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     private static async Task ResetWolverineAsync(WebApplicationFactory<Program> factory)
     {
         var runtime = factory.Services.GetRequiredService<IWolverineRuntime>();
-        await runtime.Storage.Admin.ClearAllAsync();
+        await runtime.Storage.Admin.ClearAllAsync().ConfigureAwait(false);
     }
 
     private static HttpClient AuthenticatedClient(
@@ -697,7 +909,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     )> ConnectAsync(WebApplicationFactory<Program> factory, string token)
     {
         var hub = BuildHubConnection(factory, token, out var events);
-        await hub.StartAsync();
+        await hub.StartAsync().ConfigureAwait(false);
         return (hub, events);
     }
 
@@ -706,8 +918,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         Func<PushedEvent, bool> predicate
     )
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
-        while (DateTime.UtcNow < deadline)
+        var deadline = TimeProvider.System.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds(15);
+        while (TimeProvider.System.GetUtcNow().UtcDateTime < deadline)
         {
             var match = events.FirstOrDefault(predicate);
             if (match is not null)
@@ -715,7 +927,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                 return match;
             }
 
-            await Task.Delay(50);
+            await Task.Delay(50).ConfigureAwait(false);
         }
 
         throw new TimeoutException(
@@ -736,7 +948,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                 new Claim("sub", TestActorId.ToString()),
                 new Claim(ClaimTypes.Role, "Admin"),
             ]),
-            Expires = DateTime.UtcNow.AddMinutes(10),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(10),
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         };
         var handler = new JwtSecurityTokenHandler();
@@ -767,7 +979,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
         );
     }
 
-    private sealed class InjectedCommandFailureException : Exception;
+    public sealed class InjectedCommandFailureException : Exception;
 
     private sealed class DuplicateDeliveryListener(Uri address) : IListener
     {

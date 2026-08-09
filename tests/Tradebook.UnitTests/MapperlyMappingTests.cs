@@ -1,8 +1,6 @@
 using System.Text.Json;
-using Tradebook.Api.Features.Auth.Login;
 using Tradebook.Api.Features.Dashboards;
 using Tradebook.Api.Features.PhysicalDeliveries.CreatePhysicalDelivery;
-using Tradebook.Core.Domain.Entities;
 using Tradebook.Core.DTOs;
 
 namespace Tradebook.UnitTests;
@@ -18,11 +16,10 @@ public sealed class MapperlyMappingTests
             "PhysicalDeliveryMapper"
         ),
         ("Tradebook.Infrastructure/Data/DeliveryMapper.cs", "DeliveryMapper"),
-        ("Tradebook.Infrastructure/Outbox/OutboxEventMapper.cs", "OutboxEventMapper"),
     ];
 
     [Fact]
-    public void SAFE05BackendMappersAreExactlyTheFiveMapperlyPartialTypes()
+    public void SAFE05BackendMappersAreExactlyTheFourMapperlyPartialTypes()
     {
         var backendSourceRoot = Path.Combine(FindRepositoryRoot(), "src", "Backend", "src");
         var actualFiles = Directory
@@ -54,27 +51,6 @@ public sealed class MapperlyMappingTests
             Assert.DoesNotContain("GetProperties(", source, StringComparison.Ordinal);
             Assert.DoesNotMatch(@"\bdynamic\b", source);
         }
-    }
-
-    [Fact]
-    public void LoginMapperCombinesUserTokenAndExpiryAndRenamesActorId()
-    {
-        var actorId = Guid.NewGuid();
-        var expiresAt = new DateTimeOffset(2026, 8, 9, 18, 0, 0, TimeSpan.Zero);
-        var user = new User
-        {
-            Id = actorId,
-            Username = "trader",
-            PasswordHash = "hash",
-            Roles = ["Trader"],
-            IsActive = true,
-        };
-
-        var response = LoginMapper.ToResponse(user, "signed-token", expiresAt);
-
-        Assert.Equal(actorId, response.ActorId.Value);
-        Assert.Equal("signed-token", response.AccessToken);
-        Assert.Equal(expiresAt, response.ExpiresAtUtc);
     }
 
     [Fact]

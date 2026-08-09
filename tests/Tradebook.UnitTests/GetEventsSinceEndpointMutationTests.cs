@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FastEndpoints;
 using Tradebook.Api.Features.Events;
 using Tradebook.Core.DTOs;
@@ -60,9 +59,9 @@ public sealed class GetEventsSinceEndpointMutationTests
             ],
             42
         );
-        var reader = new RecordingOutboxEventReader(response);
+        var reader = new RecordingRealtimeEventReader(response);
         var endpoint = Factory.Create<GetEventsSinceEndpoint>(
-            context => context.User = Principal(actorId),
+            context => context.User = DomainEndpointTestData.Principal(actorId),
             reader
         );
         var request = new GetEventsSinceRequest { AfterSequence = 17, Limit = 23 };
@@ -78,20 +77,8 @@ public sealed class GetEventsSinceEndpointMutationTests
         Assert.Equal(cancellation.Token, reader.CancellationToken);
     }
 
-    private static ClaimsPrincipal Principal(Guid actorId) =>
-        new(
-            new ClaimsIdentity(
-                [
-                    new Claim("oid", actorId.ToString()),
-                    new("tid", "11111111-1111-1111-1111-111111111111"),
-                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
-                ],
-                "test"
-            )
-        );
-
-    private sealed class RecordingOutboxEventReader(GetEventsSinceResponse response)
-        : IOutboxEventReader
+    private sealed class RecordingRealtimeEventReader(GetEventsSinceResponse response)
+        : IRealtimeEventReader
     {
         public int Calls { get; private set; }
         public long AfterSequence { get; private set; }

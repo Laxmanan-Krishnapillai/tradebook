@@ -23,12 +23,12 @@ public sealed class DtoContractShapeTests
     private static readonly NullabilityInfoContext Nullability = new();
 
     [Fact]
-    public void All78AuditedContractsArePropertyBodiedSealedRecords()
+    public void All77AuditedRecordContractsArePropertyBodiedAndSealed()
     {
         var contracts = AuditedContracts();
 
-        Assert.Equal(78, contracts.Length);
-        Assert.Equal(78, contracts.Distinct().Count());
+        Assert.Equal(77, contracts.Length);
+        Assert.Equal(77, contracts.Distinct().Count());
         foreach (var contract in contracts)
         {
             Assert.True(contract.IsSealed, $"{contract.FullName} must be sealed.");
@@ -213,7 +213,6 @@ public sealed class DtoContractShapeTests
                 typeof(GetCapacityBookingByIdRequest),
                 typeof(GetContractByIdRequest),
                 typeof(GetDashboardRequest),
-                typeof(GetEventsSinceRequest),
                 typeof(GetGooCertificateByIdRequest),
                 typeof(GetHedgeByIdRequest),
                 typeof(GetMarketPriceByDateRequest),

@@ -1,10 +1,5 @@
-using System.Reflection;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Loader;
-using ArchUnitNET.xUnit;
-using Microsoft.AspNetCore.SignalR;
-using Tradebook.Api.RealTime.Handlers;
-using Tradebook.Core.Messaging;
 using Xunit;
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
 
@@ -33,44 +28,28 @@ public sealed class BoundaryTests
         .Build();
 
     [Fact]
-    public void Core_depends_on_neither_api_nor_infrastructure() =>
-        Types()
-            .That()
-            .ResideInNamespace("Tradebook.Core", true)
-            .Should()
-            .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api", true))
-            .AndShould()
-            .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Infrastructure", true))
-            .Check(Architecture);
-
-    [Fact]
-    public void Api_endpoints_do_not_reference_npgsql() =>
-        Classes()
-            .That()
-            .ResideInNamespace("Tradebook.Api.Features", true)
-            .Should()
-            .NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
-            .Check(Architecture);
-
-    [Fact]
-    public void Msg07_signalr_hub_context_dependencies_exist_only_in_realtime_handlers()
-    {
-        const string handlerNamespace = "Tradebook.Api.RealTime.Handlers";
-        var hubContextConsumers = typeof(Program)
-            .Assembly.GetTypes()
-            .Where(DependsOnGenericHubContext)
-            .ToArray();
-
-        var consumer = Assert.Single(hubContextConsumers);
-        Assert.Equal(typeof(EntityChangedRealtimeHandler), consumer);
-        Assert.Equal(handlerNamespace, consumer.Namespace);
-        Assert.NotNull(
-            consumer.GetMethod(
-                nameof(EntityChangedRealtimeHandler.Handle),
-                [typeof(EntityChangedDomainEvent), typeof(CancellationToken)]
-            )
+    public void CoreDependsOnNeitherApiNorInfrastructure() =>
+        Assert.True(
+            Types()
+                .That()
+                .ResideInNamespace("Tradebook.Core", true)
+                .Should()
+                .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Api", true))
+                .AndShould()
+                .NotDependOnAny(Types().That().ResideInNamespace("Tradebook.Infrastructure", true))
+                .HasNoViolations(Architecture)
         );
-    }
+
+    [Fact]
+    public void ApiEndpointsDoNotReferenceNpgsql() =>
+        Assert.True(
+            Classes()
+                .That()
+                .ResideInNamespace("Tradebook.Api.Features", true)
+                .Should()
+                .NotDependOnAny(Types().That().ResideInNamespace("Npgsql", true))
+                .HasNoViolations(Architecture)
+        );
 
     public static IEnumerable<object[]> SiblingFeaturePairs() =>
         from source in FeatureSlices
@@ -80,45 +59,15 @@ public sealed class BoundaryTests
 
     [Theory]
     [MemberData(nameof(SiblingFeaturePairs))]
-    public void Feature_slices_do_not_reference_siblings(string source, string target) =>
-        Types()
-            .That()
-            .ResideInNamespace($"Tradebook.Api.Features.{source}", true)
-            .Should()
-            .NotDependOnAny(
-                Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true)
-            )
-            .Check(Architecture);
-
-    private static bool DependsOnGenericHubContext(System.Type type)
-    {
-        const BindingFlags allMembers =
-            BindingFlags.Instance
-            | BindingFlags.Static
-            | BindingFlags.Public
-            | BindingFlags.NonPublic
-            | BindingFlags.DeclaredOnly;
-
-        return type.GetConstructors(allMembers)
-                .SelectMany(constructor => constructor.GetParameters())
-                .Any(parameter => ContainsGenericHubContext(parameter.ParameterType))
-            || type.GetFields(allMembers).Any(field => ContainsGenericHubContext(field.FieldType))
-            || type.GetProperties(allMembers)
-                .Any(property => ContainsGenericHubContext(property.PropertyType))
-            || type.GetMethods(allMembers)
-                .Any(method =>
-                    ContainsGenericHubContext(method.ReturnType)
-                    || method
-                        .GetParameters()
-                        .Any(parameter => ContainsGenericHubContext(parameter.ParameterType))
-                );
-    }
-
-    private static bool ContainsGenericHubContext(System.Type type) =>
-        type.IsGenericType
-        && (
-            type.GetGenericTypeDefinition() == typeof(IHubContext<>)
-            || type.GetGenericTypeDefinition() == typeof(IHubContext<,>)
-            || type.GetGenericArguments().Any(ContainsGenericHubContext)
+    public void FeatureSlicesDoNotReferenceSiblings(string source, string target) =>
+        Assert.True(
+            Types()
+                .That()
+                .ResideInNamespace($"Tradebook.Api.Features.{source}", true)
+                .Should()
+                .NotDependOnAny(
+                    Types().That().ResideInNamespace($"Tradebook.Api.Features.{target}", true)
+                )
+                .HasNoViolations(Architecture)
         );
 }

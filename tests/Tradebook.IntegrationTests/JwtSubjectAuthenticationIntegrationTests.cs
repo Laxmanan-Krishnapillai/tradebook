@@ -19,7 +19,7 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
     [Theory]
     [InlineData(null)]
     [InlineData("not-a-guid")]
-    public async Task Rest_api_rejects_tokens_without_a_valid_uuid_subject(string? subject)
+    public async Task RestApiRejectsTokensWithoutAValidUuidSubject(string? subject)
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -36,7 +36,7 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
     [Theory]
     [InlineData(null)]
     [InlineData("not-a-guid")]
-    public async Task Dashboard_hub_rejects_tokens_without_a_valid_uuid_subject(string? subject)
+    public async Task DashboardHubRejectsTokensWithoutAValidUuidSubject(string? subject)
     {
         await using var factory = CreateFactory();
         await using var hub = BuildHubConnection(
@@ -48,7 +48,7 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
     }
 
     [Fact]
-    public async Task Dashboard_hub_requires_a_read_role()
+    public async Task DashboardHubRequiresAReadRole()
     {
         await using var factory = CreateFactory();
         await using var hub = BuildHubConnection(
@@ -61,21 +61,20 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
-            builder.ConfigureAppConfiguration(
-                (_, configuration) =>
-                    configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>
-                        {
-                            ["Database:ConnectionString"] = Postgres.ConnectionString,
-                            ["Jwt:Issuer"] = "Tradebook",
-                            ["Jwt:Audience"] = "Tradebook",
-                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
-                        }
-                    )
-            );
-        });
+            builder
+                .UseEnvironment("Testing")
+                .ConfigureAppConfiguration(
+                    (_, configuration) =>
+                        configuration.AddInMemoryCollection(
+                            new Dictionary<string, string?>(StringComparer.Ordinal)
+                            {
+                                ["Database:ConnectionString"] = Postgres.ConnectionString,
+                                ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                            }
+                        )
+                )
+        );
 
     private static HubConnection BuildHubConnection(
         WebApplicationFactory<Program> factory,
@@ -114,7 +113,7 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
             Issuer = "Tradebook",
             Audience = "Tradebook",
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddMinutes(5),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         };
         var handler = new JwtSecurityTokenHandler();

@@ -15,8 +15,52 @@ public sealed class RealtimeMigrationTests(PostgresTestFixture postgres)
         DateTime OccurredAt
     );
 
+    private sealed record LegacyMigrationScenario(
+        Guid PublicEventId,
+        Guid DashboardEventId,
+        Guid DashboardId,
+        Guid ActorId,
+        DateTimeOffset PublicOccurredAt,
+        DateTimeOffset DashboardOccurredAt,
+        string PublicPayload,
+        string DashboardPayload
+    );
+
+    private const string LegacySchemaSql = """
+        DROP TABLE public.realtime_event_log;
+        DROP TABLE public.outbox_events;
+        DROP FUNCTION IF EXISTS public.mirror_realtime_event_to_legacy_outbox();
+        DROP FUNCTION IF EXISTS public.notify_outbox_new_event();
+        CREATE TABLE public.outbox_events (
+            event_id UUID PRIMARY KEY,
+            sequence_id BIGSERIAL NOT NULL UNIQUE,
+            aggregate_type VARCHAR(128) NOT NULL,
+            aggregate_id VARCHAR(128) NOT NULL,
+            event_type VARCHAR(128) NOT NULL,
+            payload JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            processed_at TIMESTAMPTZ
+        );
+        CREATE OR REPLACE FUNCTION public.notify_outbox_new_event() RETURNS trigger AS $$
+        BEGIN
+            PERFORM pg_notify('outbox_new_event', NEW.event_id::text);
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        CREATE TRIGGER trg_outbox_notify AFTER INSERT ON public.outbox_events
+        FOR EACH ROW EXECUTE FUNCTION public.notify_outbox_new_event();
+        INSERT INTO public.outbox_events (
+            event_id, sequence_id, aggregate_type, aggregate_id, event_type,
+            payload, created_at, processed_at)
+        VALUES
+            (@PublicEventId, 7, 'PhysicalDelivery', 'legacy-delivery', 'Updated',
+             CAST(@PublicPayload AS jsonb), @PublicOccurredAt, @PublicOccurredAt),
+            (@DashboardEventId, 11, 'WorkspaceDashboard', @DashboardId, 'Updated',
+             CAST(@DashboardPayload AS jsonb), @DashboardOccurredAt, NULL);
+        """;
+
     [Fact]
-    public async Task Legacy_history_and_writes_are_preserved_during_the_expand_migration()
+    public async Task LegacyHistoryAndWritesArePreservedDuringTheExpandMigration()
     {
         var publicEventId = Guid.NewGuid();
         var dashboardEventId = Guid.NewGuid();
@@ -27,69 +71,96 @@ public sealed class RealtimeMigrationTests(PostgresTestFixture postgres)
         const string publicPayload = """{"aggregateId":"legacy-delivery","version":4}""";
         var dashboardPayload =
             $$"""{"dashboardId":"{{dashboardId}}","actorId":"{{actorId}}","version":9}""";
+        var scenario = new LegacyMigrationScenario(
+            publicEventId,
+            dashboardEventId,
+            dashboardId,
+            actorId,
+            publicOccurredAt,
+            dashboardOccurredAt,
+            publicPayload,
+            dashboardPayload
+        );
 
         await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await connection.OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync();
         try
         {
-            await connection.ExecuteAsync(
-                new CommandDefinition(
-                    """
-                    DROP TABLE public.realtime_event_log;
-                    DROP TABLE public.outbox_events;
-                    DROP FUNCTION IF EXISTS public.mirror_realtime_event_to_legacy_outbox();
-                    DROP FUNCTION IF EXISTS public.notify_outbox_new_event();
-                    CREATE TABLE public.outbox_events (
-                        event_id UUID PRIMARY KEY,
-                        sequence_id BIGSERIAL NOT NULL UNIQUE,
-                        aggregate_type VARCHAR(128) NOT NULL,
-                        aggregate_id VARCHAR(128) NOT NULL,
-                        event_type VARCHAR(128) NOT NULL,
-                        payload JSONB NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-                        processed_at TIMESTAMPTZ
-                    );
-                    CREATE OR REPLACE FUNCTION public.notify_outbox_new_event() RETURNS trigger AS $$
-                    BEGIN
-                        PERFORM pg_notify('outbox_new_event', NEW.event_id::text);
-                        RETURN NEW;
-                    END;
-                    $$ LANGUAGE plpgsql;
-                    CREATE TRIGGER trg_outbox_notify AFTER INSERT ON public.outbox_events
-                    FOR EACH ROW EXECUTE FUNCTION public.notify_outbox_new_event();
-                    INSERT INTO public.outbox_events (
-                        event_id, sequence_id, aggregate_type, aggregate_id, event_type,
-                        payload, created_at, processed_at)
-                    VALUES
-                        (@PublicEventId, 7, 'PhysicalDelivery', 'legacy-delivery', 'Updated',
-                         CAST(@PublicPayload AS jsonb), @PublicOccurredAt, @PublicOccurredAt),
-                        (@DashboardEventId, 11, 'WorkspaceDashboard', @DashboardId, 'Updated',
-                         CAST(@DashboardPayload AS jsonb), @DashboardOccurredAt, NULL);
-                    """,
-                    new
-                    {
-                        PublicEventId = publicEventId,
-                        PublicPayload = publicPayload,
-                        PublicOccurredAt = publicOccurredAt,
-                        DashboardEventId = dashboardEventId,
-                        DashboardId = dashboardId.ToString(),
-                        DashboardPayload = dashboardPayload,
-                        DashboardOccurredAt = dashboardOccurredAt,
-                    },
-                    transaction
-                )
-            );
+            await SeedLegacySchemaAsync(connection, transaction, scenario);
 
-            var migrationSql = await File.ReadAllTextAsync(
+            await ApplyMigrationAsync(connection, transaction);
+
+            await VerifyMigratedHistoryAsync(connection, transaction, scenario);
+
+            await VerifyLegacyWriteAfterMigrationAsync(
+                connection,
+                transaction,
+                scenario.DashboardEventId
+            );
+            await VerifyWolverineWriteAfterMigrationAsync(connection, transaction);
+        }
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
+    }
+
+    private static Task<int> SeedLegacySchemaAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        LegacyMigrationScenario scenario
+    ) =>
+        connection.ExecuteAsync(
+            new CommandDefinition(
+                LegacySchemaSql,
+                new
+                {
+                    scenario.PublicEventId,
+                    scenario.PublicPayload,
+                    scenario.PublicOccurredAt,
+                    scenario.DashboardEventId,
+                    DashboardId = scenario.DashboardId.ToString(),
+                    scenario.DashboardPayload,
+                    scenario.DashboardOccurredAt,
+                },
+                transaction
+            )
+        );
+
+    private static async Task ApplyMigrationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction
+    )
+    {
+        var migrationSql = await File.ReadAllTextAsync(
                 FindRepositoryFile("src/Database/Migrations/014_wolverine_realtime.sql")
-            );
-            await connection.ExecuteAsync(
-                new CommandDefinition(migrationSql, transaction: transaction)
-            );
+            )
+            .ConfigureAwait(false);
+        await connection
+            .ExecuteAsync(new CommandDefinition(migrationSql, transaction: transaction))
+            .ConfigureAwait(false);
+    }
 
-            var rows = (
-                await connection.QueryAsync<MigratedEvent>(
+    private static async Task VerifyMigratedHistoryAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        LegacyMigrationScenario scenario
+    )
+    {
+        await VerifyMigratedRowsAsync(connection, transaction, scenario).ConfigureAwait(false);
+        await VerifyLegacyArtifactsAsync(connection, transaction, scenario).ConfigureAwait(false);
+    }
+
+    private static async Task VerifyMigratedRowsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        LegacyMigrationScenario scenario
+    )
+    {
+        var rows = (
+            await connection
+                .QueryAsync<MigratedEvent>(
                     new CommandDefinition(
                         """
                         SELECT event_id AS "EventId", sequence_id AS "SequenceId",
@@ -100,61 +171,88 @@ public sealed class RealtimeMigrationTests(PostgresTestFixture postgres)
                         transaction: transaction
                     )
                 )
-            ).ToArray();
-
-            Assert.Collection(
-                rows,
-                row =>
-                    Assert.Equal(
-                        (
-                            publicEventId,
-                            7L,
-                            "entity:PhysicalDelivery",
-                            publicOccurredAt.UtcDateTime
-                        ),
-                        (row.EventId, row.SequenceId, row.GroupName, row.OccurredAt)
+                .ConfigureAwait(false)
+        ).ToArray();
+        Assert.Collection(
+            rows,
+            row =>
+                Assert.Equal(
+                    (
+                        scenario.PublicEventId,
+                        7L,
+                        "entity:PhysicalDelivery",
+                        scenario.PublicOccurredAt.UtcDateTime
                     ),
-                row =>
-                    Assert.Equal(
-                        (
-                            dashboardEventId,
-                            11L,
-                            $"dashboard:{actorId}",
-                            dashboardOccurredAt.UtcDateTime
-                        ),
-                        (row.EventId, row.SequenceId, row.GroupName, row.OccurredAt)
-                    )
-            );
-            Assert.True(
-                await PayloadMatchesAsync(connection, transaction, publicEventId, publicPayload)
-            );
-            Assert.True(
-                await PayloadMatchesAsync(
+                    (row.EventId, row.SequenceId, row.GroupName, row.OccurredAt)
+                ),
+            row =>
+                Assert.Equal(
+                    (
+                        scenario.DashboardEventId,
+                        11L,
+                        $"dashboard:{scenario.ActorId}",
+                        scenario.DashboardOccurredAt.UtcDateTime
+                    ),
+                    (row.EventId, row.SequenceId, row.GroupName, row.OccurredAt)
+                )
+        );
+    }
+
+    private static async Task VerifyLegacyArtifactsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        LegacyMigrationScenario scenario
+    )
+    {
+        Assert.True(
+            await PayloadMatchesAsync(
                     connection,
                     transaction,
-                    dashboardEventId,
-                    dashboardPayload
+                    scenario.PublicEventId,
+                    scenario.PublicPayload
                 )
-            );
-            Assert.True(
-                await connection.ExecuteScalarAsync<bool>(
+                .ConfigureAwait(false)
+        );
+        Assert.True(
+            await PayloadMatchesAsync(
+                    connection,
+                    transaction,
+                    scenario.DashboardEventId,
+                    scenario.DashboardPayload
+                )
+                .ConfigureAwait(false)
+        );
+        Assert.True(
+            await connection
+                .ExecuteScalarAsync<bool>(
                     new CommandDefinition(
                         "SELECT to_regclass('public.outbox_events') IS NOT NULL",
                         transaction: transaction
                     )
                 )
-            );
-            Assert.True(
-                await connection.ExecuteScalarAsync<bool>(
+                .ConfigureAwait(false)
+        );
+        Assert.True(
+            await connection
+                .ExecuteScalarAsync<bool>(
                     new CommandDefinition(
                         "SELECT to_regprocedure('public.notify_outbox_new_event()') IS NOT NULL",
                         transaction: transaction
                     )
                 )
-            );
+                .ConfigureAwait(false)
+        );
+    }
 
-            var compatibilityEventId = Guid.NewGuid();
-            var compatibilitySequence = await connection.ExecuteScalarAsync<long>(
+    private static async Task VerifyLegacyWriteAfterMigrationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid dashboardEventId
+    )
+    {
+        var compatibilityEventId = Guid.NewGuid();
+        var compatibilitySequence = await connection
+            .ExecuteScalarAsync<long>(
                 new CommandDefinition(
                     """
                     INSERT INTO public.outbox_events (
@@ -165,39 +263,39 @@ public sealed class RealtimeMigrationTests(PostgresTestFixture postgres)
                     new { EventId = compatibilityEventId },
                     transaction
                 )
-            );
-            Assert.Equal(12, compatibilitySequence);
-            Assert.Equal(
-                12,
-                await connection.ExecuteScalarAsync<long>(
+            )
+            .ConfigureAwait(false);
+        Assert.Equal(12, compatibilitySequence);
+        Assert.Equal(
+            12,
+            await connection
+                .ExecuteScalarAsync<long>(
                     new CommandDefinition(
                         "SELECT sequence_id FROM realtime_event_log WHERE event_id = @EventId",
                         new { EventId = compatibilityEventId },
                         transaction
                     )
                 )
-            );
-            Assert.True(
-                await connection.ExecuteScalarAsync<bool>(
-                    new CommandDefinition(
-                        "SELECT processed_at IS NULL FROM outbox_events WHERE event_id = @EventId",
-                        new { EventId = compatibilityEventId },
-                        transaction
-                    )
-                )
-            );
-            Assert.True(
-                await connection.ExecuteScalarAsync<bool>(
-                    new CommandDefinition(
-                        "SELECT processed_at IS NULL FROM outbox_events WHERE event_id = @EventId",
-                        new { EventId = dashboardEventId },
-                        transaction
-                    )
-                )
-            );
+                .ConfigureAwait(false)
+        );
+        Assert.True(
+            await IsLegacyEventPendingAsync(connection, transaction, compatibilityEventId)
+                .ConfigureAwait(false)
+        );
+        Assert.True(
+            await IsLegacyEventPendingAsync(connection, transaction, dashboardEventId)
+                .ConfigureAwait(false)
+        );
+    }
 
-            var wolverineEventId = Guid.NewGuid();
-            var nextWolverineSequence = await connection.ExecuteScalarAsync<long>(
+    private static async Task VerifyWolverineWriteAfterMigrationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction
+    )
+    {
+        var eventId = Guid.NewGuid();
+        var sequence = await connection
+            .ExecuteScalarAsync<long>(
                 new CommandDefinition(
                     """
                     INSERT INTO realtime_event_log (
@@ -205,111 +303,161 @@ public sealed class RealtimeMigrationTests(PostgresTestFixture postgres)
                     VALUES (@EventId, 'entity:Hedge', 'Hedge', 'next', 'Created', '{}'::jsonb)
                     RETURNING sequence_id
                     """,
-                    new { EventId = wolverineEventId },
+                    new { EventId = eventId },
                     transaction
                 )
-            );
-            Assert.Equal(13, nextWolverineSequence);
-            Assert.True(
-                await connection.ExecuteScalarAsync<bool>(
+            )
+            .ConfigureAwait(false);
+        Assert.Equal(13, sequence);
+        Assert.True(
+            await connection
+                .ExecuteScalarAsync<bool>(
                     new CommandDefinition(
                         """
                         SELECT sequence_id = 13 AND processed_at IS NOT NULL
                         FROM outbox_events
                         WHERE event_id = @EventId
                         """,
-                        new { EventId = wolverineEventId },
+                        new { EventId = eventId },
                         transaction
                     )
                 )
-            );
-        }
-        finally
-        {
-            await transaction.RollbackAsync();
-        }
+                .ConfigureAwait(false)
+        );
     }
 
+    private static Task<bool> IsLegacyEventPendingAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid eventId
+    ) =>
+        connection.ExecuteScalarAsync<bool>(
+            new CommandDefinition(
+                "SELECT processed_at IS NULL FROM outbox_events WHERE event_id = @EventId",
+                new { EventId = eventId },
+                transaction
+            )
+        );
+
     [Fact]
-    public async Task Compatibility_bridge_is_visible_after_commit_and_duplicate_safe()
+    public async Task CompatibilityBridgeIsVisibleAfterCommitAndDuplicateSafe()
     {
         var legacyEventId = Guid.NewGuid();
-        long legacySequence;
-        await using (var legacyConnection = new NpgsqlConnection(Postgres.ConnectionString))
-        {
-            legacySequence = await legacyConnection.ExecuteScalarAsync<long>(
+        var legacySequence = await InsertCommittedLegacyEventAsync(legacyEventId);
+
+        var wolverineEventId = Guid.NewGuid();
+        var wolverineSequence = await InsertCommittedWolverineEventAsync(wolverineEventId);
+
+        Assert.True(wolverineSequence > legacySequence);
+        await VerifyCommittedBridgeAsync(
+            legacyEventId,
+            legacySequence,
+            wolverineEventId,
+            wolverineSequence
+        );
+    }
+
+    private async Task<long> InsertCommittedLegacyEventAsync(Guid eventId)
+    {
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        return await connection
+            .ExecuteScalarAsync<long>(
                 """
                 INSERT INTO outbox_events (
                     event_id, aggregate_type, aggregate_id, event_type, payload)
                 VALUES (@EventId, 'Hedge', 'legacy-committed', 'Created', '{}'::jsonb)
                 RETURNING sequence_id
                 """,
-                new { EventId = legacyEventId }
-            );
-        }
+                new { EventId = eventId }
+            )
+            .ConfigureAwait(false);
+    }
 
-        var wolverineEventId = Guid.NewGuid();
-        long wolverineSequence;
-        await using (var wolverineConnection = new NpgsqlConnection(Postgres.ConnectionString))
-        {
-            wolverineSequence = await wolverineConnection.ExecuteScalarAsync<long>(
+    private async Task<long> InsertCommittedWolverineEventAsync(Guid eventId)
+    {
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        var sequence = await connection
+            .ExecuteScalarAsync<long>(
                 """
                 INSERT INTO realtime_event_log (
                     event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
                 VALUES (@EventId, 'entity:Hedge', 'Hedge', 'wolverine-committed', 'Created', '{}'::jsonb)
                 RETURNING sequence_id
                 """,
-                new { EventId = wolverineEventId }
-            );
-            await wolverineConnection.ExecuteAsync(
+                new { EventId = eventId }
+            )
+            .ConfigureAwait(false);
+        await connection
+            .ExecuteAsync(
                 """
                 INSERT INTO realtime_event_log (
                     event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
                 VALUES (@EventId, 'entity:Hedge', 'Hedge', 'wolverine-committed', 'Created', '{}'::jsonb)
                 ON CONFLICT (event_id) DO NOTHING
                 """,
-                new { EventId = wolverineEventId }
-            );
-        }
+                new { EventId = eventId }
+            )
+            .ConfigureAwait(false);
+        return sequence;
+    }
 
-        Assert.True(wolverineSequence > legacySequence);
-        await using var verification = new NpgsqlConnection(Postgres.ConnectionString);
+    private async Task VerifyCommittedBridgeAsync(
+        Guid legacyEventId,
+        long legacySequence,
+        Guid wolverineEventId,
+        long wolverineSequence
+    )
+    {
+        var verification = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredVerification = verification.ConfigureAwait(false);
         Assert.Equal(
             legacySequence,
-            await verification.ExecuteScalarAsync<long>(
-                "SELECT sequence_id FROM realtime_event_log WHERE event_id = @EventId",
-                new { EventId = legacyEventId }
-            )
+            await verification
+                .ExecuteScalarAsync<long>(
+                    "SELECT sequence_id FROM realtime_event_log WHERE event_id = @EventId",
+                    new { EventId = legacyEventId }
+                )
+                .ConfigureAwait(false)
         );
         Assert.True(
-            await verification.ExecuteScalarAsync<bool>(
-                "SELECT processed_at IS NULL FROM outbox_events WHERE event_id = @EventId",
-                new { EventId = legacyEventId }
-            )
+            await verification
+                .ExecuteScalarAsync<bool>(
+                    "SELECT processed_at IS NULL FROM outbox_events WHERE event_id = @EventId",
+                    new { EventId = legacyEventId }
+                )
+                .ConfigureAwait(false)
         );
         Assert.True(
-            await verification.ExecuteScalarAsync<bool>(
-                """
-                SELECT sequence_id = @SequenceId AND processed_at IS NOT NULL
-                FROM outbox_events
-                WHERE event_id = @EventId
-                """,
-                new { EventId = wolverineEventId, SequenceId = wolverineSequence }
-            )
+            await verification
+                .ExecuteScalarAsync<bool>(
+                    """
+                    SELECT sequence_id = @SequenceId AND processed_at IS NOT NULL
+                    FROM outbox_events
+                    WHERE event_id = @EventId
+                    """,
+                    new { EventId = wolverineEventId, SequenceId = wolverineSequence }
+                )
+                .ConfigureAwait(false)
         );
         Assert.Equal(
             1,
-            await verification.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM realtime_event_log WHERE event_id = @EventId",
-                new { EventId = wolverineEventId }
-            )
+            await verification
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM realtime_event_log WHERE event_id = @EventId",
+                    new { EventId = wolverineEventId }
+                )
+                .ConfigureAwait(false)
         );
         Assert.Equal(
             1,
-            await verification.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM outbox_events WHERE event_id = @EventId",
-                new { EventId = wolverineEventId }
-            )
+            await verification
+                .ExecuteScalarAsync<int>(
+                    "SELECT COUNT(*) FROM outbox_events WHERE event_id = @EventId",
+                    new { EventId = wolverineEventId }
+                )
+                .ConfigureAwait(false)
         );
     }
 

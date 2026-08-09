@@ -18,7 +18,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Returns_ordered_pages_and_the_latest_sequence_from_real_postgres()
+    public async Task ReturnsOrderedPagesAndTheLatestSequenceFromRealPostgres()
     {
         await ResetRealtimeEventLogAsync();
         await InsertEventsAsync(25);
@@ -57,7 +57,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     }
 
     [Fact]
-    public async Task Catch_up_requires_a_jwt()
+    public async Task CatchUpRequiresAJwt()
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -68,7 +68,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     }
 
     [Fact]
-    public async Task Catch_up_excludes_other_actors_private_dashboard_events()
+    public async Task CatchUpExcludesOtherActorsPrivateDashboardEvents()
     {
         await ResetRealtimeEventLogAsync();
         var actorId = Guid.NewGuid();
@@ -104,8 +104,15 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
 
         Assert.NotNull(response);
         Assert.Equal(2, response.Events.Count);
-        Assert.Contains(response.Events, item => item.AggregateType == "WorkspaceDashboard");
-        Assert.Contains(response.Events, item => item.AggregateType == "MarketPrice");
+        Assert.Contains(
+            response.Events,
+            item =>
+                string.Equals(item.AggregateType, "WorkspaceDashboard", StringComparison.Ordinal)
+        );
+        Assert.Contains(
+            response.Events,
+            item => string.Equals(item.AggregateType, "MarketPrice", StringComparison.Ordinal)
+        );
         Assert.Equal(3, response.LatestSequence);
     }
 
@@ -113,7 +120,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     [InlineData("afterSequence=-1&limit=10")]
     [InlineData("afterSequence=0&limit=0")]
     [InlineData("afterSequence=0&limit=501")]
-    public async Task Invalid_cursor_parameters_are_rejected(string query)
+    public async Task InvalidCursorParametersAreRejected(string query)
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -134,7 +141,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
                             ["Jwt:Issuer"] = "Tradebook",
@@ -147,20 +154,23 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
 
     private async Task ResetRealtimeEventLogAsync()
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand(
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection.OpenAsync().ConfigureAwait(false);
+        var command = new NpgsqlCommand(
             "TRUNCATE TABLE realtime_event_log RESTART IDENTITY",
             connection
         );
-        await command.ExecuteNonQueryAsync();
+        await using var configuredCommand = command.ConfigureAwait(false);
+        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
     private async Task InsertEventsAsync(int count)
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand(
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection.OpenAsync().ConfigureAwait(false);
+        var command = new NpgsqlCommand(
             """
             INSERT INTO realtime_event_log
                 (event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
@@ -174,8 +184,9 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
             """,
             connection
         );
+        await using var configuredCommand = command.ConfigureAwait(false);
         command.Parameters.AddWithValue("count", count);
-        await command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
     private static string CreateToken(Guid? actorId = null)
@@ -194,7 +205,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
                     new Claim(ClaimTypes.Role, "Trader"),
                 }
             ),
-            Expires = DateTime.UtcNow.AddMinutes(5),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         };
         return new JwtSecurityTokenHandler().WriteToken(

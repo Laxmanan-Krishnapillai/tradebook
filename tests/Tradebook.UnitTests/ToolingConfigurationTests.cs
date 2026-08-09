@@ -678,9 +678,8 @@ public sealed class ToolingConfigurationTests
             );
         }
 
+        AddTask17Versions(versions);
         AddTask21Versions(versions);
-        versions.TryAdd("WolverineFx", "5.40.1");
-        versions.TryAdd("WolverineFx.Postgresql", "5.40.1");
 
         return versions;
     }
@@ -925,6 +924,22 @@ public sealed class ToolingConfigurationTests
             $"Could not locate repository file '{fileName}'.",
             fileName
         );
+    }
+
+    private static void AddTask17Versions(Dictionary<string, string> versions)
+    {
+        var task17Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["WolverineFx"] = "5.40.1",
+            ["WolverineFx.Postgresql"] = "5.40.1",
+        };
+        foreach (var package in task17Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"Task 17 package '{package.Key}' duplicates an existing central pin."
+            );
+        }
     }
 
     private static void AddTask21Versions(Dictionary<string, string> versions)

@@ -19,7 +19,7 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Duplicate_domain_create_returns_safe_conflict_response()
+    public async Task DuplicateDomainCreateReturnsSafeConflictResponse()
     {
         var contractId = await SeedContractAsync();
         await using var factory = CreateFactory();
@@ -38,7 +38,7 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
     }
 
     [Fact]
-    public async Task Partial_date_update_against_stored_counterpart_returns_bad_request_and_rolls_back()
+    public async Task PartialDateUpdateAgainstStoredCounterpartReturnsBadRequestAndRollsBack()
     {
         var contractId = await SeedContractAsync();
         await using var factory = CreateFactory();
@@ -100,7 +100,7 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
                             ["Jwt:Issuer"] = "Tradebook",
@@ -131,7 +131,7 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
                 new Claim("sub", actorId.ToString()),
                 new Claim("role", "Trader"),
             ]),
-            Expires = DateTime.UtcNow.AddMinutes(5),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(
                     Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)
@@ -145,32 +145,37 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
 
     private async Task<Guid> SeedContractAsync()
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         var counterpartyId = Guid.NewGuid();
-        await connection.ExecuteAsync(
-            "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
-            new
-            {
-                Id = counterpartyId,
-                Name = $"Constraint Counterparty {counterpartyId:N}",
-                Shorthand = $"CE{counterpartyId:N}"[..20],
-            }
-        );
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
+                new
+                {
+                    Id = counterpartyId,
+                    Name = $"Constraint Counterparty {counterpartyId:N}",
+                    Shorthand = $"CE{counterpartyId:N}"[..20],
+                }
+            )
+            .ConfigureAwait(false);
         var contractId = Guid.NewGuid();
-        await connection.ExecuteAsync(
-            """
-            INSERT INTO contracts
-                (id, contract_name, counterparty_id, product_type, action, subsidy_status)
-            VALUES
-                (@Id, @Name, @CounterpartyId, 'Gas', 'Sell', 'SUB')
-            """,
-            new
-            {
-                Id = contractId,
-                Name = $"ERR45.SG.{contractId:N}.NOQS",
-                CounterpartyId = counterpartyId,
-            }
-        );
+        await connection
+            .ExecuteAsync(
+                """
+                INSERT INTO contracts
+                    (id, contract_name, counterparty_id, product_type, action, subsidy_status)
+                VALUES
+                    (@Id, @Name, @CounterpartyId, 'Gas', 'Sell', 'SUB')
+                """,
+                new
+                {
+                    Id = contractId,
+                    Name = $"ERR45.SG.{contractId:N}.NOQS",
+                    CounterpartyId = counterpartyId,
+                }
+            )
+            .ConfigureAwait(false);
         return contractId;
     }
 
@@ -179,23 +184,25 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
         string aggregateId
     )
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
-        while (DateTime.UtcNow < deadline)
+        var deadline = TimeProvider.System.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds(15);
+        while (TimeProvider.System.GetUtcNow().UtcDateTime < deadline)
         {
-            var count = await connection.ExecuteScalarAsync<int>(
-                """
-                SELECT COUNT(*)
-                FROM realtime_event_log
-                WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @AggregateId
-                """,
-                new { AggregateId = aggregateId }
-            );
+            var count = await connection
+                .ExecuteScalarAsync<int>(
+                    """
+                    SELECT COUNT(*)
+                    FROM realtime_event_log
+                    WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @AggregateId
+                    """,
+                    new { AggregateId = aggregateId }
+                )
+                .ConfigureAwait(false);
             if (count > 0)
             {
                 return count;
             }
 
-            await Task.Delay(50);
+            await Task.Delay(50).ConfigureAwait(false);
         }
 
         return 0;

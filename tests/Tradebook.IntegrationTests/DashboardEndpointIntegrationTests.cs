@@ -19,8 +19,10 @@ namespace Tradebook.IntegrationTests;
 public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
+    private static readonly string[] InvalidMeasures = ["not_a_measure"];
+
     [Fact]
-    public async Task Dashboard_endpoints_require_a_jwt()
+    public async Task DashboardEndpointsRequireAJwt()
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -29,7 +31,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Unknown_chart_type_is_rejected()
+    public async Task UnknownChartTypeIsRejected()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -47,14 +49,14 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Invalid_semantic_query_is_rejected_before_dashboard_or_event_persistence()
+    public async Task InvalidSemanticQueryIsRejectedBeforeDashboardOrEventPersistence()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
         using var client = AuthenticatedClient(factory, Guid.NewGuid());
         var layout = JsonSerializer.SerializeToNode(Layout(dashboardId, 0))!.AsObject();
         layout["widgets"]![0]!["queryAst"]!["measures"] = JsonSerializer.SerializeToNode(
-            new[] { "not_a_measure" }
+            InvalidMeasures
         );
 
         var response = await client.PutAsJsonAsync(
@@ -86,7 +88,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Layout_contract_requires_theme_and_positive_grid_sizes()
+    public async Task LayoutContractRequiresThemeAndPositiveGridSizes()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -123,14 +125,14 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     [InlineData("yAxis")]
     [InlineData("tooltipFields")]
     [InlineData("measures")]
-    public async Task Dashboard_string_array_bindings_must_be_non_empty_when_present(string binding)
+    public async Task DashboardStringArrayBindingsMustBeNonEmptyWhenPresent(string binding)
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
         using var client = AuthenticatedClient(factory, Guid.NewGuid());
         var layout = JsonSerializer.SerializeToNode(Layout(dashboardId, 0))!.AsObject();
         var widget = layout["widgets"]![0]!;
-        if (binding == "measures")
+        if (string.Equals(binding, "measures", StringComparison.Ordinal))
             widget["queryAst"]![binding] = new JsonArray();
         else
             widget["visualEncodings"]![binding] = new JsonArray();
@@ -152,7 +154,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     [InlineData(1)]
     [InlineData(3)]
     [InlineData(5)]
-    public async Task Candlestick_widgets_require_exactly_four_ohlc_bindings(int bindingCount)
+    public async Task CandlestickWidgetsRequireExactlyFourOhlcBindings(int bindingCount)
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -178,7 +180,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Candlestick_widget_with_four_ohlc_bindings_is_accepted()
+    public async Task CandlestickWidgetWithFourOhlcBindingsIsAccepted()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -204,7 +206,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Actors_can_only_read_their_own_dashboards()
+    public async Task ActorsCanOnlyReadTheirOwnDashboards()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -225,7 +227,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Saves_and_reads_a_dashboard_for_its_actor()
+    public async Task SavesAndReadsADashboardForItsActor()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -252,7 +254,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
     }
 
     [Fact]
-    public async Task Stale_version_returns_current_server_dashboard_state()
+    public async Task StaleVersionReturnsCurrentServerDashboardState()
     {
         var dashboardId = Guid.NewGuid();
         await using var factory = CreateFactory();
@@ -310,7 +312,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration.AddInMemoryCollection(
-                        new Dictionary<string, string?>
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
                             ["Jwt:Issuer"] = "Tradebook",
@@ -344,7 +346,7 @@ public sealed class DashboardEndpointIntegrationTests(PostgresTestFixture postgr
                 new Claim("sub", actorId.ToString()),
                 new Claim("role", "Trader"),
             ]),
-            Expires = DateTime.UtcNow.AddMinutes(5),
+            Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(
                     Encoding.UTF8.GetBytes(CustomWebApplicationFactory.JwtSigningKey)

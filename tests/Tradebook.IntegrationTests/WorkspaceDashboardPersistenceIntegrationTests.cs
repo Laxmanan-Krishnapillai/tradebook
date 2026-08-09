@@ -9,7 +9,7 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task Dashboard_writes_are_audited_published_and_versioned()
+    public async Task DashboardWritesAreAuditedPublishedAndVersioned()
     {
         var actorId = Guid.NewGuid();
         var dashboardId = Guid.NewGuid();
@@ -42,17 +42,29 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
         );
         Assert.Null(stale);
 
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await VerifyPersistenceAsync(dashboardId, actorId, publisher);
+    }
+
+    private async Task VerifyPersistenceAsync(
+        Guid dashboardId,
+        Guid actorId,
+        RecordingTransactionalEventPublisher publisher
+    )
+    {
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         var audit = (
-            await connection.QueryAsync<(string Operation, Guid ActorId)>(
-                """
-                SELECT operation AS Operation, actor_id AS ActorId
-                FROM audit_log
-                WHERE entity_name = 'workspace_dashboards' AND entity_id = @DashboardId
-                ORDER BY lower(system_time)
-                """,
-                new { DashboardId = dashboardId.ToString() }
-            )
+            await connection
+                .QueryAsync<(string Operation, Guid ActorId)>(
+                    """
+                    SELECT operation AS Operation, actor_id AS ActorId
+                    FROM audit_log
+                    WHERE entity_name = 'workspace_dashboards' AND entity_id = @DashboardId
+                    ORDER BY lower(system_time)
+                    """,
+                    new { DashboardId = dashboardId.ToString() }
+                )
+                .ConfigureAwait(false)
         ).ToList();
         Assert.Collection(
             audit,
@@ -91,16 +103,20 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
         RecordingTransactionalEventPublisher publisher
     )
     {
-        await using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync();
-        await connection.ExecuteAsync(
-            new CommandDefinition(
-                "SELECT set_config('app.actor_id', @ActorId, true)",
-                new { ActorId = actorId.ToString() },
-                transaction
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection.OpenAsync().ConfigureAwait(false);
+        var transaction = await connection.BeginTransactionAsync().ConfigureAwait(false);
+        await using var configuredTransaction = transaction.ConfigureAwait(false);
+        await connection
+            .ExecuteAsync(
+                new CommandDefinition(
+                    "SELECT set_config('app.actor_id', @ActorId, true)",
+                    new { ActorId = actorId.ToString() },
+                    transaction
+                )
             )
-        );
+            .ConfigureAwait(false);
 
         const string save = """
             INSERT INTO workspace_dashboards (id, actor_id, layout_json, version)
@@ -110,37 +126,41 @@ public sealed class WorkspaceDashboardPersistenceIntegrationTests(PostgresTestFi
             WHERE workspace_dashboards.actor_id = @ActorId AND workspace_dashboards.version = @ExpectedVersion
             RETURNING version, (xmax = 0) AS created;
             """;
-        var result = await connection.QuerySingleOrDefaultAsync<(long Version, bool Created)>(
-            new CommandDefinition(
-                save,
-                new
-                {
-                    DashboardId = dashboardId,
-                    ActorId = actorId,
-                    Layout = layout,
-                    ExpectedVersion = expectedVersion,
-                },
-                transaction
+        var result = await connection
+            .QuerySingleOrDefaultAsync<(long Version, bool Created)>(
+                new CommandDefinition(
+                    save,
+                    new
+                    {
+                        DashboardId = dashboardId,
+                        ActorId = actorId,
+                        Layout = layout,
+                        ExpectedVersion = expectedVersion,
+                    },
+                    transaction
+                )
             )
-        );
+            .ConfigureAwait(false);
         if (result == default)
         {
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync().ConfigureAwait(false);
             return null;
         }
 
-        await publisher.EnlistAsync(transaction, default);
-        await publisher.PublishAsync(
-            EntityChangedDomainEvent.Create(
-                RealtimeAggregateTypes.WorkspaceDashboard,
-                dashboardId.ToString(),
-                result.Created ? "Created" : "Updated",
-                result.Version,
-                actorId: actorId
+        await publisher.EnlistAsync(transaction, default).ConfigureAwait(false);
+        await publisher
+            .PublishAsync(
+                EntityChangedDomainEvent.Create(
+                    RealtimeAggregateTypes.WorkspaceDashboard,
+                    dashboardId.ToString(),
+                    result.Created ? "Created" : "Updated",
+                    result.Version,
+                    actorId: actorId
+                )
             )
-        );
-        await transaction.CommitAsync();
-        await publisher.FlushAsync();
+            .ConfigureAwait(false);
+        await transaction.CommitAsync().ConfigureAwait(false);
+        await publisher.FlushAsync().ConfigureAwait(false);
         return result.Version;
     }
 }
