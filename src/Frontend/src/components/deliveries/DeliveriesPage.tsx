@@ -8,8 +8,8 @@ import {
   useRef,
   useState,
 } from "react";
-import type { GetDeliveryHistoryResponse } from "../../api/generated/get-delivery-history-response";
-import type { PhysicalDeliveryDetailsDto } from "../../api/generated/physical-delivery-details-dto";
+import type { GetDeliveryHistoryResponse } from "../../api/generated/types.gen";
+import type { PhysicalDeliveryDetailsDto } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
@@ -474,7 +474,7 @@ export function DeliveriesPage() {
                     volumeRealisedMwh:
                       event.target.value === ""
                         ? undefined
-                        : Number(event.target.value),
+                        : event.target.value,
                   }))
                 }
               />

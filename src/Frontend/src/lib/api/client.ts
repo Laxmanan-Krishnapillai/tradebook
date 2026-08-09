@@ -1,11 +1,51 @@
 import { endSession } from '../session/sessionController';
 import { useAuthStore } from '../state/useAuthStore';
+import { client as generatedClient } from '../../api/generated/client.gen';
+import type { ProblemDetails } from '../../api/generated/types.gen';
+import { zProblemDetails } from '../../api/generated/zod.gen';
+
+let generatedClientConfigured = false;
+
+export function configureGeneratedApiClient(): void {
+  if (generatedClientConfigured) return;
+  generatedClientConfigured = true;
+  generatedClient.setConfig({ baseUrl: globalThis.location.origin, responseStyle: 'data', throwOnError: true });
+  generatedClient.interceptors.request.use((request) => {
+    const token = useAuthStore.getState().accessToken;
+    if (token) request.headers.set('Authorization', `Bearer ${token}`);
+    return request;
+  });
+  generatedClient.interceptors.response.use((response) => {
+    const token = useAuthStore.getState().accessToken;
+    if (response.status === 401 && token) {
+      void endSession('unauthorized', { expectedAccessToken: token });
+    }
+    return response;
+  });
+}
 
 export class ApiError extends Error {
   constructor(public readonly status: number, public readonly problem?: unknown) {
     super(`HTTP ${status}`);
     this.name = 'ApiError';
   }
+}
+
+function parseProblemDetails(value: unknown): ProblemDetails | undefined {
+  if (typeof value !== 'object' || value === null || !['type', 'title', 'status', 'detail', 'instance', 'errors'].some((key) => key in value)) return undefined;
+  const result = zProblemDetails.safeParse(value);
+  return result.success ? result.data : undefined;
+}
+
+export function problemFieldErrors(problem: ProblemDetails | undefined): Record<string, string[]> {
+  if (!problem?.errors) return {};
+  return Object.fromEntries(
+    Object.entries(problem.errors).flatMap(([path, messages]) => {
+      if (typeof messages === 'string') return [[path, [messages]]];
+      if (Array.isArray(messages) && messages.every((message) => typeof message === 'string')) return [[path, messages]];
+      return [];
+    }),
+  );
 }
 
 /**
@@ -44,7 +84,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const response = await fetch(url, { ...init, headers, signal: fetchCompatibleSignal(url, init.signal) });
   if (!response.ok) {
     let problem: unknown;
-    try { problem = await response.json(); } catch { problem = undefined; }
+    try {
+      const body = await response.json();
+      problem = parseProblemDetails(body) ?? body;
+    } catch { problem = undefined; }
     if (response.status === 401 && token) {
       void endSession('unauthorized', { expectedAccessToken: token });
     }

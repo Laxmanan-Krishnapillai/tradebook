@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { CreatePhysicalDeliveryResponse } from '../api/generated/create-physical-delivery-response';
+import type { CreatePhysicalDeliveryResponse } from '../api/generated/types.gen';
 
 type CreateDeliveryBody = { contractInstanceId?: string };
 
@@ -9,7 +9,7 @@ export const handlers = [
     const response: CreatePhysicalDeliveryResponse = {
       deliveryId: '11111111-2222-3333-4444-555555555555',
       contractInstanceId: body.contractInstanceId ?? 'BFEX45.BT.2301.CO2E-9-2023',
-      invoiceAmountEur: 0,
+      invoiceAmountEur: '0',
       status: 'Pending - No Invoice',
       version: 1,
       createdAt: new Date().toISOString()

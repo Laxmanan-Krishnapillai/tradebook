@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { apiFetch, resolveApiUrl } from '../../src/lib/api/client';
+import { apiFetch, problemFieldErrors, resolveApiUrl } from '../../src/lib/api/client';
 import { server } from '../../src/mocks/server';
 import { useAuthStore } from '../../src/lib/state/useAuthStore';
 
@@ -10,6 +10,12 @@ afterEach(() => {
 });
 
 describe('API URL resolution', () => {
+  it('maps Problem Details field errors by property path', () => {
+    expect(problemFieldErrors({ errors: { 'order.price': ['Price is required.'], ignored: 42 } })).toEqual({
+      'order.price': ['Price is required.'],
+    });
+  });
+
   it('resolves relative paths against the current document origin', () => {
     const documentUrl = 'https://tradebook.example/dashboards/current?tab=charts';
 

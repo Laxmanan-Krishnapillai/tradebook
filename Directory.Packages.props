@@ -29,7 +29,7 @@
     <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.6.0" />
     <PackageVersion Include="TngTech.ArchUnitNET" Version="0.11.0" />
-    <PackageVersion Include="TypeGen" Version="7.0.0" />
+    <PackageVersion Include="TngTech.ArchUnitNET.xUnit" Version="0.11.0" />
     <PackageVersion Include="Vogen" Version="8.0.7" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
