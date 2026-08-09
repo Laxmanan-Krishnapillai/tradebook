@@ -74,7 +74,7 @@ function MarketPriceEditor({
 }) {
   const [ttf, setTtf] = useState(price.ttfEurMwh?.toString() ?? "");
   return (
-    <div className="row-actions">
+    <div className="grid grid-cols-4 items-center gap-2 max-[800px]:grid-cols-2">
       <input
         aria-label={`TTF price for ${price.priceDate}`}
         type="number"
@@ -89,7 +89,7 @@ function MarketPriceEditor({
       >
         Save
       </button>
-      <button type="button" className="danger" onClick={() => onDelete(price)}>
+      <button type="button" className="bg-red-700" onClick={() => onDelete(price)}>
         Delete
       </button>
     </div>
@@ -270,9 +270,9 @@ export function MarketPricesPage() {
 
   return (
     <section>
-      <header className="page-header">
+      <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
         <div>
-          <p className="eyebrow">Market data</p>
+          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Market data</p>
           <h2>Market prices</h2>
           <p>
             {history.data
@@ -289,7 +289,7 @@ export function MarketPricesPage() {
         </button>
       </header>
       {error && (
-        <p role="alert" className="error-banner">
+        <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">
           {error}
         </p>
       )}
@@ -303,7 +303,7 @@ export function MarketPricesPage() {
         />
       )}
       {history.data && (
-        <nav className="toolbar" aria-label="Market-price history pages">
+        <nav className="flex flex-wrap items-center gap-2" aria-label="Market-price history pages">
           <button type="button" disabled={page === 1 || history.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
           <span>Page {page}</span>
           <button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
@@ -311,7 +311,7 @@ export function MarketPricesPage() {
       )}
       {showCreate && (
         <section
-          className="modal"
+          className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Add market price"
@@ -364,10 +364,10 @@ export function MarketPricesPage() {
                 }
               />
             </label>
-            <div className="toolbar">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="secondary"
+                className="bg-gray-200 text-gray-800"
                 onClick={() => setShowCreate(false)}
               >
                 Close
@@ -380,7 +380,7 @@ export function MarketPricesPage() {
         </section>
       )}
       {conflict && (
-        <div className="modal">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
           <ConflictDialog
             entityId={conflict.id}
             serverState={conflict.serverState}

@@ -2,6 +2,8 @@
 
 ## Binding rules
 
+- Read `docs/design/DESIGN.md` before changing frontend UI. Compose approved
+  `@tradebook` registry components; do not hand-roll an existing primitive.
 - Read `docs/architecture/decision-log.md` before task work; it overrides all other documents.
 - The authoritative domain model is `docs/architecture/entity-model.md`. Do not invent schema or enum values.
 - Every endpoint requires JWT authentication except `/health/live`, `/health/ready`, and `POST /api/v1/auth/login` (the sole anonymous API route). Derive the actor from the JWT `sub` claim only.

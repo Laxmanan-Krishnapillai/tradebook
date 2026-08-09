@@ -36,7 +36,7 @@ export function DashboardGrid({ dashboard, onChange }: { dashboard: DashboardSpe
   const theme = dashboardTheme(dashboard.theme, systemDark);
   return <ResponsiveGrid
     data-testid="dashboard-grid"
-    className="dashboard-grid"
+    className="grid"
     layouts={{ lg: layout }}
     breakpoints={{ lg: 1200, md: 996, sm: 768 }}
     cols={{ lg: dashboard.gridLayout.columns, md: dashboard.gridLayout.columns, sm: dashboard.gridLayout.columns }}

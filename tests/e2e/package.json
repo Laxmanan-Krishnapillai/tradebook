@@ -2,6 +2,15 @@
   "name": "tradebook-e2e",
   "private": true,
   "type": "module",
-  "scripts": { "test": "playwright test", "typecheck": "tsc --noEmit" },
-  "devDependencies": { "@playwright/test": "1.54.2", "@types/node": "22.15.30", "typescript": "5.9.3" }
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@argos-ci/playwright": "^7.4.3",
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "1.54.2",
+    "@types/node": "22.15.30",
+    "typescript": "5.9.3"
+  }
 }
