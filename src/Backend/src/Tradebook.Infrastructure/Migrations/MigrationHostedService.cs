@@ -12,6 +12,9 @@ namespace Tradebook.Infrastructure.Migrations;
 /// </summary>
 public sealed class MigrationHostedService(
     IOptions<DatabaseOptions> options,
+    Tradebook.Core.Analytics.SemanticModelLoader semanticModels,
+    Tradebook.Infrastructure.Data.INpgsqlConnectionFactory connections,
+    Microsoft.Extensions.Hosting.IHostApplicationLifetime lifetime,
     ILogger<MigrationHostedService> logger
 ) : BackgroundService
 {
@@ -24,6 +27,7 @@ public sealed class MigrationHostedService(
             try
             {
                 MigrationRunner.Run(options.Value.ConnectionString);
+                await ValidateSchemaOrStopAsync(stoppingToken).ConfigureAwait(false);
                 return;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -39,6 +43,28 @@ public sealed class MigrationHostedService(
             {
                 return;
             }
+        }
+    }
+
+    private async Task ValidateSchemaOrStopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var connection = await connections
+                .OpenConnectionAsync(cancellationToken)
+                .ConfigureAwait(false);
+            await using var configuredConnection = connection.ConfigureAwait(false);
+            await semanticModels
+                .ValidateDatabaseSchemaAsync(connection, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // A migrated, reachable database with semantic-model drift must fail the
+            // process rather than serve wrong analytics (same contract as the old
+            // startup-time validation, now sequenced after the async migrations).
+            MigrationLog.SchemaDriftFatal(logger, exception);
+            lifetime.StopApplication();
         }
     }
 }
