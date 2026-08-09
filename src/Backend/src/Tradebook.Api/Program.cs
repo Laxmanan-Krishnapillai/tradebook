@@ -55,12 +55,16 @@ builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddHostedService<Tradebook.Infrastructure.Migrations.MigrationHostedService>();
 
-var wolverineConnectionString =
-    builder.Configuration["Database:ConnectionString"]
-    ?? throw new InvalidOperationException("Database:ConnectionString is required.");
 builder.Host.UseWolverine(options =>
 {
+    // Read inside the callback (services phase of Build), not at top-level: the
+    // ConfigurationManager is live, and test-harness overrides are merged into it
+    // after these top-level statements have already run.
+    var wolverineConnectionString =
+        builder.Configuration["Database:ConnectionString"]
+        ?? throw new InvalidOperationException("Database:ConnectionString is required.");
     options.PersistMessagesWithPostgresql(wolverineConnectionString, "wolverine");
+    options.AutoBuildMessageStorageOnStartup = AutoCreate.CreateOrUpdate;
     options.Policies.UseDurableLocalQueues();
     options.LocalQueueFor<EntityChangedDomainEvent>().Sequential();
     options.Policies.AutoApplyTransactions();
@@ -79,22 +83,9 @@ builder.Services.AddScoped<IRealtimeEventReader, PostgresRealtimeEventReader>();
 builder.Services.AddResourceSetupOnStartup();
 
 var app = builder.Build();
-try
-{
-    var connection = await app
-        .Services.GetRequiredService<INpgsqlConnectionFactory>()
-        .OpenConnectionAsync(CancellationToken.None)
-        .ConfigureAwait(false);
-    await using var _ = connection.ConfigureAwait(false);
-    await semanticModels.ValidateDatabaseSchemaAsync(connection).ConfigureAwait(false);
-}
-catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
-{
-    // Keep liveness independent from PostgreSQL availability. Readiness repeats the
-    // validation and stays unhealthy until the database can be reached, while a
-    // reachable database with semantic-model drift still fails startup above.
-    ProgramLog.SchemaValidationDeferred(app.Logger, exception);
-}
+
+// Schema validation runs inside MigrationHostedService after the background migration
+// pass; semantic-model drift stops the application there instead of racing startup.
 
 app.UseExceptionHandler();
 app.UseAuthentication();
