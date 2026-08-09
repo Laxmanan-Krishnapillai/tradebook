@@ -1,6 +1,6 @@
 # Task 10: Tradebook Platform Integration, Continuous Verification & Sentinel Master Blueprint
 
-> **DESCOPE NOTICE (2026-08-06 — applied to this spec)** — per [`architecture/decision-log.md`](../architecture/decision-log.md): Merkle/WORM verification was deleted (**D6** — the C# and SQL roots were mathematically incompatible anyway; replaced by a backup-restore rehearsal check), all NATS checks were deleted (**D2** — realtime is Task 03's in-process outbox dispatcher + SignalR, spec kept under its legacy filename [`task-03-signalr-realtime-and-nats.md`](task-03-signalr-realtime-and-nats.md)), `/api/v1/mutations/batch` and `perform3WayMerge` were deleted (**D5** — sync is per-entity REST with `version`-column optimistic concurrency), TimescaleDB references were deleted (**D3** — Task 01's spec keeps its legacy filename [`task-01-database-and-timescaledb-setup.md`](task-01-database-and-timescaledb-setup.md)), Native AOT was deleted (**D7**), the 35,000 req/sec gate and every other absolute performance gate were deleted (**D10** — Task 09's k6 baseline-regression model applies, [`task-09-e2e-testing-and-nbomber-harness.md`](task-09-e2e-testing-and-nbomber-harness.md), legacy filename), and `AllowAnonymous()` examples were replaced by named JWT policies (**D11**). Verify scripts never wrap checks in `|| true` or any other error suppression — a check that cannot fail is not a check. All cross-links resolve against the post-descope file set in `docs/tasks/` under their legacy filenames.
+> **DESCOPE NOTICE (2026-08-06 — applied to this spec)** — per [`architecture/decision-log.md`](../architecture/decision-log.md): Merkle/WORM verification was deleted (**D6** — the C# and SQL roots were mathematically incompatible anyway; replaced by a backup-restore rehearsal check), all NATS checks were deleted (**D2** — realtime is Task 03's in-process outbox dispatcher + SignalR, spec kept under its legacy filename [`task-03-signalr-realtime-and-nats.md`](task-03-signalr-realtime-and-nats.md)), `/api/v1/mutations/batch` and `perform3WayMerge` were deleted (**D5** — sync is per-entity REST with `version`-column optimistic concurrency), TimescaleDB references were deleted (**D3** — Task 01's spec keeps its legacy filename [`task-01-database-and-timescaledb-setup.md`](task-01-database-and-timescaledb-setup.md)), Native AOT was deleted (**D7**), the 35,000 req/sec gate and every other absolute performance gate were deleted (**D10** — Task 09's k6 baseline-regression model applies, [`task-09-e2e-testing-and-nbomber-harness.md`](task-09-e2e-testing-and-nbomber-harness.md), legacy filename), and JWT remains mandatory for business and realtime routes while the binding repository guide exempts the two health probes and login. Verify scripts never wrap checks in `|| true` or any other error suppression — a check that cannot fail is not a check. All cross-links resolve against the post-descope file set in `docs/tasks/` under their legacy filenames.
 
 - **Phase**: Master Platform Integration, Continuous Verification & Production Sentinel
 - **Lead / Owner**: Principal Systems Architect & Lead QA Engineer
@@ -18,10 +18,10 @@
 ## 1. Objectives, Scope, Dependencies & Prerequisites
 
 ### 1.1 Objectives
-1. **End-to-End System Integration**: Seamlessly connect all Tradebook layers — PostgreSQL 17 System of Record (plain, no extensions beyond `btree_gist`), .NET 9 FastEndpoints REPR API in a standard JIT container, the in-process outbox dispatcher, SignalR MessagePack push hub, React 19 SPA with optimistic mutations, and the `ChartAdapter` visualization layer.
+1. **End-to-End System Integration**: Seamlessly connect all Tradebook layers — PostgreSQL 17 System of Record (plain, no extensions beyond `btree_gist`), .NET 10 FastEndpoints REPR API in a standard JIT container, the in-process outbox dispatcher, SignalR MessagePack push hub, React 19 SPA with optimistic mutations, and the `ChartAdapter` visualization layer.
 2. **Backup Integrity via Rehearsal**: Replace cryptographic audit verification with an executable **backup-restore rehearsal**: restore the latest nightly `pg_dump` into a fresh `postgres:17` container and compare per-table row counts against the source. A mismatch fails the run.
 3. **Optimistic Concurrency Integrity**: Server-authoritative conflict handling via the `version BIGINT` column — stale writes receive HTTP 409 and the client shows a conflict prompt. There is no client-side merge engine.
-4. **Full Platform Production Launch Runbook & Environment Verification**: Automated pre-flight environment checks, Terraform Tier 1 provisioning (Azure, D14), Caddy reverse proxy TLS orchestration, and container health probes (`/health/live`, `/health/ready`).
+4. **Full Platform Production Launch Runbook & Environment Verification**: Automated pre-flight environment checks, Terraform Tier 1 provisioning (Azure, D14), Azure Container Apps ingress TLS and WebSocket orchestration, and container health probes (`/health/live`, `/health/ready`).
 5. **Continuous Agent Verification Protocol & Sentinel Master Acceptance Criteria**: Automated CI/CD guardrails (TypeGen DTO zero-drift, ArchUnitNET boundaries, Stryker mutation testing ≥80%, Playwright E2E suites, k6 baseline-regression checks per Task 09) and a 10-domain Sentinel Master Acceptance Criteria Matrix.
 
 ### 1.2 Scope
@@ -30,7 +30,7 @@
 
 ### 1.3 Dependencies & Prerequisites
 - **Task 01**: Plain PostgreSQL 17 schema — bi-temporal `audit_log` (`TSTZRANGE` + `btree_gist` exclusion), `outbox_events` (including `sequence_id BIGSERIAL` and the `outbox_new_event` NOTIFY trigger), `version BIGINT` on mutable entities. Migrations live in `src/Database/Migrations`.
-- **Task 02**: .NET 9 FastEndpoints modular monolith (standard JIT container), JWT policies on **every** endpoint, FluentValidation, per-entity REST mutations with `version`-column optimistic concurrency.
+- **Task 02**: .NET 10 FastEndpoints modular monolith (standard JIT container), JWT policies on every endpoint except the two health probes and login, FluentValidation, per-entity REST mutations with `version`-column optimistic concurrency.
 - **Task 03**: `OutboxDispatcher` background service (`LISTEN outbox_new_event`), `DashboardPushHub` at `/hubs/dashboard` (MessagePack, typed client), catch-up endpoint `GET /api/v1/events`.
 - **Task 04**: Semantic layer single query path: JSON AST → C# `SemanticQueryCompiler` → parameterized SQL → JSON result set; identifier whitelist enforced.
 - **Task 05**: React 19 + Vite SPA, TanStack Query v5 optimistic mutations with rollback, HTTP 409 conflict prompt flow, cmdk command palette, in-memory session-scoped undo/redo.
@@ -63,15 +63,15 @@
 |            (JWT bearer; validated payloads)                         (binary MessagePack; JWT via accessTokenFactory)  |
 |                              v                                                     |                                  |
 |   +---------------------------------------------------------------------------------------------------------------+   |
-|   |                                  CADDY REVERSE PROXY & TLS TERMINATION                                        |   |
-|   |  - Automatic TLS, WebSocket proxying for /hubs/*, static frontend assets                                      |   |
+|   |                                  AZURE CONTAINER APPS INGRESS & TLS TERMINATION                                        |   |
+|   |  - Managed TLS and WebSocket ingress for /hubs/*; the API serves static frontend assets                                      |   |
 |   +---------------------------------------------------------------------------------------------------------------+   |
 |                              |                                                                                        |
 |                              v                                                                                        |
 |   +---------------------------------------------------------------------------------------------------------------+   |
-|   |                                .NET 9 FASTENDPOINTS MODULAR MONOLITH (JIT container, D7)                      |   |
+|   |                                .NET 10 FASTENDPOINTS MODULAR MONOLITH (JIT container, D7)                      |   |
 |   |  - REPR Endpoint Slices (Request -> Endpoint -> Response) with FluentValidation                               |   |
-|   |  - JWT policies on EVERY endpoint (D11); actor identity from the token `sub` claim only                       |   |
+|   |  - JWT policies on every business and realtime endpoint; actor identity from the token `sub` claim only                       |   |
 |   |  - SignalR DashboardPushHub (typed client, MessagePack)                                                       |   |
 |   |  - OutboxDispatcher BackgroundService: LISTEN outbox_new_event -> claim -> hub fan-out (D2)                   |   |
 |   +---------------------------------------------------------------------------------------------------------------+   |
@@ -97,7 +97,7 @@
 
 ### 2.2 Integration Layer Contracts, Protocols & Payloads
 
-#### 1. Boundary A: PostgreSQL 17 -> .NET 9 REPR API Integration
+#### 1. Boundary A: PostgreSQL 17 -> .NET 10 REPR API Integration
 - **Mechanism**: `NpgsqlDataSource` connection pooling combined with Dapper.
 - **Auth**: every mutation endpoint is configured with a named policy (e.g. `Policies("TraderPolicy")`); the actor identity comes from the JWT `sub` claim **only** — never from the request body (D11).
 - **Atomic Transaction Guarantee**: Every write command executes within a single PostgreSQL transaction wrapping:
@@ -297,12 +297,12 @@ Verification of this contract is owned by Task 09's Tier 2 concurrent-edit E2E s
 |   └── Verify btree_gist extension, audit_log triggers, outbox sequence + NOTIFY trigger                                 |
 +-------------------------------------------------------------------------------------------------------------------------+
 | STEP 3: BACKEND API SERVICE DEPLOYMENT                                                                                  |
-|   ├── Deploy the .NET 9 JIT container image (D7)                                                                        |
-|   └── Validate liveness probe /health/live and readiness probe /health/ready (probe token configured)                   |
+|   ├── Deploy the .NET 10 JIT container image (D7)                                                                        |
+|   └── Validate anonymous liveness probe /health/live and readiness probe /health/ready                   |
 +-------------------------------------------------------------------------------------------------------------------------+
-| STEP 4: REVERSE PROXY & FRONTEND                                                                                        |
-|   ├── Route Caddy TLS proxy to the API upstream and /hubs/dashboard WebSocket endpoint                                  |
-|   └── Serve the React 19 Vite production build behind Caddy                                                             |
+| STEP 4: MANAGED INGRESS & FRONTEND                                                                                        |
+|   ├── Route Azure Container Apps TLS ingress to the API and /hubs/dashboard WebSocket endpoint                                  |
+|   └── Serve the React 19 Vite production build from the API container                                                             |
 +-------------------------------------------------------------------------------------------------------------------------+
 | STEP 5: BACKUP JOB & RESTORE REHEARSAL                                                                                  |
 |   ├── Schedule the nightly pg_dump to versioned Blob storage                                                            |
@@ -332,11 +332,10 @@ psql "${DATABASE_URL:?DATABASE_URL missing}" -c "SELECT version();" | grep -q "P
 psql "${DATABASE_URL}" -tAc "SELECT extname FROM pg_extension;" | grep -q "btree_gist"
 echo " -> PostgreSQL 17 & extensions PASSED."
 
-# 2. Backend API Health Check (probes are JWT-protected — D11; a probe token is required)
+# 2. Backend API Health Check (the two exact platform probe routes are anonymous)
 echo "[2/6] Querying health endpoints..."
-: "${HEALTH_PROBE_TOKEN:?HEALTH_PROBE_TOKEN missing}"
-LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${HEALTH_PROBE_TOKEN}" http://localhost:5000/health/live)
-READY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${HEALTH_PROBE_TOKEN}" http://localhost:5000/health/ready)
+LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health/live)
+READY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health/ready)
 if [ "$LIVE_STATUS" -ne 200 ] || [ "$READY_STATUS" -ne 200 ]; then
     echo " -> ERROR: health check failed! live=$LIVE_STATUS ready=$READY_STATUS"
     exit 1
@@ -386,59 +385,28 @@ echo "======================================================================"
 
 ### 4.3 ASP.NET Core Health Probe Endpoint Implementation (`HealthEndpoints.cs`)
 
-Per **D11** there are no anonymous endpoints — health probes included. Probes authenticate with a token issued for the probe identity (the container platform's probe configuration supplies it, sourced from Key Vault); the endpoints use a named policy.
+The binding repository security rule exempts only the two exact health routes and `POST /api/v1/auth/login`. The probes are anonymous so Azure Container Apps can call them; readiness still performs a real PostgreSQL query. Every business and realtime endpoint remains JWT-protected.
 
 ```csharp
-namespace Tradebook.Api.Features.Health;
-
-using FastEndpoints;
-using Npgsql;
-
-public class LiveHealthEndpoint : EndpointWithoutRequest
+public static IEndpointRouteBuilder MapTradebookHealthEndpoints(
+    this IEndpointRouteBuilder endpoints
+)
 {
-    public override void Configure()
-    {
-        Get("/health/live");
-        Policies("HealthProbePolicy"); // D11: JWT on every endpoint — no anonymous access
-    }
+    endpoints
+        .MapHealthChecks(LivePath, new HealthCheckOptions { Predicate = static _ => false })
+        .AllowAnonymous();
 
-    public override async Task HandleAsync(CancellationToken ct)
-    {
-        await SendOkAsync(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }, ct);
-    }
-}
+    endpoints
+        .MapHealthChecks(
+            ReadyPath,
+            new HealthCheckOptions
+            {
+                Predicate = static registration => registration.Tags.Contains("ready"),
+            }
+        )
+        .AllowAnonymous();
 
-public class ReadyHealthEndpoint : EndpointWithoutRequest
-{
-    private readonly NpgsqlDataSource _dataSource;
-
-    public ReadyHealthEndpoint(NpgsqlDataSource dataSource)
-    {
-        _dataSource = dataSource;
-    }
-
-    public override void Configure()
-    {
-        Get("/health/ready");
-        Policies("HealthProbePolicy"); // D11: JWT on every endpoint — no anonymous access
-    }
-
-    public override async Task HandleAsync(CancellationToken ct)
-    {
-        try
-        {
-            await using var conn = await _dataSource.OpenConnectionAsync(ct);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1;";
-            await cmd.ExecuteScalarAsync(ct);
-
-            await SendOkAsync(new { status = "Healthy", postgres = "Connected" }, ct);
-        }
-        catch (Exception ex)
-        {
-            await SendAsync(new { status = "Unhealthy", error = ex.Message }, 503, ct);
-        }
-    }
+    return endpoints;
 }
 ```
 
@@ -475,7 +443,7 @@ The matrix below maps every domain of the Tradebook platform to its functional r
 | Domain ID | Platform Domain | Functional Requirement | Target Behavior / Baseline | Automated Verification Command | Pass Criteria | Sentinel Audit Verification Step |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **SEC-01** | **Bi-Temporal Audit & Backups** | Append-only `audit_log`; nightly dump provably restorable | Restored per-table row counts match the source exactly | `./scripts/backup-restore-rehearsal.sh` | Script exits 0; any count mismatch fails | Run the §3.1 overlap query — zero overlapping `system_time` ranges |
-| **API-02** | **.NET 9 Backend** | FastEndpoints REPR slices in a standard JIT container (D7); JWT policy on every endpoint (D11) | Container builds and starts; probes green with probe token | `dotnet build src/Backend/Tradebook.sln -c Release` | Build succeeds; `/health/ready` returns 200 | Inspect every endpoint `Configure()`: named policy present, no anonymous access |
+| **API-02** | **.NET 10 Backend** | FastEndpoints REPR slices in a standard JIT container (D7); JWT on business/realtime endpoints | Container builds and starts; anonymous probes green | `dotnet build src/Backend/Tradebook.sln -c Release` | Build succeeds; `/health/ready` returns 200 | Verify only health and login are anonymous; actor comes from JWT `sub` |
 | **MSG-03** | **Real-Time Push** | `OutboxDispatcher` (LISTEN `outbox_new_event`) -> `EntityChanged` fan-out; catch-up via `GET /api/v1/events?afterSequence=N` | At-least-once delivery with client dedup; catch-up pages complete and ordered | `dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --filter "FullyQualifiedName~RealTime"` | Task 03 tests T1–T7 green | WebSocket trace shows binary MessagePack frames on `/hubs/dashboard` |
 | **ANA-04** | **Semantic Layer** | JSON AST -> `SemanticQueryCompiler` -> parameterized SQL (D4) | Identifier whitelist enforced; filter values parameterized (D11) | `dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj --filter "FullyQualifiedName~SemanticQueryCompiler"` | Injection attempts rejected; valid ASTs compile | Inspect generated SQL: zero interpolated user strings |
 | **UI-05** | **React 19 SPA** | Optimistic mutations with rollback; 409 conflict prompt (D5) | Latency recorded as data — no absolute render gate (D10) | `npx playwright test` (from `tests/e2e`) | Tier 1–3 specs green incl. the concurrent-edit 409 spec | Verify the conflict prompt shows server state; no silent overwrite |
@@ -497,7 +465,7 @@ The matrix below maps every domain of the Tradebook platform to its functional r
    - Author `scripts/backup-restore-rehearsal.sh` and run it green against a seeded database.
 
 2. **Step 2: Backend API & Health Probes**:
-   - Implement `LiveHealthEndpoint` and `ReadyHealthEndpoint` in `src/Backend/src/Tradebook.Api/Features/Health/HealthEndpoints.cs` with `Policies("HealthProbePolicy")`.
+   - Map `/health/live` and `/health/ready` anonymously in `src/Backend/src/Tradebook.Api/Features/Health/HealthEndpoints.cs`; readiness must execute a PostgreSQL health check.
    - Confirm SignalR MessagePack registration and the `/hubs/dashboard` route (owned by Task 03; wired in Task 02's `Program.cs`).
 
 3. **Step 3: Concurrency Conflict Contract**:
