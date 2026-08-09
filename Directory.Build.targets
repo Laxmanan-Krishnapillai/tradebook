@@ -1,13 +1,1 @@
-<Project>
-  <Target
-    Name="GenerateTypeScriptContracts"
-    AfterTargets="Build"
-    Condition="'$(Configuration)' == 'Debug' and '$(MSBuildProjectName)' == 'Tradebook.Core'"
-  >
-    <Message Text="[TypeGen] Generating TypeScript DTO contracts..." Importance="high" />
-    <Exec
-      WorkingDirectory="$(MSBuildThisFileDirectory)"
-      Command="dotnet typegen generate --project-folder $(MSBuildThisFileDirectory)"
-    />
-  </Target>
-</Project>
+<Project />

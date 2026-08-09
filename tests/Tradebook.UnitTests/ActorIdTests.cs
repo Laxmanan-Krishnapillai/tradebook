@@ -5,24 +5,48 @@ namespace Tradebook.UnitTests;
 
 public sealed class ActorIdTests
 {
+    private static readonly Guid Tenant = Guid.NewGuid();
+
     [Fact]
-    public void ParsesSubClaim()
+    public void UsesOidOnlyAfterTenantValidation()
     {
-        var actorId = Guid.NewGuid();
-        var principal = new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim("sub", actorId.ToString())], "test")
+        var actor = Guid.NewGuid();
+        Assert.Equal(
+            actor,
+            ActorId.From(Principal(actor.ToString(), Tenant.ToString(), Tenant.ToString()))
         );
-        Assert.Equal(actorId, ActorId.From(principal));
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("not-a-guid")]
-    public void MissingOrMalformedSubClaimThrows(string? subValue)
+    [InlineData("bad", "same", "same")]
+    [InlineData(
+        "00000000-0000-0000-0000-000000000001",
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000001"
+    )]
+    public void RejectsMalformedOidOrTenantMismatch(string oid, string tid, string validated) =>
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            ActorId.From(Principal(oid, tid, validated))
+        );
+
+    [Fact]
+    public void IgnoresEmailUsernameNameAndSubject()
     {
-        Claim[] claims = subValue is null ? [] : [new Claim("sub", subValue)];
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
-        var exception = Assert.Throws<UnauthorizedAccessException>(() => ActorId.From(principal));
-        Assert.Contains("sub claim", exception.Message, StringComparison.Ordinal);
+        var actor = Guid.NewGuid();
+        var p = Principal(actor.ToString(), Tenant.ToString(), Tenant.ToString());
+        ((ClaimsIdentity)p.Identity!).AddClaims([
+            new("email", Guid.NewGuid().ToString()),
+            new("preferred_username", Guid.NewGuid().ToString()),
+            new("sub", Guid.NewGuid().ToString()),
+        ]);
+        Assert.Equal(actor, ActorId.From(p));
     }
+
+    private static ClaimsPrincipal Principal(string oid, string tid, string validated) =>
+        new(
+            new ClaimsIdentity(
+                [new Claim("oid", oid), new("tid", tid), new("tradebook_tenant", validated)],
+                "test"
+            )
+        );
 }

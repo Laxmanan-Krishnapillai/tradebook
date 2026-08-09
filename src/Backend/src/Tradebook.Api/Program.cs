@@ -8,6 +8,7 @@ using Tradebook.Api.ErrorHandling;
 using Tradebook.Api.Features.Health;
 using Tradebook.Api.RealTime;
 using Tradebook.Api.Security;
+using Tradebook.Api.Serialization;
 using Tradebook.Core.Analytics;
 using Tradebook.Core.Interfaces;
 using Tradebook.Infrastructure.Caching;
@@ -20,6 +21,7 @@ VogenTypeHandlers.RegisterAll();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new VogenTypesFactory());
+    options.SerializerOptions.Converters.Add(new MoneyJsonConverter());
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
 });
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -33,9 +35,10 @@ builder.Services.AddSingleton<ICacheService, HybridCacheService>();
 var semanticModels = new SemanticModelLoader();
 builder.Services.AddSingleton(semanticModels);
 builder.Services.AddSingleton<SemanticQueryCompiler>();
-builder.Services.AddTradebookAuthentication(builder.Configuration);
+builder.Services.AddTradebookAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddTradebookHealthChecks();
 builder.Services.AddFastEndpoints();
+builder.Services.AddOpenApi();
 builder.Services.AddDashboardPush();
 builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -65,6 +68,7 @@ app.UseAuthorization();
 app.UseFastEndpoints(config =>
     config.Serializer.Options.TypeInfoResolver = AppJsonSerializerContext.Default
 );
+app.MapOpenApi().RequireAuthorization();
 app.MapTradebookHealthEndpoints();
 app.MapDashboardPushHub();
 

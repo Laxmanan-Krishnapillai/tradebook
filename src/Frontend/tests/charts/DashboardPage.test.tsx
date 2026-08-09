@@ -29,7 +29,7 @@ describe('DashboardPage', () => {
       gridLayout: { columns: 12, rowHeight: 56, items: [] },
       widgets: []
     };
-    useAuthStore.getState().setSession('dashboard-token', '2099-01-01T00:00:00.000Z', dashboardId);
+    useAuthStore.getState().setSession({ accountKey: 'account-dashboard', actorId: dashboardId });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       dashboardId,
       version: emptyDashboard.version,

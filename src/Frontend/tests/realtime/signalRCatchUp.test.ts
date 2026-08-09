@@ -20,6 +20,15 @@ class FakeConnection implements DashboardHubConnection {
 }
 
 describe('DashboardStreamClient catch-up', () => {
+  it('rejects a malformed live SignalR envelope before it reaches the cache', () => {
+    const delivered = vi.fn();
+    const connection = new FakeConnection();
+    new DashboardStreamClient(delivered, { connection, fetchPage: async () => ({ events: [], latestSequence: 0 }) });
+
+    expect(() => connection.emit({ ...event(1), sequenceId: Number.NaN })).toThrow();
+    expect(delivered).not.toHaveBeenCalled();
+  });
+
   it('pages to a short response, deduplicates overlap, and re-subscribes before reconnect catch-up', async () => {
     const pages = [
       Array.from({ length: 500 }, (_, index) => event(index + 1)),

@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/physical-delivery-details-dto';
+import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/types.gen';
 import { reconcileRealtimeEvent } from '../../src/hooks/useRealtimeQuerySync';
 import { ApiError } from '../../src/lib/api/client';
 import { queryKeys } from '../../src/lib/query/queryKeys';

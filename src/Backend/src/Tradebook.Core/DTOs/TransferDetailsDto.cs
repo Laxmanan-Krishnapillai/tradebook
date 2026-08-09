@@ -1,11 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Tradebook.Core.Domain.ValueObjects.Ids;
 using Tradebook.Core.Domain.ValueObjects.Money;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record TransferDetailsDto
 {
     public TransferDetailsDto() { }
@@ -63,46 +61,32 @@ public sealed record TransferDetailsDto
     public required string ContractInstanceId { get; init; }
     public required DateOnly SupplyMonth { get; init; }
 
-    [TsOptional]
     public CounterpartyId? CounterpartyId { get; init; }
 
-    [TsOptional]
     public string? BalancingGroup { get; init; }
 
-    [TsOptional]
     public string? TradingArea { get; init; }
 
-    [TsOptional]
     public Quantity? CapacityMw { get; init; }
 
-    [TsOptional]
     public Quantity? BookedCapacityMw { get; init; }
 
-    [TsOptional]
     public Quantity? VolumeMwh { get; init; }
 
-    [TsOptional]
     public Quantity? BalancingEffectMwh { get; init; }
 
-    [TsOptional]
     public DateOnly? StartDay { get; init; }
 
-    [TsOptional]
     public DateOnly? EndDay { get; init; }
 
-    [TsOptional]
     public string? PriceMechanism { get; init; }
 
-    [TsOptional]
     public Amount? TransportCostEurMwh { get; init; }
 
-    [TsOptional]
     public Quantity? CapacityCostEurMwh { get; init; }
 
-    [TsOptional]
     public string? Status { get; init; }
 
-    [TsOptional]
     public string? Comments { get; init; }
     public required long Version { get; init; }
     public required DateTime CreatedAt { get; init; }

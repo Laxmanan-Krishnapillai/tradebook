@@ -1,9 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
-using TypeGen.Core.TypeAnnotations;
 
 namespace Tradebook.Core.DTOs;
 
-[ExportTsInterface]
 public sealed record DeleteMarketPriceRequest
 {
     public DeleteMarketPriceRequest() { }
