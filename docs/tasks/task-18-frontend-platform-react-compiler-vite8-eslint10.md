@@ -1,6 +1,6 @@
 # Task 18: Frontend Platform Upgrade — React Compiler, Vite 8, Tailwind v4 & ESLint 10 Type-Aware Linting
 
-> **GREENFIELD MODERNIZATION TASK (2026-08-07)** — This task adopts **React Compiler 1.0 (GA)**, **Vite 8 (Rolldown default)**, **Tailwind v4 (CSS-first)**, **ESLint 10 flat config** with **typescript-eslint type-checked linting**, and **Knip** across the entire `src/Frontend` workspace. It is a committed, repo-wide adoption — every `src` file is compiled by React Compiler and type-checked-linted, with no per-file opt-in. The legacy `.eslintrc.cjs` is **deleted** (ESLint 10 removed the eslintrc format). Record the rationale and pinned version matrix under [`docs/architecture/decision-log.md`](../docs/architecture/decision-log.md).
+> **GREENFIELD MODERNIZATION TASK (2026-08-07)** — This task adopts **React Compiler 1.0 (GA)**, **Vite 8 (Rolldown default)**, **Tailwind v4 (CSS-first)**, **ESLint 10 flat config** with **typescript-eslint type-checked linting**, and **Knip** across the entire `src/Frontend` workspace. It is a committed, repo-wide adoption — every `src` file is compiled by React Compiler and type-checked-linted, with no per-file opt-in. The legacy `.eslintrc.cjs` is **deleted** (ESLint 10 removed the eslintrc format). Record the rationale and pinned version matrix under [`docs/architecture/decision-log.md`](../architecture/decision-log.md).
 
 - **Phase**: Frontend Platform Hardening (lands after Task 16's generated client, before Task 19's UI/forms wave)
 - **Lead / Owner**: Frontend Platform & Build Tooling Specialist
@@ -158,7 +158,7 @@ export default tseslint.config(   // typescript-eslint flat config helper
 | `knip` / `@total-typescript/ts-reset` | — | 5.x / 0.6.x | CI gate; `unknown`-return reset |
 | Node engine | — | ≥20.19 / 22.13 / 24 | required by Vite 8 + ESLint 10 |
 
-Primary references: [React Compiler](https://react.dev/learn/react-compiler), [Vite 8 / Rolldown](https://vite.dev/guide/rolldown), [Tailwind v4](https://tailwindcss.com/docs/upgrade-guide), [ESLint flat config](https://eslint.org/docs/latest/use/configure/configuration-files), [typescript-eslint typed linting](https://typescript-eslint.io/getting-started/typed-linting), [Knip](https://knip.dev), and [`docs/architecture/decision-log.md`](../docs/architecture/decision-log.md).
+Primary references: [React Compiler](https://react.dev/learn/react-compiler), [Vite 8 / Rolldown](https://vite.dev/guide/rolldown), [Tailwind v4](https://tailwindcss.com/docs/upgrade-guide), [ESLint flat config](https://eslint.org/docs/latest/use/configure/configuration-files), [typescript-eslint typed linting](https://typescript-eslint.io/getting-started/typed-linting), [Knip](https://knip.dev), and [`docs/architecture/decision-log.md`](../architecture/decision-log.md).
 
 ---
 

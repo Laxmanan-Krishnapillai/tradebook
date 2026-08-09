@@ -12,12 +12,12 @@ const markdownLinkPattern = /!?\[[^\]]*\]\(([^)]+)\)/g;
 const taskEntries = (await readdir(tasksDirectory))
   .filter((entry) => taskFilePattern.test(entry))
   .sort();
-const expectedTaskNumbers = Array.from({ length: 10 }, (_, index) => String(index + 1).padStart(2, '0'));
+const expectedTaskNumbers = Array.from({ length: 24 }, (_, index) => String(index + 1).padStart(2, '0'));
 const actualTaskNumbers = taskEntries.map((entry) => entry.match(taskFilePattern)[1]);
 
 const failures = [];
 if (actualTaskNumbers.join(',') !== expectedTaskNumbers.join(',')) {
-  failures.push(`expected task specifications 01-10; found ${actualTaskNumbers.join(', ') || 'none'}`);
+  failures.push(`expected task specifications 01-24; found ${actualTaskNumbers.join(', ') || 'none'}`);
 }
 
 const markdownFiles = [path.join(tasksDirectory, 'README.md'), ...taskEntries.map((entry) => path.join(tasksDirectory, entry))];
@@ -65,5 +65,5 @@ if (failures.length > 0) {
   }
   process.exitCode = 1;
 } else {
-  console.log(`Documentation verification PASSED: 10 task specifications and ${checkedLinks} local links resolved.`);
+  console.log(`Documentation verification PASSED: ${taskEntries.length} task specifications and ${checkedLinks} local links resolved.`);
 }
