@@ -18,7 +18,10 @@
   "ignoreDependencies": [
     "tailwindcss",
     "shadcn",
-    "@argos-ci/cli"
+    "@argos-ci/cli",
+    "@fontsource-variable/inter",
+    "@fontsource-variable/roboto-mono",
+    "tw-animate-css"
   ],
   "vite": {
     "config": [

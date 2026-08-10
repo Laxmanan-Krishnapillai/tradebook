@@ -26,8 +26,16 @@ async function load(initialPath: string, session?: AuthSession) {
   return router;
 }
 
+// Vite auto-code-splits every route component, so `router.load()` imports the
+// matched page's chunk on demand. Under Vitest that first import transforms and
+// executes the page's whole module graph cold (the dashboard chunk alone pulls in
+// echarts + lightweight-charts and takes >10s on a warm dev machine), which blows
+// the default 5s budget. Raise the budget for the tests that pay that one-off
+// cold-load cost; the assertions themselves are unchanged.
+const routeChunkColdLoadTimeout = { timeout: 60_000 };
+
 describe('production route tree', () => {
-  it('redirects the index canonically and protects authenticated routes', async () => {
+  it('redirects the index canonically and protects authenticated routes', routeChunkColdLoadTimeout, async () => {
     const index = await load('/', validSession);
     expect(index.state.location.pathname).toBe('/deliveries');
 
@@ -39,7 +47,7 @@ describe('production route tree', () => {
   it.each([
     '/deliveries', '/contracts', '/market-prices', '/dashboard', '/capacity-bookings', '/transfers',
     '/biotickets', '/goo-certificates', '/tax-tariffs', '/hedges', '/workflow',
-  ])('deep-links to %s with the production route tree', async (path) => {
+  ])('deep-links to %s with the production route tree', routeChunkColdLoadTimeout, async (path) => {
     const router = await load(path, validSession);
     expect(router.state.location.pathname).toBe(path);
     expect(router.state.matches.some((match) => match.status === 'notFound')).toBe(false);
