@@ -47,7 +47,7 @@ SELECT
         WHEN aggregate_type = 'WorkspaceDashboard'
             THEN 'dashboard:' || ((payload ->> 'actorId')::uuid)::text
         ELSE 'entity:' || aggregate_type
-    END,
+    END AS group_name,
     aggregate_type,
     aggregate_id,
     event_type,

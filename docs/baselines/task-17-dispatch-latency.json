@@ -1,0 +1,31 @@
+{
+  "sampleCount": 20,
+  "p99Milliseconds": 99.49477599999997,
+  "capturedAtUtc": "2026-08-10T07:20:00+00:00",
+  "sourceRevision": "db2d786863dbcb4ad1081b8986f7be3ae63abbca",
+  "operatingSystem": "Microsoft Windows 11 Business 10.0.26100",
+  "processor": "AMD Ryzen 5 7530U with Radeon Graphics",
+  "dockerVersion": "Docker version 28.3.2, build 578ccf6",
+  "samplesMilliseconds": [
+    76.3953,
+    76.3116,
+    60.6497,
+    62.316,
+    77.7218,
+    75.289,
+    76.9252,
+    62.3618,
+    75.5337,
+    77.5069,
+    76.7741,
+    76.0224,
+    77.5146,
+    61.3774,
+    76.4373,
+    76.2225,
+    63.1716,
+    76.3547,
+    104.3891,
+    78.6295
+  ]
+}

@@ -779,8 +779,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                     contractId,
                     bookType = "Sales",
                     supplyMonth = supplyMonth.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    volumeNominatedMwh = 10m,
-                    volumeRealisedMwh = 9m,
+                    volumeNominatedMwh = "10",
+                    volumeRealisedMwh = "9",
                     priceMechanism = "TTF",
                 }
             )
@@ -806,7 +806,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                 new
                 {
                     priceDate = aggregateId,
-                    ttfEurMwh = 31.5m,
+                    ttfEurMwh = "31.5",
                     version = 0,
                 }
             )
@@ -839,9 +839,8 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                         new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
-                            ["Jwt:Issuer"] = "Tradebook",
-                            ["Jwt:Audience"] = "Tradebook",
-                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                            ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                            ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
                         }
                     )
             );

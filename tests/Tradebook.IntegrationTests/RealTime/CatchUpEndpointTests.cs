@@ -137,6 +137,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Testing");
             builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
@@ -144,9 +145,8 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
                         new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
-                            ["Jwt:Issuer"] = "Tradebook",
-                            ["Jwt:Audience"] = "Tradebook",
-                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                            ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
+                            ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
                         }
                     )
             );
