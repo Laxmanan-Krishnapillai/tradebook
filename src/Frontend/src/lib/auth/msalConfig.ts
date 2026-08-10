@@ -21,7 +21,8 @@ export const msalConfig: Configuration = {
     redirectUri: redirectOrigin,
     postLogoutRedirectUri: redirectOrigin,
   },
-  // MemoryStorage keeps tokens out of web storage; the redirect flow then requires the
-  // auth state/nonce in a cookie or MSAL refuses with in_mem_redirect_unavailable.
-  cache: { cacheLocation: BrowserCacheLocation.MemoryStorage, storeAuthStateInCookie: true },
+  // msal-browser v5 refuses the redirect flow whenever cacheLocation is MemoryStorage
+  // (in_mem_redirect_unavailable) and removed the storeAuthStateInCookie escape hatch,
+  // so keep tokens in sessionStorage: per-tab, cleared on close, redirect-compatible.
+  cache: { cacheLocation: BrowserCacheLocation.SessionStorage },
 };
