@@ -126,8 +126,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             await hub.InvokeAsync("Subscribe", $"entity:{RealtimeAggregateTypes.PhysicalDelivery}")
                 .ConfigureAwait(true);
 
-            var firstDispatch = await factory
-                .Services.SendMessageAndWaitAsync(message, timeoutInMilliseconds: 15_000)
+            var firstDispatch = await SendWithStartupGraceAsync(factory, message)
                 .ConfigureAwait(true);
             var sentEnvelope = firstDispatch.Executed.SingleEnvelope<EntityChangedDomainEvent>();
             envelopeId = sentEnvelope.Id;
@@ -846,6 +845,30 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
                     )
             );
         });
+
+    private static async Task<ITrackedSession> SendWithStartupGraceAsync(
+        WebApplicationFactory<Program> factory,
+        EntityChangedDomainEvent message
+    )
+    {
+        // Wolverine starts on a background retry loop; the tracked send waits out a
+        // racing deferred start the same way the production publisher does.
+        var attempt = 0;
+        while (true)
+        {
+            try
+            {
+                return await factory
+                    .Services.SendMessageAndWaitAsync(message, timeoutInMilliseconds: 15_000)
+                    .ConfigureAwait(true);
+            }
+            catch (WolverineHasNotStartedException) when (attempt < 300)
+            {
+                attempt++;
+                await Task.Delay(100).ConfigureAwait(true);
+            }
+        }
+    }
 
     private static async Task ResetWolverineAsync(WebApplicationFactory<Program> factory)
     {
