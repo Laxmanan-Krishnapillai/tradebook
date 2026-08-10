@@ -850,7 +850,22 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     private static async Task ResetWolverineAsync(WebApplicationFactory<Program> factory)
     {
         var runtime = factory.Services.GetRequiredService<IWolverineRuntime>();
-        await runtime.Storage.Admin.ClearAllAsync().ConfigureAwait(false);
+        // Wolverine now starts on a background retry loop, so the envelope schema may
+        // not exist yet when a test resets storage; wait for the deferred start.
+        var attempt = 0;
+        while (true)
+        {
+            try
+            {
+                await runtime.Storage.Admin.ClearAllAsync().ConfigureAwait(false);
+                return;
+            }
+            catch (Exception) when (attempt < 300)
+            {
+                attempt++;
+                await Task.Delay(100).ConfigureAwait(false);
+            }
+        }
     }
 
     private static HttpClient AuthenticatedClient(

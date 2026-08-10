@@ -32,7 +32,7 @@ public sealed class Task01IntegrityIntegrationTests(PostgresTestFixture postgres
         Assert.Equal(embeddedCount, rows.Length);
         Assert.Equal(rows.Length, rows.Distinct(StringComparer.Ordinal).Count());
         Assert.StartsWith("Tradebook.Database.Migrations.001_", rows[0], StringComparison.Ordinal);
-        Assert.StartsWith("Tradebook.Database.Migrations.013_", rows[^1], StringComparison.Ordinal);
+        Assert.StartsWith("Tradebook.Database.Migrations.014_", rows[^1], StringComparison.Ordinal);
     }
 
     [Fact]
