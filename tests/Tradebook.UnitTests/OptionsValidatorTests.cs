@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using Tradebook.Infrastructure.Options;
-using Tradebook.Infrastructure.Outbox;
 
 namespace Tradebook.UnitTests;
 
@@ -50,7 +49,7 @@ public sealed class OptionsValidatorTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["DatabaseOptions", "EntraOptions", "OutboxOptions"], optionTypes);
+        Assert.Equal(["DatabaseOptions", "EntraOptions"], optionTypes);
         AssertValidatorShapes(optionTypes, backendSource);
     }
 
@@ -73,40 +72,6 @@ public sealed class OptionsValidatorTests
             null,
             new DatabaseOptions { ConnectionString = "Host=localhost;Database=tradebook" }
         );
-
-        Assert.True(result.Succeeded);
-    }
-
-    [Theory]
-    [InlineData(0, 1, 2)]
-    [InlineData(101, 1, 2)]
-    [InlineData(100, 0, 2)]
-    [InlineData(100, 301, 2)]
-    [InlineData(100, 1, 0)]
-    [InlineData(100, 1, 301)]
-    public void OutboxValuesOutsideTheSupportedRangesAreRejected(
-        int batchSize,
-        int fallbackPollSeconds,
-        int errorBackoffSeconds
-    )
-    {
-        var result = new OutboxOptionsValidator().Validate(
-            null,
-            new OutboxOptions
-            {
-                BatchSize = batchSize,
-                FallbackPollSeconds = fallbackPollSeconds,
-                ErrorBackoffSeconds = errorBackoffSeconds,
-            }
-        );
-
-        Assert.True(result.Failed);
-    }
-
-    [Fact]
-    public void DefaultOutboxOptionsAreAccepted()
-    {
-        var result = new OutboxOptionsValidator().Validate(null, new OutboxOptions());
 
         Assert.True(result.Succeeded);
     }

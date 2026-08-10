@@ -1,12 +1,17 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class TransferRepository(INpgsqlConnectionFactory connections) : ITransferRepository
+public sealed class TransferRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher
+) : ITransferRepository
 {
     private const string Projection = """
         id AS TransferId, contract_id AS ContractId, contract_instance_id AS ContractInstanceId,
@@ -117,19 +122,19 @@ public sealed class TransferRepository(INpgsqlConnectionFactory connections) : I
                         )
                     )
                 ).ConfigureAwait(false);
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.Transfer,
-                        created.TransferId.Value.ToString(),
-                        "Created",
-                        created.Version,
-                        null,
-                        ct
+                await publisher.EnlistAsync((DbTransaction)transaction, ct).ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.Transfer,
+                            created.TransferId.Value.ToString(),
+                            "Created",
+                            created.Version
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return created;
             }
         }
@@ -182,19 +187,19 @@ public sealed class TransferRepository(INpgsqlConnectionFactory connections) : I
                     await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
                     return null;
                 }
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.Transfer,
-                        updated.TransferId.Value.ToString(),
-                        "Updated",
-                        updated.Version,
-                        null,
-                        ct
+                await publisher.EnlistAsync((DbTransaction)transaction, ct).ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.Transfer,
+                            updated.TransferId.Value.ToString(),
+                            "Updated",
+                            updated.Version
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return updated;
             }
         }
@@ -234,19 +239,22 @@ public sealed class TransferRepository(INpgsqlConnectionFactory connections) : I
                 ).ConfigureAwait(false);
                 if (newVersion is not null)
                 {
-                    await (
-                        RepositoryMutation.WriteOutboxAsync(
-                            connection,
-                            transaction,
-                            OutboxAggregateTypes.Transfer,
-                            id.ToString(),
-                            "Cancelled",
-                            newVersion.Value,
-                            reason,
-                            ct
+                    await publisher
+                        .EnlistAsync((DbTransaction)transaction, ct)
+                        .ConfigureAwait(false);
+                    await publisher
+                        .PublishAsync(
+                            EntityChangedDomainEvent.Create(
+                                RealtimeAggregateTypes.Transfer,
+                                id.ToString(),
+                                "Cancelled",
+                                newVersion.Value,
+                                reason
+                            )
                         )
-                    ).ConfigureAwait(false);
+                        .ConfigureAwait(false);
                     await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                    await publisher.FlushAsync().ConfigureAwait(false);
                     return null;
                 }
                 await (transaction.RollbackAsync(ct)).ConfigureAwait(false);

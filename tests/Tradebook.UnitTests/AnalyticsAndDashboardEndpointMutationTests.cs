@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FastEndpoints;
@@ -15,9 +14,8 @@ namespace Tradebook.UnitTests;
 
 public sealed class AnalyticsAndDashboardEndpointMutationTests
 {
-    private static readonly string[] DashboardDimensions = ["supply_month"];
-    private static readonly string[] DashboardMeasures = ["volume_mwh"];
-    private static readonly string[] DashboardYAxis = ["volume_mwh"];
+    private static readonly string[] SupplyMonthDimensions = ["supply_month"];
+    private static readonly string[] VolumeMeasures = ["volume_mwh"];
 
     [Fact]
     public async Task AnalyticsSemanticValidationFailureReturns400WithoutOpeningPostgres()
@@ -87,7 +85,8 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var endpoint = Factory.Create<SaveDashboardEndpoint>(
             connections,
             new SemanticQueryCompiler(new SemanticModelLoader()),
-            DashboardJsonOptions()
+            DashboardJsonOptions(),
+            new UnitTestNoopPublisher()
         );
         var request = new SaveDashboardRequest(
             Guid.NewGuid(),
@@ -113,10 +112,11 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var connections = new ThrowingConnectionFactory(marker);
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<SaveDashboardEndpoint>(
-            context => context.User = Principal(actorId),
+            context => context.User = DomainEndpointTestData.Principal(actorId),
             connections,
             new SemanticQueryCompiler(new SemanticModelLoader()),
-            DashboardJsonOptions()
+            DashboardJsonOptions(),
+            new UnitTestNoopPublisher()
         );
 
         var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -139,7 +139,7 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var connections = new ThrowingConnectionFactory(marker);
         using var cancellation = new CancellationTokenSource();
         var endpoint = Factory.Create<GetDashboardEndpoint>(
-            context => context.User = Principal(actorId),
+            context => context.User = DomainEndpointTestData.Principal(actorId),
             connections
         );
 
@@ -161,18 +161,6 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         return Microsoft.Extensions.Options.Options.Create(options);
     }
-
-    private static ClaimsPrincipal Principal(Guid actorId) =>
-        new(
-            new ClaimsIdentity(
-                [
-                    new Claim("oid", actorId.ToString()),
-                    new("tid", "11111111-1111-1111-1111-111111111111"),
-                    new("tradebook_tenant", "11111111-1111-1111-1111-111111111111"),
-                ],
-                "test"
-            )
-        );
 
     private static JsonElement DashboardLayout(Guid dashboardId) =>
         JsonSerializer.SerializeToElement(
@@ -210,10 +198,10 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
                         queryAst = new
                         {
                             modelName = "delivery_pnl_analytics",
-                            dimensions = DashboardDimensions,
-                            measures = DashboardMeasures,
+                            dimensions = SupplyMonthDimensions,
+                            measures = VolumeMeasures,
                         },
-                        visualEncodings = new { xAxis = "supply_month", yAxis = DashboardYAxis },
+                        visualEncodings = new { xAxis = "supply_month", yAxis = VolumeMeasures },
                     },
                 },
             }

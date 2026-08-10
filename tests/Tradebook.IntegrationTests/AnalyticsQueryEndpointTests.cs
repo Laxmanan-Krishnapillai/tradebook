@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
@@ -75,7 +76,12 @@ public sealed class AnalyticsQueryEndpointTests(CustomWebApplicationFactory fact
         Assert.Equal("book_type", document.RootElement.GetProperty("columns")[0].GetString());
         Assert.Equal("revenue_eur", document.RootElement.GetProperty("columns")[1].GetString());
         Assert.Equal("Sales", document.RootElement.GetProperty("rows")[0][0].GetString());
-        Assert.Equal(1234.56m, document.RootElement.GetProperty("rows")[0][1].GetDecimal());
+        // D20: monetary decimals serialize as JSON strings (MoneyJsonConverter).
+        var revenue = document.RootElement.GetProperty("rows")[0][1].GetString();
+        Assert.Equal(
+            1234.56m,
+            decimal.Parse(revenue!, NumberStyles.Number, CultureInfo.InvariantCulture)
+        );
     }
 
     private void Authenticate() =>

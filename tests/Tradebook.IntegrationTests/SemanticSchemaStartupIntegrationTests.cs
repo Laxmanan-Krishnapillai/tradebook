@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
-using Tradebook.Core.Analytics;
 using Tradebook.IntegrationTests.Fixtures;
 
 namespace Tradebook.IntegrationTests;
@@ -20,16 +21,29 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
     }
 
     [Fact]
-    public async Task HostStartupFailsWhenADeclaredSemanticColumnIsMissing()
+    public async Task HostStopsWhenADeclaredSemanticColumnIsMissing()
     {
+        // Schema validation moved out of synchronous startup into MigrationHostedService:
+        // the host boots (liveness stays database-independent), the background migration
+        // pass detects the drift and requests an application stop instead of throwing.
         await RenameVolumeColumnAsync("volume_mwh", "volume_mwh_drifted");
         try
         {
             using var factory = CreateFactory();
+            using var client = factory.CreateClient();
 
-            var exception = Assert.Throws<SemanticSchemaMismatchException>(factory.CreateClient);
+            var lifetime = factory.Services.GetRequiredService<IHostApplicationLifetime>();
+            var stopRequested = new TaskCompletionSource();
+            using var stopRegistration = lifetime.ApplicationStopping.Register(() =>
+                stopRequested.TrySetResult()
+            );
 
-            Assert.Contains("volume_mwh", exception.Message, StringComparison.Ordinal);
+            var completed = await Task.WhenAny(
+                stopRequested.Task,
+                Task.Delay(TimeSpan.FromSeconds(60))
+            );
+
+            Assert.Same(stopRequested.Task, completed);
         }
         finally
         {
@@ -41,6 +55,10 @@ public sealed class SemanticSchemaStartupIntegrationTests(PostgresTestFixture po
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder
                 .UseEnvironment("Testing")
+                // UseSetting lands early enough for services-phase reads (Wolverine
+                // envelope storage); the in-memory overrides below cover options-bound
+                // consumers.
+                .UseSetting("Database:ConnectionString", Postgres.ConnectionString)
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(

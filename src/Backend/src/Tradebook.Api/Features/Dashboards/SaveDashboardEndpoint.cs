@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
 using Tradebook.Api.Security;
 using Tradebook.Core.Analytics;
+using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
+using Tradebook.Core.Messaging;
 using Tradebook.Infrastructure.Data;
 
 namespace Tradebook.Api.Features.Dashboards;
@@ -15,7 +17,8 @@ namespace Tradebook.Api.Features.Dashboards;
 public sealed class SaveDashboardEndpoint(
     INpgsqlConnectionFactory connections,
     SemanticQueryCompiler semanticQueries,
-    IOptions<JsonOptions> jsonOptions
+    IOptions<JsonOptions> jsonOptions,
+    ITransactionalEventPublisher publisher
 ) : Endpoint<SaveDashboardRequest, SaveDashboardResponse>
 {
     private const string InsertSql = """
@@ -30,12 +33,6 @@ public sealed class SaveDashboardEndpoint(
         SET layout_json = @Layout::jsonb, version = version + 1, updated_at = clock_timestamp()
         WHERE id = @Id AND actor_id = @ActorId AND version = @ExpectedVersion
         RETURNING layout_json::text AS Layout, version AS Version;
-        """;
-
-    private const string OutboxSql = """
-        INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-        VALUES ('WorkspaceDashboard', @Id::text, @EventType,
-                jsonb_build_object('dashboardId', @Id::text, 'actorId', @ActorId::text, 'version', @Version));
         """;
 
     public override void Configure()
@@ -72,18 +69,22 @@ public sealed class SaveDashboardEndpoint(
             return;
         }
 
-        await (
-            WriteOutboxAsync(
-                connection,
-                transaction,
-                req.DashboardId,
-                actorId,
-                eventType,
-                saved,
-                ct
+        await publisher
+            .EnlistAsync((System.Data.Common.DbTransaction)transaction, ct)
+            .ConfigureAwait(false);
+        await publisher
+            .PublishAsync(
+                EntityChangedDomainEvent.Create(
+                    RealtimeAggregateTypes.WorkspaceDashboard,
+                    req.DashboardId.Value.ToString(),
+                    eventType,
+                    saved.Version,
+                    actorId: actorId
+                )
             )
-        ).ConfigureAwait(false);
+            .ConfigureAwait(false);
         await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+        await publisher.FlushAsync().ConfigureAwait(false);
         await (
             Send.ResponseAsync(DashboardMapper.ToResponse(saved, req.DashboardId), cancellation: ct)
         ).ConfigureAwait(false);
@@ -174,30 +175,6 @@ public sealed class SaveDashboardEndpoint(
             )
         ).ConfigureAwait(false);
     }
-
-    private static Task<int> WriteOutboxAsync(
-        IDbConnection connection,
-        IDbTransaction transaction,
-        Guid dashboardId,
-        Guid actorId,
-        string eventType,
-        DashboardRow saved,
-        CancellationToken ct
-    ) =>
-        connection.ExecuteAsync(
-            new CommandDefinition(
-                OutboxSql,
-                new
-                {
-                    Id = dashboardId,
-                    ActorId = actorId,
-                    EventType = eventType,
-                    saved.Version,
-                },
-                transaction,
-                cancellationToken: ct
-            )
-        );
 
     private static Task<DashboardRow?> CurrentForActorAsync(
         IDbConnection connection,

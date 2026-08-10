@@ -1,6 +1,7 @@
 using Dapper;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
 using Tradebook.Infrastructure.Data;
@@ -12,14 +13,15 @@ public sealed class DeliveryRepositoryIntegrationTests(PostgresTestFixture postg
     : PostgresDatabaseTestBase(postgres)
 {
     [Fact]
-    public async Task MutationsWriteAuditAndOutboxAndEnforceVersions()
+    public async Task MutationsWriteAuditPublishEventsAndEnforceVersions()
     {
         var actorId = Guid.NewGuid();
         var (contractId, contractName) = await CreateContractAsync();
         await using var factory = new NpgsqlConnectionFactory(
             Options.Create(new DatabaseOptions { ConnectionString = Postgres.ConnectionString })
         );
-        var repository = new DeliveryRepository(factory);
+        var publisher = new RecordingTransactionalEventPublisher();
+        var repository = new DeliveryRepository(factory, publisher);
         var created = await repository.CreateAtomicAsync(
             new CreatePhysicalDeliveryRequest(
                 contractId,
@@ -38,7 +40,7 @@ public sealed class DeliveryRepositoryIntegrationTests(PostgresTestFixture postg
         );
         Assert.Equal($"{contractName}-1-2026", created.ContractInstanceId);
 
-        await AssertAuditAndOutboxAsync(created.DeliveryId, actorId);
+        await VerifyCreatedEventAsync(created, actorId, publisher);
 
         var updated = await repository.UpdateAtomicAsync(
             new UpdatePhysicalDeliveryRequest(created.DeliveryId, 11m, null, created.Version),
@@ -53,6 +55,7 @@ public sealed class DeliveryRepositoryIntegrationTests(PostgresTestFixture postg
             CancellationToken.None
         );
         Assert.Null(stale);
+        Assert.Equal(2, publisher.Events.Count);
 
         var cancelled = await repository.CancelAtomicAsync(
             created.DeliveryId,
@@ -64,60 +67,66 @@ public sealed class DeliveryRepositoryIntegrationTests(PostgresTestFixture postg
         Assert.Null(cancelled);
         var current = await repository.GetByIdAsync(created.DeliveryId, CancellationToken.None);
         Assert.Equal("Cancelled", current!.Status);
+        Assert.Equal(
+            ["Created", "Updated", "Cancelled"],
+            publisher.Events.Select(item => item.EventType),
+            StringComparer.Ordinal
+        );
+        Assert.Equal(3, publisher.Transactions.Count);
+        Assert.Equal(3, publisher.FlushCount);
     }
 
-    private async Task AssertAuditAndOutboxAsync(Guid deliveryId, Guid actorId)
+    private async Task VerifyCreatedEventAsync(
+        PhysicalDeliveryDetailsDto created,
+        Guid actorId,
+        RecordingTransactionalEventPublisher publisher
+    )
     {
-        using var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        var parameters = new { Id = deliveryId.ToString() };
+        var connection = new NpgsqlConnection(Postgres.ConnectionString);
+        await using var configuredConnection = connection.ConfigureAwait(false);
         var auditActor = await connection
             .ExecuteScalarAsync<Guid>(
                 "SELECT actor_id FROM audit_log WHERE entity_name = 'physical_deliveries' AND entity_id = @Id",
-                parameters
-            )
-            .ConfigureAwait(false);
-        var outboxCount = await connection
-            .ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM outbox_events WHERE aggregate_type = 'PhysicalDelivery' AND aggregate_id = @Id",
-                parameters
+                new { Id = created.DeliveryId.Value.ToString() }
             )
             .ConfigureAwait(false);
         Assert.Equal(actorId, auditActor);
-        Assert.Equal(1, outboxCount);
+        var createdEvent = Assert.Single(publisher.Events);
+        Assert.Equal(RealtimeAggregateTypes.PhysicalDelivery, createdEvent.AggregateType);
+        Assert.Equal(created.DeliveryId.Value.ToString(), createdEvent.AggregateId);
+        Assert.Equal("Created", createdEvent.EventType);
     }
 
     private async Task<(Guid Id, string Name)> CreateContractAsync()
     {
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
-        await using (connection.ConfigureAwait(false))
-        {
-            await connection.OpenAsync().ConfigureAwait(false);
-            var counterpartyId = Guid.NewGuid();
-            await connection
-                .ExecuteAsync(
-                    "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
-                    new
-                    {
-                        Id = counterpartyId,
-                        Name = $"Counterparty-{counterpartyId}",
-                        Shorthand = $"CP{counterpartyId:N}"[..20],
-                    }
-                )
-                .ConfigureAwait(false);
-            var contractId = Guid.NewGuid();
-            var contractName = $"TEST45.SG.{contractId:N}";
-            await connection
-                .ExecuteAsync(
-                    "INSERT INTO contracts (id, contract_name, counterparty_id, product_type, action) VALUES (@Id, @Name, @CounterpartyId, 'Gas', 'Sell')",
-                    new
-                    {
-                        Id = contractId,
-                        Name = contractName,
-                        CounterpartyId = counterpartyId,
-                    }
-                )
-                .ConfigureAwait(false);
-            return (contractId, contractName);
-        }
+        await using var configuredConnection = connection.ConfigureAwait(false);
+        await connection.OpenAsync().ConfigureAwait(false);
+        var counterpartyId = Guid.NewGuid();
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO counterparties (id, name, shorthand) VALUES (@Id, @Name, @Shorthand)",
+                new
+                {
+                    Id = counterpartyId,
+                    Name = $"Counterparty-{counterpartyId}",
+                    Shorthand = $"CP{counterpartyId:N}"[..20],
+                }
+            )
+            .ConfigureAwait(false);
+        var contractId = Guid.NewGuid();
+        var contractName = $"TEST45.SG.{contractId:N}";
+        await connection
+            .ExecuteAsync(
+                "INSERT INTO contracts (id, contract_name, counterparty_id, product_type, action) VALUES (@Id, @Name, @CounterpartyId, 'Gas', 'Sell')",
+                new
+                {
+                    Id = contractId,
+                    Name = contractName,
+                    CounterpartyId = counterpartyId,
+                }
+            )
+            .ConfigureAwait(false);
+        return (contractId, contractName);
     }
 }

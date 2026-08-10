@@ -6,18 +6,26 @@ using Tradebook.Core.Domain;
 namespace Tradebook.Api.RealTime;
 
 [Authorize(Policy = "ReadPolicy")]
-public sealed class DashboardPushHub : Hub
+public sealed class DashboardPushHub : Hub<IDashboardPushClient>
 {
-    [HubMethodName("Subscribe")]
-    public async Task SubscribeAsync(string group)
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Style",
+        "VSTHRD200:Use Async suffix",
+        Justification = "SignalR client contract / Wolverine handler naming convention."
+    )]
+    public async Task Subscribe(string group)
     {
         ValidateGroup(group);
 
-        await (Groups.AddToGroupAsync(Context.ConnectionId, group)).ConfigureAwait(false);
+        await Groups.AddToGroupAsync(Context.ConnectionId, group).ConfigureAwait(false);
     }
 
-    [HubMethodName("Unsubscribe")]
-    public Task UnsubscribeAsync(string group)
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Style",
+        "VSTHRD200:Use Async suffix",
+        Justification = "SignalR hub method name is the client-facing contract."
+    )]
+    public Task Unsubscribe(string group)
     {
         ValidateGroup(group);
         return Groups.RemoveFromGroupAsync(Context.ConnectionId, group);
@@ -29,10 +37,10 @@ public sealed class DashboardPushHub : Hub
         const string dashboardPrefix = "dashboard:";
         var validEntity =
             group?.StartsWith(entityPrefix, StringComparison.Ordinal) == true
-            && OutboxAggregateTypes.IsKnown(group[entityPrefix.Length..])
+            && RealtimeAggregateTypes.IsKnown(group[entityPrefix.Length..])
             && !string.Equals(
                 group[entityPrefix.Length..],
-                OutboxAggregateTypes.WorkspaceDashboard,
+                RealtimeAggregateTypes.WorkspaceDashboard,
                 StringComparison.Ordinal
             );
         var validDashboard =

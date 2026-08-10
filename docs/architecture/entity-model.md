@@ -618,9 +618,10 @@ authenticated JWT `sub` claim resolved by the API; clients never supply or selec
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
-The table is audit-triggered using `audit_log`. Dashboard writes create the
-transactional outbox aggregate type `WorkspaceDashboard`; Task 03 distributes it to
-the `entity:WorkspaceDashboard` SignalR group.
+The table is audit-triggered using `audit_log`. Dashboard writes publish the
+transactional Wolverine aggregate type `WorkspaceDashboard`; Task 17 distributes it
+only to the actor-scoped `dashboard:{JWT sub}` SignalR group, never a public entity
+group.
 
 ---
 

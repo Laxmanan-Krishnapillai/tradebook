@@ -1,12 +1,17 @@
 using System.Data;
+using System.Data.Common;
 using Dapper;
 using Tradebook.Core.Domain;
 using Tradebook.Core.DTOs;
 using Tradebook.Core.Interfaces;
+using Tradebook.Core.Messaging;
 
 namespace Tradebook.Infrastructure.Data;
 
-public sealed class TaxTariffRepository(INpgsqlConnectionFactory connections) : ITaxTariffRepository
+public sealed class TaxTariffRepository(
+    INpgsqlConnectionFactory connections,
+    ITransactionalEventPublisher publisher
+) : ITaxTariffRepository
 {
     private const string Projection = """
         id AS TaxTariffId, contract_id AS ContractId, counterparty_id AS CounterpartyId,
@@ -109,19 +114,19 @@ public sealed class TaxTariffRepository(INpgsqlConnectionFactory connections) : 
                         )
                     )
                 ).ConfigureAwait(false);
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.TaxTariff,
-                        created.TaxTariffId.Value.ToString(),
-                        "Created",
-                        created.Version,
-                        null,
-                        ct
+                await publisher.EnlistAsync((DbTransaction)transaction, ct).ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.TaxTariff,
+                            created.TaxTariffId.Value.ToString(),
+                            "Created",
+                            created.Version
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return created;
             }
         }
@@ -172,19 +177,19 @@ public sealed class TaxTariffRepository(INpgsqlConnectionFactory connections) : 
                     await (transaction.RollbackAsync(ct)).ConfigureAwait(false);
                     return null;
                 }
-                await (
-                    RepositoryMutation.WriteOutboxAsync(
-                        connection,
-                        transaction,
-                        OutboxAggregateTypes.TaxTariff,
-                        updated.TaxTariffId.Value.ToString(),
-                        "Updated",
-                        updated.Version,
-                        null,
-                        ct
+                await publisher.EnlistAsync((DbTransaction)transaction, ct).ConfigureAwait(false);
+                await publisher
+                    .PublishAsync(
+                        EntityChangedDomainEvent.Create(
+                            RealtimeAggregateTypes.TaxTariff,
+                            updated.TaxTariffId.Value.ToString(),
+                            "Updated",
+                            updated.Version
+                        )
                     )
-                ).ConfigureAwait(false);
+                    .ConfigureAwait(false);
                 await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                await publisher.FlushAsync().ConfigureAwait(false);
                 return updated;
             }
         }
@@ -221,19 +226,22 @@ public sealed class TaxTariffRepository(INpgsqlConnectionFactory connections) : 
                 ).ConfigureAwait(false);
                 if (deletedVersion is not null)
                 {
-                    await (
-                        RepositoryMutation.WriteOutboxAsync(
-                            connection,
-                            transaction,
-                            OutboxAggregateTypes.TaxTariff,
-                            id.ToString(),
-                            "Deleted",
-                            deletedVersion.Value,
-                            reason,
-                            ct
+                    await publisher
+                        .EnlistAsync((DbTransaction)transaction, ct)
+                        .ConfigureAwait(false);
+                    await publisher
+                        .PublishAsync(
+                            EntityChangedDomainEvent.Create(
+                                RealtimeAggregateTypes.TaxTariff,
+                                id.ToString(),
+                                "Deleted",
+                                deletedVersion.Value,
+                                reason
+                            )
                         )
-                    ).ConfigureAwait(false);
+                        .ConfigureAwait(false);
                     await (transaction.CommitAsync(ct)).ConfigureAwait(false);
+                    await publisher.FlushAsync().ConfigureAwait(false);
                     return null;
                 }
                 await (transaction.RollbackAsync(ct)).ConfigureAwait(false);

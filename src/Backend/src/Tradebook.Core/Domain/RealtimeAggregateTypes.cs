@@ -1,6 +1,6 @@
 namespace Tradebook.Core.Domain;
 
-public static class OutboxAggregateTypes
+public static class RealtimeAggregateTypes
 {
     public const string PhysicalDelivery = nameof(PhysicalDelivery);
     public const string Contract = nameof(Contract);

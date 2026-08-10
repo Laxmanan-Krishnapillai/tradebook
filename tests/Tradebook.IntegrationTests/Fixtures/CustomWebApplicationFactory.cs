@@ -51,6 +51,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        // UseSetting lands in host configuration early enough for services-phase reads
+        // (Wolverine envelope storage); the AddInMemoryCollection overrides below merge
+        // later and only cover options-bound consumers.
+        builder.UseSetting("Database:ConnectionString", ConnectionString);
         builder.ConfigureAppConfiguration(
             (_, configuration) =>
                 configuration.AddInMemoryCollection(
@@ -66,8 +70,10 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public override async ValueTask DisposeAsync()
     {
+        // Stop the host first: Wolverine's node shutdown releases envelope ownership
+        // against the database, so the container must still be running.
+        await base.DisposeAsync().ConfigureAwait(false);
         await _connection.DisposeAsync().ConfigureAwait(false);
         await _container.DisposeAsync().ConfigureAwait(false);
-        await base.DisposeAsync().ConfigureAwait(false);
     }
 }

@@ -20,7 +20,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     [Fact]
     public async Task ReturnsOrderedPagesAndTheLatestSequenceFromRealPostgres()
     {
-        await ResetOutboxAsync();
+        await ResetRealtimeEventLogAsync();
         await InsertEventsAsync(25);
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -70,7 +70,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     [Fact]
     public async Task CatchUpExcludesOtherActorsPrivateDashboardEvents()
     {
-        await ResetOutboxAsync();
+        await ResetRealtimeEventLogAsync();
         var actorId = Guid.NewGuid();
         var otherActorId = Guid.NewGuid();
         await using (var connection = new NpgsqlConnection(Postgres.ConnectionString))
@@ -78,11 +78,12 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
             await connection.OpenAsync();
             await using var command = new NpgsqlCommand(
                 """
-                INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
+                INSERT INTO realtime_event_log
+                    (event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
                 VALUES
-                    ('WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @otherActorId::text)),
-                    ('WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @actorId::text)),
-                    ('MarketPrice', '2026-08-08', 'Updated', '{}'::jsonb);
+                    (gen_random_uuid(), 'dashboard:' || @otherActorId::text, 'WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @otherActorId::text)),
+                    (gen_random_uuid(), 'dashboard:' || @actorId::text, 'WorkspaceDashboard', gen_random_uuid()::text, 'Updated', jsonb_build_object('actorId', @actorId::text)),
+                    (gen_random_uuid(), 'entity:MarketPrice', 'MarketPrice', '2026-08-08', 'Updated', '{}'::jsonb);
                 """,
                 connection
             );
@@ -136,27 +137,28 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.UseEnvironment("Testing");
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration.AddInMemoryCollection(
                         new Dictionary<string, string?>(StringComparer.Ordinal)
                         {
                             ["Database:ConnectionString"] = Postgres.ConnectionString,
-                            ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
-                            ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
                         }
                     )
             );
         });
 
-    private async Task ResetOutboxAsync()
+    private async Task ResetRealtimeEventLogAsync()
     {
         var connection = new NpgsqlConnection(Postgres.ConnectionString);
         await using var configuredConnection = connection.ConfigureAwait(false);
         await connection.OpenAsync().ConfigureAwait(false);
         var command = new NpgsqlCommand(
-            "TRUNCATE TABLE outbox_events RESTART IDENTITY",
+            "TRUNCATE TABLE realtime_event_log RESTART IDENTITY",
             connection
         );
         await using var configuredCommand = command.ConfigureAwait(false);
@@ -170,8 +172,11 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
         await connection.OpenAsync().ConfigureAwait(false);
         var command = new NpgsqlCommand(
             """
-            INSERT INTO outbox_events (aggregate_type, aggregate_id, event_type, payload)
-            SELECT CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
+            INSERT INTO realtime_event_log
+                (event_id, group_name, aggregate_type, aggregate_id, event_type, payload)
+            SELECT gen_random_uuid(),
+                   CASE WHEN value = 1 THEN 'entity:MarketPrice' ELSE 'entity:PhysicalDelivery' END,
+                   CASE WHEN value = 1 THEN 'MarketPrice' ELSE 'PhysicalDelivery' END,
                    CASE WHEN value = 1 THEN '2026-08-07' ELSE gen_random_uuid()::text END,
                    'Created',
                    jsonb_build_object('ordinal', value)

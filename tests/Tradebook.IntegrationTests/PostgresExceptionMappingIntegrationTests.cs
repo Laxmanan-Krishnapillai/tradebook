@@ -89,29 +89,27 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
         Assert.Equal(version, persisted.Version);
         Assert.Equal(
             1,
-            await connection.ExecuteScalarAsync<int>(
-                "SELECT COUNT(*) FROM outbox_events WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @Id",
-                new { Id = capacityBookingId.ToString() }
-            )
+            await WaitForRealtimeEventCountAsync(connection, capacityBookingId.ToString())
         );
     }
 
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder
-                .UseEnvironment("Testing")
-                .ConfigureAppConfiguration(
-                    (_, configuration) =>
-                        configuration.AddInMemoryCollection(
-                            new Dictionary<string, string?>(StringComparer.Ordinal)
-                            {
-                                ["Database:ConnectionString"] = Postgres.ConnectionString,
-                                ["Entra:TenantId"] = "11111111-1111-1111-1111-111111111111",
-                                ["Entra:ClientId"] = "22222222-2222-2222-2222-222222222222",
-                            }
-                        )
-                )
-        );
+        {
+            builder.UseSetting("Database:ConnectionString", Postgres.ConnectionString);
+            builder.ConfigureAppConfiguration(
+                (_, configuration) =>
+                    configuration.AddInMemoryCollection(
+                        new Dictionary<string, string?>(StringComparer.Ordinal)
+                        {
+                            ["Database:ConnectionString"] = Postgres.ConnectionString,
+                            ["Jwt:Issuer"] = "Tradebook",
+                            ["Jwt:Audience"] = "Tradebook",
+                            ["Jwt:SigningKey"] = CustomWebApplicationFactory.JwtSigningKey,
+                        }
+                    )
+            );
+        });
 
     private static HttpClient AuthenticatedClient(WebApplicationFactory<Program> factory)
     {
@@ -179,5 +177,34 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             )
             .ConfigureAwait(false);
         return contractId;
+    }
+
+    private static async Task<int> WaitForRealtimeEventCountAsync(
+        NpgsqlConnection connection,
+        string aggregateId
+    )
+    {
+        var deadline = TimeProvider.System.GetUtcNow().UtcDateTime + TimeSpan.FromSeconds(15);
+        while (TimeProvider.System.GetUtcNow().UtcDateTime < deadline)
+        {
+            var count = await connection
+                .ExecuteScalarAsync<int>(
+                    """
+                    SELECT COUNT(*)
+                    FROM realtime_event_log
+                    WHERE aggregate_type = 'CapacityBooking' AND aggregate_id = @AggregateId
+                    """,
+                    new { AggregateId = aggregateId }
+                )
+                .ConfigureAwait(false);
+            if (count > 0)
+            {
+                return count;
+            }
+
+            await Task.Delay(50).ConfigureAwait(false);
+        }
+
+        return 0;
     }
 }
