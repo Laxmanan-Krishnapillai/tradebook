@@ -30,7 +30,7 @@ public sealed class ResilientStartupHostedService(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await _stopping.CancelAsync().ConfigureAwait(false);
+        await CancelStoppingAsync().ConfigureAwait(false);
         if (!_started || _inner is null)
         {
             return;
@@ -50,7 +50,7 @@ public sealed class ResilientStartupHostedService(
 
     public async ValueTask DisposeAsync()
     {
-        await _stopping.CancelAsync().ConfigureAwait(false);
+        await CancelStoppingAsync().ConfigureAwait(false);
         _stopping.Dispose();
         try
         {
@@ -66,6 +66,19 @@ public sealed class ResilientStartupHostedService(
         catch (Exception exception)
         {
             ResilientStartupLog.StopFaulted(logger, _inner?.GetType().Name ?? "inner", exception);
+        }
+    }
+
+    private async Task CancelStoppingAsync()
+    {
+        try
+        {
+            await _stopping.CancelAsync().ConfigureAwait(false);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Host dispose can precede or repeat stop; a disposed source already
+            // means "stop everything", which is the state we wanted.
         }
     }
 
