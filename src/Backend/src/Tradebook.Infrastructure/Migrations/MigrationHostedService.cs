@@ -58,13 +58,15 @@ public sealed class MigrationHostedService(
                 .ValidateDatabaseSchemaAsync(connection, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Tradebook.Core.Analytics.SemanticSchemaMismatchException exception)
         {
             // A migrated, reachable database with semantic-model drift must fail the
             // process rather than serve wrong analytics (same contract as the old
             // startup-time validation, now sequenced after the async migrations).
             // Non-zero exit code so orchestrators treat the stop as a crash, not a
-            // graceful shutdown they would leave unrestarted and unalerted.
+            // graceful shutdown they would leave unrestarted and unalerted. Transient
+            // faults (connection refused mid-validation) deliberately propagate to the
+            // caller's retry loop instead of killing a healthy process.
             MigrationLog.SchemaDriftFatal(logger, exception);
             Environment.ExitCode = 1;
             lifetime.StopApplication();

@@ -101,7 +101,10 @@ app.MapDashboardPushHub();
 // return 404 instead of index.html.
 app.UseDefaultFiles();
 app.UseStaticFiles();
-app.MapFallbackToFile("{*path:regex(^(?!api|hubs)(.*)$)}", "index.html");
+// AllowAnonymous: the SPA shell must load on deep-link refresh (F5 on /dashboards/x)
+// so MSAL can run; without it the authorization FallbackPolicy returns 401 for the
+// HTML document itself. Data still comes from the policy-guarded /api endpoints.
+app.MapFallbackToFile("{*path:regex(^(?!api|hubs)(.*)$)}", "index.html").AllowAnonymous();
 
 await app.RunAsync().ConfigureAwait(false);
 
