@@ -70,9 +70,9 @@ public sealed class DeliveryRepository(
             request.ToMonth,
         };
         const string rowsSql =
-            $"SELECT {DetailsProjection} FROM physical_deliveries WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@ContractInstanceId IS NULL OR contract_instance_id = @ContractInstanceId) AND (@BookType IS NULL OR book_type::text = @BookType) AND (@Status IS NULL OR status::text = @Status) AND (@FromMonth IS NULL OR supply_month >= @FromMonth) AND (@ToMonth IS NULL OR supply_month <= @ToMonth) ORDER BY supply_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
+            $"SELECT {DetailsProjection} FROM physical_deliveries WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@ContractInstanceId::text IS NULL OR contract_instance_id = @ContractInstanceId) AND (@BookType::text IS NULL OR book_type::text = @BookType) AND (@Status::text IS NULL OR status::text = @Status) AND (@FromMonth::date IS NULL OR supply_month >= @FromMonth) AND (@ToMonth::date IS NULL OR supply_month <= @ToMonth) ORDER BY supply_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM physical_deliveries WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@ContractInstanceId IS NULL OR contract_instance_id = @ContractInstanceId) AND (@BookType IS NULL OR book_type::text = @BookType) AND (@Status IS NULL OR status::text = @Status) AND (@FromMonth IS NULL OR supply_month >= @FromMonth) AND (@ToMonth IS NULL OR supply_month <= @ToMonth)";
+            "SELECT COUNT(*) FROM physical_deliveries WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@ContractInstanceId::text IS NULL OR contract_instance_id = @ContractInstanceId) AND (@BookType::text IS NULL OR book_type::text = @BookType) AND (@Status::text IS NULL OR status::text = @Status) AND (@FromMonth::date IS NULL OR supply_month >= @FromMonth) AND (@ToMonth::date IS NULL OR supply_month <= @ToMonth)";
         var connection = await connections
             .OpenConnectionAsync(cancellationToken)
             .ConfigureAwait(false);

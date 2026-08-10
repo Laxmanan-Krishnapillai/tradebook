@@ -83,9 +83,9 @@ public sealed class ContractRepository(
             request.IsActive,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM contracts WHERE (@CounterpartyId IS NULL OR counterparty_id = @CounterpartyId) AND (@ProductType IS NULL OR product_type::text = @ProductType) AND (@Action IS NULL OR action::text = @Action) AND (@IsActive IS NULL OR is_active = @IsActive) ORDER BY contract_name LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM contracts WHERE (@CounterpartyId::uuid IS NULL OR counterparty_id = @CounterpartyId) AND (@ProductType::text IS NULL OR product_type::text = @ProductType) AND (@Action::text IS NULL OR action::text = @Action) AND (@IsActive::boolean IS NULL OR is_active = @IsActive) ORDER BY contract_name LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM contracts WHERE (@CounterpartyId IS NULL OR counterparty_id = @CounterpartyId) AND (@ProductType IS NULL OR product_type::text = @ProductType) AND (@Action IS NULL OR action::text = @Action) AND (@IsActive IS NULL OR is_active = @IsActive)";
+            "SELECT COUNT(*) FROM contracts WHERE (@CounterpartyId::uuid IS NULL OR counterparty_id = @CounterpartyId) AND (@ProductType::text IS NULL OR product_type::text = @ProductType) AND (@Action::text IS NULL OR action::text = @Action) AND (@IsActive::boolean IS NULL OR is_active = @IsActive)";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {
