@@ -15,3 +15,7 @@ reports/
 error.log
 
 docs/api/typespec/tsp-output/
+
+# adversarial-review drops and TS build cache must never land in commits
+ADVERSARIAL-REVIEW-*.md
+tsconfig.tsbuildinfo
