@@ -14,7 +14,10 @@ public sealed class AppHostSmokeTests
     [Trait("Category", "Aspire")]
     public async Task ApiIsHealthyWhenTheGraphBoots()
     {
-        var cancellationToken = CancellationToken.None;
+        // Every phase shares one hard deadline: an unbounded CreateAsync/StartAsync has
+        // hung this suite (and a CI runner) for hours when DCP never came up.
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        var cancellationToken = deadline.Token;
         var appHost = await DistributedApplicationTestingBuilder
             .CreateAsync<apphost::Projects.Tradebook_AppHost>(cancellationToken)
             .ConfigureAwait(true);

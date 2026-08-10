@@ -63,7 +63,10 @@ public sealed class MigrationHostedService(
             // A migrated, reachable database with semantic-model drift must fail the
             // process rather than serve wrong analytics (same contract as the old
             // startup-time validation, now sequenced after the async migrations).
+            // Non-zero exit code so orchestrators treat the stop as a crash, not a
+            // graceful shutdown they would leave unrestarted and unalerted.
             MigrationLog.SchemaDriftFatal(logger, exception);
+            Environment.ExitCode = 1;
             lifetime.StopApplication();
         }
     }

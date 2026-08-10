@@ -9,8 +9,13 @@ OPENAPI="$ROOT/docs/api/typespec/tsp-output/@typespec/openapi3/openapi.yaml"
 before="$(find "$GENERATED" -type f -print0 2>/dev/null | sort -z | xargs -0 sha256sum 2>/dev/null || true)"
 
 cd "$ROOT"
+if [[ ! -d "$ROOT/node_modules/@typespec/compiler" ]]; then
+  echo "@typespec/compiler is not installed; run 'npm ci' at the repo root first (a bare npx would fetch the unrelated 'tsp' package)." >&2
+  exit 1
+fi
 npx tsp compile docs/api/typespec
-python3 scripts/compare-contract-dtos.py
+PYTHON="$(command -v python3 || command -v python)"
+"$PYTHON" scripts/compare-contract-dtos.py
 
 cd "$ROOT/src/Frontend"
 npm run api:generate
