@@ -63,6 +63,7 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder
                 .UseEnvironment("Testing")
+                .UseSetting("Database:ConnectionString", Postgres.ConnectionString)
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(

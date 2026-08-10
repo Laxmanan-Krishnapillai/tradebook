@@ -42,6 +42,7 @@ public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres)
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder
                 .UseEnvironment("Testing")
+                .UseSetting("Database:ConnectionString", connectionString)
                 .ConfigureAppConfiguration(
                     (_, configuration) =>
                         configuration.AddInMemoryCollection(
