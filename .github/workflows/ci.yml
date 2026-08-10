@@ -161,7 +161,9 @@ jobs:
       - run: bash bin/check-banned-api.sh
       - run: dotnet build src/Backend/Tradebook.sln -c Debug --no-restore -warnaserror
       - run: dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj --no-restore
-      - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --no-restore
+      # Machine-bound classes (Aspire graph boot, reference-machine latency baseline)
+      # run in the nightly full-suite workflow instead of every PR-path run.
+      - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --no-restore -- --filter-not-trait "Category=Aspire" --filter-not-trait "Category=MachineBaseline"
       - run: dotnet test tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj --no-restore
       - run: dotnet stryker --config-file stryker-config.json
 

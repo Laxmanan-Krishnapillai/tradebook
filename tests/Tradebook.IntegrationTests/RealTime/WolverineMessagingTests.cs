@@ -224,6 +224,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
     }
 
     [Fact]
+    [Trait("Category", "MachineBaseline")]
     public async Task DispatchLatencyP99DoesNotRegressMoreThanTwentyPercentFromTheMeasuredBaseline()
     {
         var recordBaseline = string.Equals(
