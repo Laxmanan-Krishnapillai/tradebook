@@ -87,5 +87,8 @@ variable "entra_tenant_id" {
 variable "entra_redirect_uris" {
   type        = list(string)
   description = "Exact local, staging, and production SPA redirect URIs."
-  validation { condition = length(var.entra_redirect_uris) == 3 && alltrue([for uri in var.entra_redirect_uris : can(regex("^https?://", uri))]) error_message = "Provide exactly three absolute redirect URIs." }
+  validation {
+    condition     = length(var.entra_redirect_uris) == 3 && alltrue([for uri in var.entra_redirect_uris : can(regex("^https?://", uri))])
+    error_message = "Provide exactly three absolute redirect URIs."
+  }
 }
