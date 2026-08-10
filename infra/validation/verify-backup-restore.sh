@@ -38,12 +38,14 @@ source_contract_count="$("${compose[@]}" exec --no-TTY postgres psql \
   --username tradebook --dbname tradebook --tuples-only --no-align \
   --command 'SELECT count(*) FROM contracts;')"
 
+# The database-ops image's entrypoint is /bin/bash, so arguments must be -c payloads
+# (a literal `bash script.sh` argument list becomes `/bin/bash bash script.sh`).
 "${compose[@]}" run --rm --no-TTY \
   -e BACKUP_OUTPUT_DIRECTORY=/tmp/tradebook-backup \
-  migrations bash /opt/tradebook/database-ops/backup.sh
+  migrations -c '/opt/tradebook/database-ops/backup.sh'
 
 backup_blob="$("${compose[@]}" run --rm --no-TTY migrations \
-  find /tmp/tradebook-backup/tradebook -type f -name '*.dump' -printf '%P\n')"
+  -c "find /tmp/tradebook-backup/tradebook -type f -name '*.dump' -printf '%P\n'")"
 if [[ -z "$backup_blob" || "$(printf '%s\n' "$backup_blob" | wc -l)" -ne 1 ]]; then
   echo "Expected exactly one local backup dump, found: $backup_blob" >&2
   exit 1
@@ -55,7 +57,7 @@ backup_blob="tradebook/$backup_blob"
   -e BACKUP_INPUT_DIRECTORY=/tmp/tradebook-backup \
   -e RESTORE_DATABASE=tradebook_restore_ci \
   -e RESTORE_KEEP_DATABASE=true \
-  migrations bash /opt/tradebook/database-ops/restore.sh
+  migrations -c '/opt/tradebook/database-ops/restore.sh'
 
 restored_contract_count="$("${compose[@]}" exec --no-TTY postgres psql \
   --username tradebook --dbname tradebook_restore_ci --tuples-only --no-align \
