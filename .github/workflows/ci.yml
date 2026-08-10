@@ -165,6 +165,9 @@ jobs:
       # run in the nightly full-suite workflow instead of every PR-path run.
       - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --no-restore -- --filter-not-trait "Category=Aspire" --filter-not-trait "Category=MachineBaseline"
       - run: dotnet test tests/Tradebook.ArchitectureTests/Tradebook.ArchitectureTests.csproj --no-restore
+      - name: Dump test logs on failure
+        if: failure()
+        run: cat tests/*/bin/Debug/net10.0/TestResults/*.log 2>/dev/null || true
       - run: dotnet stryker --config-file stryker-config.json
 
   frontend:
