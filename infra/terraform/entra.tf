@@ -49,10 +49,15 @@ resource "azuread_service_principal" "api" {
 resource "azuread_application" "spa" {
   display_name     = "Tradebook SPA (${var.environment})"
   sign_in_audience = "AzureADMyOrg"
-  spa { redirect_uris = var.entra_redirect_uris }
+  single_page_application {
+    redirect_uris = var.entra_redirect_uris
+  }
   required_resource_access {
     resource_app_id = azuread_application.api.client_id
-    resource_access { id = local.tradebook_scope_id type = "Scope" }
+    resource_access {
+      id   = local.tradebook_scope_id
+      type = "Scope"
+    }
   }
 }
 

@@ -81,7 +81,10 @@ variable "alert_email" {
 variable "entra_tenant_id" {
   type        = string
   description = "Microsoft Entra workforce tenant UUID."
-  validation { condition = can(regex("^[0-9a-fA-F-]{36}$", var.entra_tenant_id)) error_message = "entra_tenant_id must be a UUID." }
+  validation {
+    condition     = can(regex("^[0-9a-fA-F-]{36}$", var.entra_tenant_id))
+    error_message = "entra_tenant_id must be a UUID."
+  }
 }
 
 variable "entra_redirect_uris" {
