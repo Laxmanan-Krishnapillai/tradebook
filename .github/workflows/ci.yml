@@ -210,7 +210,9 @@ jobs:
           bash infra/validation/verify-backup-restore.sh
 
   ci-required:
-    needs: [governance, contracts, sql-safety, backend, frontend, infra]
+    # `changes` is listed so a paths-filter failure cannot skip build jobs and
+    # still let this aggregate pass green on a run where nothing was built.
+    needs: [changes, governance, contracts, sql-safety, backend, frontend, infra]
     if: always()
     runs-on: ubuntu-latest
     steps:
