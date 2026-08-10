@@ -7,7 +7,6 @@ permissions:
   contents: read
 env:
   NO_PROXY: localhost,127.0.0.1
-  no_proxy: localhost,127.0.0.1
   POSTGRES_PASSWORD: tradebook-e2e-ci
   DATABASE_URL: postgresql://tradebook:tradebook-e2e-ci@127.0.0.1:5432/tradebook
   E2E_CONTRACT_ID: 09000000-0000-4000-8000-000000000003
