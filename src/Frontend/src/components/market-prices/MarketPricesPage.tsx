@@ -13,6 +13,7 @@ import {
   useUpsertMarketPrice,
 } from "../../lib/mutations/domainEntityMutations";
 import { queryKeys } from '../../lib/query/queryKeys';
+import { isMoneyString, moneyInputField, normalizeMoneyInput } from '../../lib/validation/money-input';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
 import { ValidatedForm } from '../ui/validated-form';
@@ -28,15 +29,24 @@ const initialCreate = (): UpsertMarketPriceRequest => ({
   ttfEurMwh: "0",
   version: 0,
 });
-const upsertMarketPriceSchema = z.custom<UpsertMarketPriceRequest>((candidate): candidate is UpsertMarketPriceRequest => {
-  const value = candidate as Partial<UpsertMarketPriceRequest>;
-  return (
-  typeof value.priceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.priceDate)
-  && typeof value.version === 'number' && Number.isSafeInteger(value.version) && value.version >= 0
-  && typeof value.ttfEurMwh === 'number' && Number.isFinite(value.ttfEurMwh)
-  && (value.eurUsd === null || value.eurUsd === undefined || (typeof value.eurUsd === 'number' && Number.isFinite(value.eurUsd) && value.eurUsd > 0))
-  );
-}, { error: 'Enter a valid market date and prices.' });
+// Mirrors the generated zUpsertMarketPriceRequest: every price field is a Money STRING on
+// the wire; moneyInputField normalizes the raw input text into that contract.
+const upsertMarketPriceSchema: z.ZodType<UpsertMarketPriceRequest> = z.object({
+  priceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Enter the market date as a full day (YYYY-MM-DD).' }),
+  ttfEurMwh: moneyInputField({ label: 'TTF EUR/MWh', required: true }),
+  egsiEtfEurMwh: moneyInputField({ label: 'EGSI ETF EUR/MWh' }),
+  theEurMwh: moneyInputField({ label: 'THE EUR/MWh' }),
+  bgoEurMwh: moneyInputField({ label: 'BGO EUR/MWh' }),
+  pgoEurMwh: moneyInputField({ label: 'PGO EUR/MWh' }),
+  euaEurMwh: moneyInputField({ label: 'EUA EUR/MWh' }),
+  withinDayMktEurMwh: moneyInputField({ label: 'Within-day EUR/MWh' }),
+  eurSek: moneyInputField({ label: 'EUR/SEK' }),
+  eurChf: moneyInputField({ label: 'EUR/CHF' }),
+  eurGbp: moneyInputField({ label: 'EUR/GBP' }),
+  eurUsd: moneyInputField({ label: 'EUR/USD', positive: true }),
+  eurDkk: moneyInputField({ label: 'EUR/DKK' }),
+  version: z.int().min(0),
+});
 
 function currentRequest(
   price: MarketPriceDetailsDto,
@@ -128,8 +138,17 @@ export function MarketPricesPage() {
   });
 
   const save = useCallback(
-    async (price: MarketPriceDetailsDto, request: UpsertMarketPriceRequest) => {
+    async (price: MarketPriceDetailsDto, requested: UpsertMarketPriceRequest) => {
       setError("");
+      // The row editor passes the raw input text; the wire contract wants a Money string.
+      const ttfEurMwh = typeof requested.ttfEurMwh === 'string'
+        ? normalizeMoneyInput(requested.ttfEurMwh)
+        : requested.ttfEurMwh;
+      if (typeof ttfEurMwh === 'string' && !isMoneyString(ttfEurMwh)) {
+        setError("TTF EUR/MWh must be a decimal number (for example 31.5).");
+        return;
+      }
+      const request = { ...requested, ttfEurMwh };
       attempted.current = request;
       let version = price.version;
       const before = currentRequest(price, price.ttfEurMwh ?? "0");

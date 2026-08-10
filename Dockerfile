@@ -9,6 +9,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props BannedSymbols.txt .editorconfig .csharpierignore ./
 COPY src/Backend/ ./src/Backend/
+COPY src/Aspire/ ./src/Aspire/
 COPY src/Database/ ./src/Database/
 COPY tests/ ./tests/
 RUN dotnet restore src/Backend/Tradebook.sln
@@ -33,7 +34,12 @@ COPY --from=backend /app/migrator/ /opt/tradebook/migrator/
 COPY --from=mcr.microsoft.com/dotnet/aspnet:10.0 /usr/share/dotnet/ /usr/share/dotnet/
 COPY infra/database-ops/ /opt/tradebook/database-ops/
 RUN ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
-    && chmod 0555 /opt/tradebook/database-ops/*.sh
+    && chmod 0555 /opt/tradebook/database-ops/*.sh \
+    # Pre-create the backup mount point owned by the runtime user: a named volume
+    # initialized from this directory inherits the ownership, so backup.sh can
+    # mkdir under it while running as postgres.
+    && mkdir -p /tmp/tradebook-backup \
+    && chown postgres:postgres /tmp/tradebook-backup
 USER postgres
 ENTRYPOINT ["/bin/bash"]
 CMD ["/opt/tradebook/database-ops/run-migrations.sh"]

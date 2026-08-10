@@ -1,0 +1,23 @@
+name: Nightly Full Suite
+# Runs the machine-bound tests the PR path filters out (Aspire graph boot,
+# reference-machine latency baseline) plus the full unfiltered integration
+# suite, so the filtered classes still execute on a schedule.
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet tool restore
+      - run: dotnet restore src/Backend/Tradebook.sln
+      - run: dotnet build src/Backend/Tradebook.sln -c Debug --no-restore -warnaserror
+      - run: dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --no-restore

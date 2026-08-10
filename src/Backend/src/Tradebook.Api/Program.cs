@@ -1,7 +1,6 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using JasperFx;
-using JasperFx.Resources;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Tradebook_Core;
@@ -55,6 +54,9 @@ builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddHostedService<Tradebook.Infrastructure.Migrations.MigrationHostedService>();
 
+var hostedServicesBeforeWolverine = builder
+    .Services.Where(descriptor => descriptor.ServiceType == typeof(IHostedService))
+    .ToList();
 builder.Host.UseWolverine(options =>
 {
     // Read inside the callback (services phase of Build), not at top-level: the
@@ -77,10 +79,15 @@ builder.Host.UseWolverine(options =>
             TimeSpan.FromMilliseconds(250)
         );
 });
+
+// No AddResourceSetupOnStartup(), and Wolverine's own hosted services start on a
+// background retry loop: an unreachable database at boot must defer messaging, not
+// abort the host — liveness stays 200 while readiness reports 503 (task-02 contract).
+// AutoBuildMessageStorageOnStartup provisions the envelope schema once the database
+// is reachable.
+builder.Services.MakeLateHostedServicesResilient(hostedServicesBeforeWolverine);
 builder.Services.AddScoped<ITransactionalEventPublisher, WolverineTransactionalEventPublisher>();
 builder.Services.AddScoped<IRealtimeEventReader, PostgresRealtimeEventReader>();
-
-builder.Services.AddResourceSetupOnStartup();
 
 var app = builder.Build();
 
@@ -101,6 +108,7 @@ app.MapDashboardPushHub();
 // return 404 instead of index.html.
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
 // AllowAnonymous: the SPA shell must load on deep-link refresh (F5 on /dashboards/x)
 // so MSAL can run; without it the authorization FallbackPolicy returns 401 for the
 // HTML document itself. Data still comes from the policy-guarded /api endpoints.

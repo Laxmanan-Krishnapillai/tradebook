@@ -22,6 +22,7 @@ import {
 } from "../../lib/mutations/entityMutations";
 import { queryKeys } from '../../lib/query/queryKeys';
 import { useUiStore } from '../../lib/state/useUiStore';
+import { isMoneyString, moneyInputField, normalizeMoneyInput } from '../../lib/validation/money-input';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
 import { ValidatedForm } from '../ui/validated-form';
@@ -85,9 +86,9 @@ function DeliveryEditor({
         type="button"
         onClick={() =>
           onSave(delivery, {
-            volumeRealisedMwh: volume === "" ? undefined : Number(volume),
+            volumeRealisedMwh: volume === "" ? undefined : volume,
             status,
-          } as UpdateDeliveryVariables["changes"])
+          })
         }
       >
         Save
@@ -110,14 +111,20 @@ const initialCreate: CreateDeliveryVariables = {
   bookType: "Sourcing",
   supplyMonth: new Date().toISOString().slice(0, 7) + "-01",
 };
-const createDeliverySchema = z.custom<CreateDeliveryVariables>((candidate): candidate is CreateDeliveryVariables => {
-  const value = candidate as Partial<CreateDeliveryVariables>;
-  return (
-  typeof value.contractId === 'string' && value.contractId.trim().length > 0
-  && typeof value.supplyMonth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.supplyMonth)
-  && (value.volumeRealisedMwh === undefined || (typeof value.volumeRealisedMwh === 'number' && Number.isFinite(value.volumeRealisedMwh) && value.volumeRealisedMwh >= 0))
-  );
-}, { error: 'Complete the delivery with valid values.' });
+// Mirrors the generated zCreatePhysicalDeliveryRequest: volume fields are Money STRINGS on
+// the wire; moneyInputField normalizes the raw input text into that contract.
+const createDeliverySchema: z.ZodType<CreateDeliveryVariables> = z.object({
+  contractId: z.string().trim().min(1, { error: 'Contract ID is required.' }),
+  contractInstanceId: z.string().nullish(),
+  bookType: z.string(),
+  supplyMonth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Enter the supply month as a full day (YYYY-MM-DD).' }),
+  capacityMw: moneyInputField({ label: 'Capacity MW' }),
+  volumeNominatedMwh: moneyInputField({ label: 'Nominated volume MWh' }),
+  volumeRealisedMwh: moneyInputField({ label: 'Realised volume MWh', nonnegative: true }),
+  priceMechanism: z.string().nullish(),
+  startDay: z.string().nullish(),
+  endDay: z.string().nullish(),
+});
 
 export function DeliveriesPage() {
   const [page, setPage] = useState(1);
@@ -177,9 +184,18 @@ export function DeliveriesPage() {
   const saveDelivery = useCallback(
     async (
       delivery: PhysicalDeliveryDetailsDto,
-      changes: UpdateDeliveryVariables["changes"],
+      requested: UpdateDeliveryVariables["changes"],
     ) => {
       setError("");
+      // The row editor passes the raw input text; the wire contract wants a Money string.
+      const volumeRealisedMwh = typeof requested.volumeRealisedMwh === 'string'
+        ? normalizeMoneyInput(requested.volumeRealisedMwh)
+        : requested.volumeRealisedMwh;
+      if (typeof volumeRealisedMwh === 'string' && !isMoneyString(volumeRealisedMwh)) {
+        setError("Realised volume MWh must be a decimal number (for example 12.5).");
+        return;
+      }
+      const changes = { ...requested, volumeRealisedMwh };
       attempted.current = changes;
       let version = delivery.version;
       const before = {

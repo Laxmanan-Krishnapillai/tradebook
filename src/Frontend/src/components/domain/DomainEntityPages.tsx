@@ -49,6 +49,7 @@ import {
   useUpdateTransfer
 } from '../../lib/mutations/domainEntityMutations';
 import { listQueryKey } from '../../lib/query/queryKeys';
+import { isMoneyString, moneyInputField, normalizeMoneyInput } from '../../lib/validation/money-input';
 import { VirtualizedDataTable } from '../grid/VirtualizedDataTable';
 import { ConflictDialog } from '../ui/ConflictDialog';
 import { ValidatedForm } from '../ui/validated-form';
@@ -74,7 +75,9 @@ const monthStart = () => `${new Date().toISOString().slice(0, 7)}-01`;
 
 function asRecord(value: object): Record<string, unknown> { return value as Record<string, unknown>; }
 function fieldValue(value: object, key: string): string { const raw = asRecord(value)[key]; return raw === null || raw === undefined ? '' : String(raw); }
-function changedValue(raw: string, field: FieldSpec): unknown { return field.kind === 'number' ? (raw === '' ? null : Number(raw)) : (raw === '' && !field.required ? null : raw); }
+// 'number' fields are Money STRINGS on the wire (see the generated types); keep the raw
+// input text in state and let normalizeMoneyInput/moneyInputField coerce it at save time.
+function changedValue(raw: string, field: FieldSpec): unknown { return field.kind === 'number' ? (raw === '' ? null : raw) : (raw === '' && !field.required ? null : raw); }
 function changeField<T extends object>(value: T, field: FieldSpec, raw: string): T { return { ...value, [field.key]: changedValue(raw, field) }; }
 function displayValue(value: unknown): string { return value === null || value === undefined || value === '' ? '—' : String(value); }
 
@@ -134,15 +137,17 @@ function DomainCrudPage<T extends Versioned, TCreate extends object, TChanges ex
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [createRequest, setCreateRequest] = useState<TCreate>(props.initialCreate);
-  const createSchema = useMemo(() => z.custom<TCreate>((candidate) => {
-    if (typeof candidate !== 'object' || candidate === null) return false;
-    const record = candidate as Record<string, unknown>;
-    return props.createFields.every((field) => {
-      const value = record[field.key];
-      if (field.required && (value === undefined || value === null || value === '')) return false;
-      return field.kind !== 'number' || value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value));
-    });
-  }, { error: 'Complete the required fields with valid values.' }), [props.createFields]);
+  const createSchema = useMemo(() => {
+    const shape: Record<string, z.ZodType<unknown>> = {};
+    for (const field of props.createFields) {
+      shape[field.key] = field.kind === 'number'
+        ? moneyInputField({ label: field.label, required: field.required })
+        : field.required
+          ? z.string({ error: `${field.label} is required.` }).min(1, { error: `${field.label} is required.` })
+          : z.string().nullish();
+    }
+    return z.object(shape) as unknown as z.ZodType<TCreate>;
+  }, [props.createFields]);
   const commandStack = useCommandStack();
   const history = useQuery({
     queryKey: listQueryKey(props.queryKey, { page, pageSize: 100 }),
@@ -151,7 +156,19 @@ function DomainCrudPage<T extends Versioned, TCreate extends object, TChanges ex
 
   const save = useCallback(async (entity: T, requested: TChanges) => {
     props.feedback.setError('');
-    const changes = Object.fromEntries(props.editFields.map((field) => [field.key, asRecord(requested)[field.key]])) as TChanges;
+    // Row editors hold raw input text for Money fields; coerce to the wire string here.
+    const changes = Object.fromEntries(props.editFields.map((field) => {
+      const raw = asRecord(requested)[field.key];
+      return [field.key, field.kind === 'number' && typeof raw === 'string' ? normalizeMoneyInput(raw) : raw];
+    })) as TChanges;
+    const invalidField = props.editFields.find((field) => {
+      const value = asRecord(changes)[field.key];
+      return field.kind === 'number' && typeof value === 'string' && !isMoneyString(value);
+    });
+    if (invalidField) {
+      props.feedback.setError(`${invalidField.label} must be a decimal number (for example 12.5).`);
+      return;
+    }
     const before = props.changesFromEntity(entity);
     let current = entity;
     const command: Command = {
