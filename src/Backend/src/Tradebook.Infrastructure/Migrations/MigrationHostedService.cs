@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Tradebook.Infrastructure.Development;
 using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.Infrastructure.Migrations;
@@ -14,6 +15,8 @@ public sealed class MigrationHostedService(
     IOptions<DatabaseOptions> options,
     Tradebook.Core.Analytics.SemanticModelLoader semanticModels,
     Tradebook.Infrastructure.Data.INpgsqlConnectionFactory connections,
+    DevelopmentDataSeeder developmentDataSeeder,
+    IHostEnvironment environment,
     Microsoft.Extensions.Hosting.IHostApplicationLifetime lifetime,
     ILogger<MigrationHostedService> logger
 ) : BackgroundService
@@ -27,6 +30,12 @@ public sealed class MigrationHostedService(
             try
             {
                 MigrationRunner.Run(options.Value.ConnectionString);
+                if (environment.IsDevelopment())
+                {
+                    await developmentDataSeeder
+                        .SeedIfEmptyAsync(stoppingToken)
+                        .ConfigureAwait(false);
+                }
                 await ValidateSchemaOrStopAsync(stoppingToken).ConfigureAwait(false);
                 return;
             }

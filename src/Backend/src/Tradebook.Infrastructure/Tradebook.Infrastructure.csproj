@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Bogus" />
     <PackageReference Include="Dapper" />
     <PackageReference Include="dbup-postgresql" />
     <PackageReference Include="Npgsql" />

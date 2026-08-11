@@ -70,6 +70,8 @@ namespace Tradebook.Api;
 [JsonSerializable(typeof(GetEventsSinceResponse))]
 [JsonSerializable(typeof(JsonQueryAst))]
 [JsonSerializable(typeof(AnalyticsQueryResponse))]
+[JsonSerializable(typeof(ActivityEntryDto))]
+[JsonSerializable(typeof(GetActivityResponse))]
 [JsonSerializable(typeof(SaveDashboardRequest))]
 [JsonSerializable(typeof(SaveDashboardResponse))]
 [JsonSerializable(typeof(ProblemDetailsResponse))]

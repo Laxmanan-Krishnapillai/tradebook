@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardPage } from '../../src/components/dashboard/DashboardPage';
 import { useAuthStore } from '../../src/lib/state/useAuthStore';
@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe('DashboardPage', () => {
-  it('renders a persisted dashboard with no widgets as an editable empty state', async () => {
+  it('renders a persisted dashboard with no widgets and exposes its editor on demand', async () => {
     const dashboardId = '11111111-1111-1111-1111-111111111111';
     const emptyDashboard: DashboardSpecification = {
       dashboardId,
@@ -42,6 +42,7 @@ describe('DashboardPage', () => {
     await screen.findByRole('heading', { name: 'Empty workspace' });
     expect(screen.getByTestId('dashboard-empty-state').textContent).toContain('No widgets configured');
     expect(screen.queryByTestId('query-binding-configurator')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
     expect((screen.getByRole('button', { name: 'Save dashboard' }) as HTMLButtonElement).disabled).toBe(false);
 
     view.unmount();

@@ -3,36 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { analyticsQuery, authLogin, bioticketsCreate, bioticketsDelete, bioticketsList, bioticketsRead, bioticketsUpdate, capacityBookingsCreate, capacityBookingsDelete, capacityBookingsList, capacityBookingsRead, capacityBookingsUpdate, contractsCreate, contractsDeactivate, contractsList, contractsRead, contractsUpdate, dashboardsRead, dashboardsSave, deliveriesCreate, deliveriesDelete, deliveriesList, deliveriesRead, deliveriesUpdate, eventsList, gooCertificatesCreate, gooCertificatesDelete, gooCertificatesList, gooCertificatesRead, gooCertificatesRequestBatchExport, gooCertificatesUpdate, healthLive, healthReady, hedgesCreate, hedgesDelete, hedgesList, hedgesRead, hedgesUpdate, marketPricesDelete, marketPricesList, marketPricesRead, marketPricesUpsert, type Options, taxTariffsCreate, taxTariffsDelete, taxTariffsList, taxTariffsRead, taxTariffsUpdate, transfersCreate, transfersDelete, transfersList, transfersRead, transfersUpdate } from '../sdk.gen';
-import type { AnalyticsQueryData, AnalyticsQueryError, AnalyticsQueryResponse2, AuthLoginData, AuthLoginError, AuthLoginResponse, BioticketsCreateData, BioticketsCreateError, BioticketsCreateResponse, BioticketsDeleteData, BioticketsDeleteError, BioticketsDeleteResponse, BioticketsListData, BioticketsListError, BioticketsListResponse, BioticketsReadData, BioticketsReadError, BioticketsReadResponse, BioticketsUpdateData, BioticketsUpdateError, BioticketsUpdateResponse, CapacityBookingsCreateData, CapacityBookingsCreateError, CapacityBookingsCreateResponse, CapacityBookingsDeleteData, CapacityBookingsDeleteError, CapacityBookingsDeleteResponse, CapacityBookingsListData, CapacityBookingsListError, CapacityBookingsListResponse, CapacityBookingsReadData, CapacityBookingsReadError, CapacityBookingsReadResponse, CapacityBookingsUpdateData, CapacityBookingsUpdateError, CapacityBookingsUpdateResponse, ContractsCreateData, ContractsCreateError, ContractsCreateResponse, ContractsDeactivateData, ContractsDeactivateError, ContractsDeactivateResponse, ContractsListData, ContractsListError, ContractsListResponse, ContractsReadData, ContractsReadError, ContractsReadResponse, ContractsUpdateData, ContractsUpdateError, ContractsUpdateResponse, DashboardsReadData, DashboardsReadError, DashboardsReadResponse, DashboardsSaveData, DashboardsSaveError, DashboardsSaveResponse, DeliveriesCreateData, DeliveriesCreateError, DeliveriesCreateResponse, DeliveriesDeleteData, DeliveriesDeleteError, DeliveriesDeleteResponse, DeliveriesListData, DeliveriesListError, DeliveriesListResponse, DeliveriesReadData, DeliveriesReadError, DeliveriesReadResponse, DeliveriesUpdateData, DeliveriesUpdateError, DeliveriesUpdateResponse, EventsListData, EventsListError, EventsListResponse, GooCertificatesCreateData, GooCertificatesCreateError, GooCertificatesCreateResponse, GooCertificatesDeleteData, GooCertificatesDeleteError, GooCertificatesDeleteResponse, GooCertificatesListData, GooCertificatesListError, GooCertificatesListResponse, GooCertificatesReadData, GooCertificatesReadError, GooCertificatesReadResponse, GooCertificatesRequestBatchExportData, GooCertificatesRequestBatchExportError, GooCertificatesRequestBatchExportResponse, GooCertificatesUpdateData, GooCertificatesUpdateError, GooCertificatesUpdateResponse, HealthLiveData, HealthLiveResponse, HealthReadyData, HealthReadyResponse, HedgesCreateData, HedgesCreateError, HedgesCreateResponse, HedgesDeleteData, HedgesDeleteError, HedgesDeleteResponse, HedgesListData, HedgesListError, HedgesListResponse, HedgesReadData, HedgesReadError, HedgesReadResponse, HedgesUpdateData, HedgesUpdateError, HedgesUpdateResponse, MarketPricesDeleteData, MarketPricesDeleteError, MarketPricesDeleteResponse, MarketPricesListData, MarketPricesListError, MarketPricesListResponse, MarketPricesReadData, MarketPricesReadError, MarketPricesReadResponse, MarketPricesUpsertData, MarketPricesUpsertError, MarketPricesUpsertResponse, TaxTariffsCreateData, TaxTariffsCreateError, TaxTariffsCreateResponse, TaxTariffsDeleteData, TaxTariffsDeleteError, TaxTariffsDeleteResponse, TaxTariffsListData, TaxTariffsListError, TaxTariffsListResponse, TaxTariffsReadData, TaxTariffsReadError, TaxTariffsReadResponse, TaxTariffsUpdateData, TaxTariffsUpdateError, TaxTariffsUpdateResponse, TransfersCreateData, TransfersCreateError, TransfersCreateResponse, TransfersDeleteData, TransfersDeleteError, TransfersDeleteResponse, TransfersListData, TransfersListError, TransfersListResponse, TransfersReadData, TransfersReadError, TransfersReadResponse, TransfersUpdateData, TransfersUpdateError, TransfersUpdateResponse } from '../types.gen';
-
-export const analyticsQueryMutation = (options?: Partial<Options<AnalyticsQueryData>>): UseMutationOptions<AnalyticsQueryResponse2, AnalyticsQueryError, Options<AnalyticsQueryData>> => {
-    const mutationOptions: UseMutationOptions<AnalyticsQueryResponse2, AnalyticsQueryError, Options<AnalyticsQueryData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await analyticsQuery({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const authLoginMutation = (options?: Partial<Options<AuthLoginData>>): UseMutationOptions<AuthLoginResponse, AuthLoginError, Options<AuthLoginData>> => {
-    const mutationOptions: UseMutationOptions<AuthLoginResponse, AuthLoginError, Options<AuthLoginData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await authLogin({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
+import { activityList, analyticsQuery, authLogin, bioticketsCreate, bioticketsDelete, bioticketsList, bioticketsRead, bioticketsUpdate, capacityBookingsCreate, capacityBookingsDelete, capacityBookingsList, capacityBookingsRead, capacityBookingsUpdate, contractsCreate, contractsDeactivate, contractsList, contractsRead, contractsUpdate, dashboardsRead, dashboardsSave, deliveriesCreate, deliveriesDelete, deliveriesList, deliveriesRead, deliveriesUpdate, eventsList, gooCertificatesCreate, gooCertificatesDelete, gooCertificatesList, gooCertificatesRead, gooCertificatesRequestBatchExport, gooCertificatesUpdate, healthLive, healthReady, hedgesCreate, hedgesDelete, hedgesList, hedgesRead, hedgesUpdate, marketPricesDelete, marketPricesList, marketPricesRead, marketPricesUpsert, type Options, taxTariffsCreate, taxTariffsDelete, taxTariffsList, taxTariffsRead, taxTariffsUpdate, transfersCreate, transfersDelete, transfersList, transfersRead, transfersUpdate } from '../sdk.gen';
+import type { ActivityListData, ActivityListError, ActivityListResponse, AnalyticsQueryData, AnalyticsQueryError, AnalyticsQueryResponse2, AuthLoginData, AuthLoginError, AuthLoginResponse, BioticketsCreateData, BioticketsCreateError, BioticketsCreateResponse, BioticketsDeleteData, BioticketsDeleteError, BioticketsDeleteResponse, BioticketsListData, BioticketsListError, BioticketsListResponse, BioticketsReadData, BioticketsReadError, BioticketsReadResponse, BioticketsUpdateData, BioticketsUpdateError, BioticketsUpdateResponse, CapacityBookingsCreateData, CapacityBookingsCreateError, CapacityBookingsCreateResponse, CapacityBookingsDeleteData, CapacityBookingsDeleteError, CapacityBookingsDeleteResponse, CapacityBookingsListData, CapacityBookingsListError, CapacityBookingsListResponse, CapacityBookingsReadData, CapacityBookingsReadError, CapacityBookingsReadResponse, CapacityBookingsUpdateData, CapacityBookingsUpdateError, CapacityBookingsUpdateResponse, ContractsCreateData, ContractsCreateError, ContractsCreateResponse, ContractsDeactivateData, ContractsDeactivateError, ContractsDeactivateResponse, ContractsListData, ContractsListError, ContractsListResponse, ContractsReadData, ContractsReadError, ContractsReadResponse, ContractsUpdateData, ContractsUpdateError, ContractsUpdateResponse, DashboardsReadData, DashboardsReadError, DashboardsReadResponse, DashboardsSaveData, DashboardsSaveError, DashboardsSaveResponse, DeliveriesCreateData, DeliveriesCreateError, DeliveriesCreateResponse, DeliveriesDeleteData, DeliveriesDeleteError, DeliveriesDeleteResponse, DeliveriesListData, DeliveriesListError, DeliveriesListResponse, DeliveriesReadData, DeliveriesReadError, DeliveriesReadResponse, DeliveriesUpdateData, DeliveriesUpdateError, DeliveriesUpdateResponse, EventsListData, EventsListError, EventsListResponse, GooCertificatesCreateData, GooCertificatesCreateError, GooCertificatesCreateResponse, GooCertificatesDeleteData, GooCertificatesDeleteError, GooCertificatesDeleteResponse, GooCertificatesListData, GooCertificatesListError, GooCertificatesListResponse, GooCertificatesReadData, GooCertificatesReadError, GooCertificatesReadResponse, GooCertificatesRequestBatchExportData, GooCertificatesRequestBatchExportError, GooCertificatesRequestBatchExportResponse, GooCertificatesUpdateData, GooCertificatesUpdateError, GooCertificatesUpdateResponse, HealthLiveData, HealthLiveResponse, HealthReadyData, HealthReadyResponse, HedgesCreateData, HedgesCreateError, HedgesCreateResponse, HedgesDeleteData, HedgesDeleteError, HedgesDeleteResponse, HedgesListData, HedgesListError, HedgesListResponse, HedgesReadData, HedgesReadError, HedgesReadResponse, HedgesUpdateData, HedgesUpdateError, HedgesUpdateResponse, MarketPricesDeleteData, MarketPricesDeleteError, MarketPricesDeleteResponse, MarketPricesListData, MarketPricesListError, MarketPricesListResponse, MarketPricesReadData, MarketPricesReadError, MarketPricesReadResponse, MarketPricesUpsertData, MarketPricesUpsertError, MarketPricesUpsertResponse, TaxTariffsCreateData, TaxTariffsCreateError, TaxTariffsCreateResponse, TaxTariffsDeleteData, TaxTariffsDeleteError, TaxTariffsDeleteResponse, TaxTariffsListData, TaxTariffsListError, TaxTariffsListResponse, TaxTariffsReadData, TaxTariffsReadError, TaxTariffsReadResponse, TaxTariffsUpdateData, TaxTariffsUpdateError, TaxTariffsUpdateResponse, TransfersCreateData, TransfersCreateError, TransfersCreateResponse, TransfersDeleteData, TransfersDeleteError, TransfersDeleteResponse, TransfersListData, TransfersListError, TransfersListResponse, TransfersReadData, TransfersReadError, TransfersReadResponse, TransfersUpdateData, TransfersUpdateError, TransfersUpdateResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -65,6 +37,49 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
         params.query = options.query;
     }
     return [params];
+};
+
+export const activityListQueryKey = (options: Options<ActivityListData>) => createQueryKey('activityList', options);
+
+export const activityListOptions = (options: Options<ActivityListData>) => queryOptions<ActivityListResponse, ActivityListError, ActivityListResponse, ReturnType<typeof activityListQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await activityList({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: activityListQueryKey(options)
+});
+
+export const analyticsQueryMutation = (options?: Partial<Options<AnalyticsQueryData>>): UseMutationOptions<AnalyticsQueryResponse2, AnalyticsQueryError, Options<AnalyticsQueryData>> => {
+    const mutationOptions: UseMutationOptions<AnalyticsQueryResponse2, AnalyticsQueryError, Options<AnalyticsQueryData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await analyticsQuery({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const authLoginMutation = (options?: Partial<Options<AuthLoginData>>): UseMutationOptions<AuthLoginResponse, AuthLoginError, Options<AuthLoginData>> => {
+    const mutationOptions: UseMutationOptions<AuthLoginResponse, AuthLoginError, Options<AuthLoginData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await authLogin({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
 };
 
 export const bioticketsListQueryKey = (options: Options<BioticketsListData>) => createQueryKey('bioticketsList', options);

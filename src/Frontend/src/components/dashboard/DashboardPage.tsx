@@ -8,32 +8,72 @@ import { queryKeys } from '../../lib/query/queryKeys';
 import { useAuthStore } from '../../lib/state/useAuthStore';
 import type { DashboardSpecification } from '../../types/visualizations';
 import { ConflictDialog } from '../ui/ConflictDialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { NumberInput } from '../ui/number-input';
+import { Select } from '../ui/select';
 import { QueryBindingConfigurator } from '../visualizations/QueryBindingConfigurator';
 import { DashboardGrid } from './DashboardGrid';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
-function defaultDashboard(dashboardId: string): DashboardSpecification {
+export function createDefaultDashboard(dashboardId: string): DashboardSpecification {
   return {
     dashboardId,
     title: 'Delivery performance',
     description: 'Revenue and volume from the canonical delivery P&L semantic model.',
     version: 0,
-    theme: 'LIGHT',
+    theme: 'SYSTEM',
     refreshRateMs: 60_000,
     gridLayout: {
-      columns: 12,
-      rowHeight: 56,
+      columns: 24,
+      rowHeight: 38,
       items: [
-        { widgetId: 'monthly-revenue', x: 0, y: 0, w: 7, h: 6, minW: 4, minH: 4 },
-        { widgetId: 'delivery-volume', x: 7, y: 0, w: 5, h: 6, minW: 4, minH: 4 }
+        { widgetId: 'revenue-total', x: 0, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
+        { widgetId: 'volume-total', x: 6, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
+        { widgetId: 'invoice-total', x: 12, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
+        { widgetId: 'delivery-count', x: 18, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
+        { widgetId: 'monthly-revenue', x: 0, y: 2, w: 15, h: 16, minW: 8, minH: 6 },
+        { widgetId: 'delivery-volume', x: 15, y: 2, w: 9, h: 16, minW: 8, minH: 6 }
       ]
     },
     widgets: [
       {
+        id: 'revenue-total',
+        title: 'Revenue, month to date',
+        chartType: 'KPI_CARD',
+        semanticModelRef: 'delivery_pnl_analytics',
+        queryAst: { modelName: 'delivery_pnl_analytics', measures: ['revenue_eur'], limit: 1 },
+        visualEncodings: { xAxis: 'revenue_eur', yAxis: ['revenue_eur'] }
+      },
+      {
+        id: 'volume-total',
+        title: 'Volume delivered MWh',
+        chartType: 'KPI_CARD',
+        semanticModelRef: 'delivery_pnl_analytics',
+        queryAst: { modelName: 'delivery_pnl_analytics', measures: ['volume_mwh'], limit: 1 },
+        visualEncodings: { xAxis: 'volume_mwh', yAxis: ['volume_mwh'] }
+      },
+      {
+        id: 'invoice-total',
+        title: 'Invoiced value',
+        chartType: 'KPI_CARD',
+        semanticModelRef: 'delivery_pnl_analytics',
+        queryAst: { modelName: 'delivery_pnl_analytics', measures: ['invoice_amount_eur'], limit: 1 },
+        visualEncodings: { xAxis: 'invoice_amount_eur', yAxis: ['invoice_amount_eur'] }
+      },
+      {
+        id: 'delivery-count',
+        title: 'Deliveries',
+        chartType: 'KPI_CARD',
+        semanticModelRef: 'delivery_pnl_analytics',
+        queryAst: { modelName: 'delivery_pnl_analytics', measures: ['delivery_count'], limit: 1 },
+        visualEncodings: { xAxis: 'delivery_count', yAxis: ['delivery_count'] }
+      },
+      {
         id: 'monthly-revenue',
         title: 'Monthly revenue',
-        chartType: 'AREA',
+        chartType: 'BAR',
         semanticModelRef: 'delivery_pnl_analytics',
         queryAst: { modelName: 'delivery_pnl_analytics', measures: ['revenue_eur'], timeDimensions: [{ dimension: 'supply_month', granularity: 'month' }], sorts: [{ member: 'supply_month_month', direction: 'asc' }], limit: 120 },
         visualEncodings: { xAxis: 'supply_month_month', yAxis: ['revenue_eur'] },
@@ -94,12 +134,13 @@ export function DashboardPage() {
   const accountKey = useAuthStore((state) => state.accountKey);
   const lastEvent = useLastRealtimeEvent();
   const queryClient = useQueryClient();
-  const fallback = useMemo(() => defaultDashboard(dashboardId), [dashboardId]);
+  const fallback = useMemo(() => createDefaultDashboard(dashboardId), [dashboardId]);
   const dashboardQueryKey = useMemo(() => queryKeys.dashboards.detail(dashboardId), [dashboardId]);
   const sessionIdentity = `${dashboardId}\u0000${accountKey}`;
   const [draft, setDraft] = useState<DashboardSpecification>(fallback);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | undefined>(fallback.widgets[0]?.id);
   const [conflict, setConflict] = useState<{ serverState?: DashboardSpecification; attempted: DashboardSpecification }>();
+  const [isEditing, setIsEditing] = useState(false);
   const dashboard = useQuery({
     queryKey: dashboardQueryKey,
     queryFn: async ({ signal }) => {
@@ -157,28 +198,56 @@ export function DashboardPage() {
     widgets: current.widgets.map((widget) => widget.id === updatedWidget.id ? updatedWidget : widget)
   }));
 
-  return <section>
-    <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
-      <div><p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Analytics</p><h2>{draft.title}</h2><p>{draft.description}</p></div>
-      <button type="button" onClick={() => save.mutate(draft)} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save dashboard'}</button>
+  const refreshSeconds = Math.round(draft.refreshRateMs / 1000);
+  const dashboardPeriod = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(new Date());
+  const liveCopy = lastEvent
+    ? `live ${lastEvent.aggregateType} #${lastEvent.sequenceId}`
+    : `saved v${draft.version}`;
+
+  return <section data-slot="dashboard-page" data-editing={isEditing || undefined}>
+    <h1 className="sr-only">Dashboard</h1>
+    <header data-slot="dashboard-header">
+      <div>
+        <h2>{draft.title}</h2>
+        <p data-testid="dashboard-last-entity-change" title={lastEvent ? `${lastEvent.aggregateType} ${lastEvent.eventType} (#${lastEvent.sequenceId})` : 'Waiting for live entity changes'}>
+          refresh {refreshSeconds}s · {liveCopy}
+        </p>
+      </div>
+      <div data-slot="dashboard-actions">
+        <span>{dashboardPeriod}</span>
+        <Button intent="secondary" size="sm" type="button" onClick={() => setIsEditing((current) => !current)} aria-expanded={isEditing}>
+          {isEditing ? 'Close editor' : 'Edit layout'}
+        </Button>
+      </div>
     </header>
-    <div className="flex flex-wrap items-center gap-2" aria-label="Dashboard settings">
-      <label>Title<input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label>
-      <label>Theme<select value={draft.theme} onChange={(event) => setDraft((current) => ({ ...current, theme: event.target.value as DashboardSpecification['theme'] }))}><option>LIGHT</option><option>DARK</option><option>SYSTEM</option></select></label>
-      <label>Refresh (seconds)<input type="number" min="5" value={Math.round(draft.refreshRateMs / 1000)} onChange={(event) => setDraft((current) => ({ ...current, refreshRateMs: Math.max(5, Number(event.target.value) || 5) * 1000 }))} /></label>
-      {selectedWidget ? <label>Widget<select value={selectedWidget.id} onChange={(event) => setSelectedWidgetId(event.target.value)}>{draft.widgets.map((widget) => <option key={widget.id} value={widget.id}>{widget.title}</option>)}</select></label> : null}
-    </div>
-    {selectedWidget
-      ? <QueryBindingConfigurator
-          widget={selectedWidget}
-          semanticMembers={getSemanticValueMembers(selectedWidget.queryAst.modelName)}
-          onChange={updateWidget}
-        />
-      : <div data-testid="dashboard-empty-state" role="status"><h3>No widgets configured</h3><p>This dashboard is empty. You can still edit its settings and save it.</p></div>}
+    {isEditing ? <aside data-slot="dashboard-editor" aria-label="Dashboard settings">
+      <div data-slot="dashboard-editor-toolbar">
+        <label>Title<Input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} /></label>
+        <div>
+          <p>Theme</p>
+          <Select
+            label="Theme"
+            options={['LIGHT', 'DARK', 'SYSTEM']}
+            value={draft.theme}
+            onValueChange={(value) => setDraft((current) => ({ ...current, theme: value as DashboardSpecification['theme'] }))}
+          />
+        </div>
+        <label>Refresh (seconds)<NumberInput aria-label="Refresh seconds" min={5} value={refreshSeconds} onValueChange={(value) => setDraft((current) => ({ ...current, refreshRateMs: Math.max(5, Number(value) || 5) * 1000 }))} /></label>
+        {selectedWidget ? <div data-slot="dashboard-control"><span>Widget</span><Select label="Widget" options={draft.widgets.map((widget) => ({ label: widget.title, value: widget.id }))} value={selectedWidget.id} onValueChange={setSelectedWidgetId} /></div> : null}
+        <Button type="button" onClick={() => save.mutate(draft)} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save dashboard'}</Button>
+      </div>
+      {selectedWidget
+        ? <QueryBindingConfigurator
+            widget={selectedWidget}
+            semanticMembers={getSemanticValueMembers(selectedWidget.queryAst.modelName)}
+            onChange={updateWidget}
+          />
+        : <div data-testid="dashboard-empty-state" role="status"><h3>No widgets configured</h3><p>This dashboard is empty. You can still edit its settings and save it.</p></div>}
+    </aside> : null}
+    {!selectedWidget && !isEditing ? <div data-slot="dashboard-empty" data-testid="dashboard-empty-state" role="status"><h3>No widgets configured</h3><p>Use Edit layout to configure and save this dashboard.</p></div> : null}
     {dashboard.isError && <p role="alert">Unable to load the persisted dashboard. Showing the default workspace.</p>}
-    {save.isError && !conflict && <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">Unable to save the dashboard.</p>}
-    <p data-testid="dashboard-last-entity-change" className="text-sm text-green-800">{lastEvent ? `Live: ${lastEvent.aggregateType} ${lastEvent.eventType} (#${lastEvent.sequenceId})` : 'Waiting for live entity changes…'}</p>
-    <DashboardGrid dashboard={draft} onChange={setDraft} />
-    {conflict && <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"><ConflictDialog entityId={dashboardId} serverState={conflict.serverState} attemptedChanges={conflict.attempted} onClose={() => setConflict(undefined)} /></div>}
+    {save.isError && !conflict && <p role="alert" className="error-banner">Unable to save the dashboard.</p>}
+    <DashboardGrid dashboard={draft} onChange={setDraft} editable={isEditing} />
+    {conflict && <div className="modal"><ConflictDialog entityId={dashboardId} serverState={conflict.serverState} attemptedChanges={conflict.attempted} onClose={() => setConflict(undefined)} /></div>}
   </section>;
 }

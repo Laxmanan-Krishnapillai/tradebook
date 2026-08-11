@@ -1,4 +1,4 @@
-import { Dialog as BaseDialog } from '@base-ui-components/react/dialog';
+import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import type { ComponentProps } from 'react';
 
 export const Dialog = BaseDialog.Root;
@@ -12,8 +12,8 @@ type DialogContentProps = Omit<ComponentProps<typeof BaseDialog.Popup>, 'classNa
 export function DialogContent({ className, ...props }: DialogContentProps) {
   return (
     <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 bg-black/50" />
-      <BaseDialog.Popup className={className ? `modal ${className}` : 'modal'} {...props} />
+      <BaseDialog.Backdrop data-slot="dialog-backdrop" />
+      <BaseDialog.Popup data-slot="dialog-content" className={className} {...props} />
     </BaseDialog.Portal>
   );
 }

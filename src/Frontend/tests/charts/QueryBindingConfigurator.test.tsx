@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { QueryBindingConfigurator } from '../../src/components/visualizations/QueryBindingConfigurator';
@@ -24,27 +25,35 @@ const widget: ChartWidgetConfig = {
 };
 
 describe('QueryBindingConfigurator', () => {
-  it('partitions selected values into whitelisted measures and metrics and updates the query AST', () => {
+  it('partitions selected values into whitelisted measures and metrics and updates the query AST', async () => {
     const onChange = vi.fn();
-    render(<QueryBindingConfigurator
-      widget={widget}
-      semanticMembers={getSemanticValueMembers(widget.queryAst.modelName)}
-      onChange={onChange}
-    />);
-    const picker = screen.getByRole('listbox', { name: 'Measures and metrics' });
-    const options = Array.from(picker.querySelectorAll('option'));
-    for (const option of options) {
-      option.selected = option.value === 'volume_mwh' || option.value === 'avg_price_eur_mwh';
+    function Harness() {
+      const [currentWidget, setCurrentWidget] = useState(widget);
+      return <QueryBindingConfigurator
+        widget={currentWidget}
+        semanticMembers={getSemanticValueMembers(currentWidget.queryAst.modelName)}
+        onChange={(nextWidget) => {
+          onChange(nextWidget);
+          setCurrentWidget(nextWidget);
+        }}
+      />;
     }
-    const injected = document.createElement('option');
-    injected.value = 'not_a_semantic_member';
-    injected.selected = true;
-    picker.append(injected);
 
-    fireEvent.change(picker);
+    render(<Harness />);
+    const picker = screen.getByRole('combobox', { name: 'Measures and metrics' });
+    fireEvent.click(picker);
 
-    expect(onChange).toHaveBeenCalledOnce();
-    const updated = onChange.mock.calls[0][0] as ChartWidgetConfig;
+    expect(screen.queryByRole('option', { name: 'not_a_semantic_member' })).toBeNull();
+    const selectOption = (option: HTMLElement) => {
+      fireEvent.pointerDown(option, { button: 0, pointerType: 'mouse' });
+      fireEvent.click(option);
+    };
+    selectOption(await screen.findByRole('option', { name: 'Measure · volume_mwh' }));
+    selectOption(screen.getByRole('option', { name: 'Metric · avg_price_eur_mwh' }));
+    selectOption(screen.getByRole('option', { name: 'Measure · revenue_eur' }));
+
+    expect(onChange).toHaveBeenCalledTimes(3);
+    const updated = onChange.mock.calls.at(-1)?.[0] as ChartWidgetConfig;
     expect(updated.queryAst.measures).toEqual(['volume_mwh']);
     expect(updated.queryAst.metrics).toEqual(['avg_price_eur_mwh']);
     expect(JSON.stringify(updated.queryAst)).not.toContain('not_a_semantic_member');
@@ -60,7 +69,7 @@ describe('QueryBindingConfigurator', () => {
   it('disables query selection when the model has no trusted member catalog', () => {
     render(<QueryBindingConfigurator widget={widget} onChange={vi.fn()} />);
 
-    expect((screen.getByRole('listbox', { name: 'Measures and metrics' }) as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole('combobox', { name: 'Measures and metrics' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole('status').textContent).toContain('no registered query-binding catalog');
   });
 });

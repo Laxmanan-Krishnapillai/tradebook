@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Tradebook.Core.Interfaces;
 using Tradebook.Infrastructure.Data;
+using Tradebook.Infrastructure.Development;
 using Tradebook.Infrastructure.Migrations;
 
 namespace Tradebook.Infrastructure.DependencyInjection;
@@ -10,6 +11,7 @@ public static class PersistenceServiceCollectionExtensions
     public static IServiceCollection AddTradebookPersistence(this IServiceCollection services)
     {
         services.AddSingleton<INpgsqlConnectionFactory, NpgsqlConnectionFactory>();
+        services.AddSingleton<DevelopmentDataSeeder>();
         services.AddScoped<IDeliveryRepository, DeliveryRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IContractRepository, ContractRepository>();

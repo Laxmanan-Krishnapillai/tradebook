@@ -132,17 +132,59 @@ export function toEChartsOption(spec: ChartSpec, data: SeriesData, tokens: Theme
   const type = chartKind[spec.chartType] ?? spec.chartType.toLowerCase();
   const first = data.series[0];
   const opacity = spec.style?.opacity;
+  const compactHorizontalBar = spec.chartType === 'BAR'
+    && (first?.x.length ?? 0) <= 8
+    && first?.x.every((value) => typeof value === 'string') === true;
+  if (compactHorizontalBar) {
+    return {
+      backgroundColor: tokens?.background,
+      textStyle: { color: tokens?.textPrimary, fontFamily: tokens?.fontFamily },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { show: spec.style?.showLegend ?? false },
+      grid: { containLabel: true, left: 0, right: 48, top: 8, bottom: 8 },
+      xAxis: { type: 'value', show: false },
+      yAxis: {
+        type: 'category',
+        data: first?.x,
+        inverse: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: tokens?.textSecondary, fontSize: 12 }
+      },
+      series: data.series.map((series, index) => ({
+        name: series.name,
+        type: 'bar',
+        data: Array.from(series.y),
+        barWidth: 4,
+        showBackground: true,
+        backgroundStyle: { color: tokens?.gridLine, borderRadius: 2 },
+        itemStyle: { color: tokens?.seriesPalette[index], borderRadius: 2 },
+        label: { show: true, position: 'right', color: tokens?.textPrimary, fontFamily: 'IBM Plex Mono', fontSize: 11 }
+      })) as EChartsOption['series']
+    };
+  }
+  const quietVerticalBar = spec.chartType === 'BAR' && data.series.length === 1;
   return {
     backgroundColor: tokens?.background,
     textStyle: { color: tokens?.textPrimary, fontFamily: tokens?.fontFamily },
     tooltip: { trigger: 'axis' },
     legend: { show: spec.style?.showLegend ?? true },
-    xAxis: { type: 'category', data: first?.x, axisLine: axisLine(tokens) },
-    yAxis: { type: 'value', splitLine: splitLine(spec, tokens) },
+    grid: quietVerticalBar ? { containLabel: true, left: 0, right: 0, top: 8, bottom: 8 } : undefined,
+    xAxis: quietVerticalBar
+      ? { type: 'category', data: first?.x, axisLine: axisLine(tokens), axisTick: { show: false }, axisLabel: { color: tokens?.textSecondary, fontSize: 10 } }
+      : { type: 'category', data: first?.x, axisLine: axisLine(tokens) },
+    yAxis: quietVerticalBar
+      ? { type: 'value', show: false, splitLine: splitLine(spec, tokens) }
+      : { type: 'value', splitLine: splitLine(spec, tokens) },
     series: data.series.map((series, index) => ({
       name: series.name,
       type,
-      data: Array.from(series.y),
+      data: quietVerticalBar
+        ? Array.from(series.y, (value, valueIndex) => ({
+            value,
+            itemStyle: { color: tokens?.seriesPalette[0], opacity: valueIndex === series.y.length - 1 ? 1 : 0.32 }
+          }))
+        : Array.from(series.y),
       areaStyle: spec.chartType === 'AREA' ? { opacity } : undefined,
       stack: spec.chartType === 'STACKED_BAR' ? 'total' : undefined,
       lineStyle: { width: spec.style?.strokeWidth, opacity },

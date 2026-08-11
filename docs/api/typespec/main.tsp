@@ -100,6 +100,15 @@ alias ApiResult<T> = T | ProblemDetails;
 model GetEventsSinceRequest { @query after: int64; }
 @route("/api/v1/events") interface Events { @get list(...GetEventsSinceRequest): ApiResult<GetEventsSinceResponse>; }
 
+model GetActivityRequest {
+  @path entityName: string;
+  @path entityId: string;
+  @query pageSize?: int32 = 100;
+}
+@route("/api/v1/activity") interface Activity {
+  @get @route("/{entityName}/{entityId}") list(...GetActivityRequest): ApiResult<GetActivityResponse>;
+}
+
 model DashboardPayload { dashboardId: string; version: int64; layout: unknown; }
 @route("/api/v1/dashboards") interface Dashboards {
   @get @route("/{dashboardId}") read(@path dashboardId: string): ApiResult<DashboardPayload>;

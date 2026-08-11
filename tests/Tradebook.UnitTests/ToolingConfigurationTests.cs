@@ -680,6 +680,10 @@ public sealed class ToolingConfigurationTests
 
         AddTask17Versions(versions);
         AddTask21Versions(versions);
+        Assert.True(
+            versions.TryAdd("Bogus", "35.6.5"),
+            "Bogus must have exactly one central package pin."
+        );
 
         return versions;
     }

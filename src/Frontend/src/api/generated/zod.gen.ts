@@ -2,6 +2,14 @@
 
 import * as z from 'zod';
 
+export const zActivityEntryDto = z.object({
+    auditId: z.string(),
+    operation: z.string(),
+    actorId: z.string().nullable(),
+    occurredAt: z.iso.datetime(),
+    changes: z.unknown()
+});
+
 export const zAnalyticsQueryResponse = z.object({
     columns: z.array(z.string()),
     rows: z.array(z.array(z.unknown()))
@@ -91,6 +99,10 @@ export const zFilterQuery = z.object({
     member: z.string(),
     operator: z.string(),
     values: z.array(z.unknown())
+});
+
+export const zGetActivityResponse = z.object({
+    items: z.array(zActivityEntryDto)
 });
 
 export const zGetBioticketHistoryRequest = z.object({
@@ -785,7 +797,27 @@ export const zUpsertMarketPriceRequest = z.object({
     version: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
 });
 
+export const zGetActivityRequestEntityId = z.string();
+
+export const zGetActivityRequestEntityName = z.string();
+
+export const zGetActivityRequestPageSize = z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).default(100);
+
 export const zGetEventsSinceRequest = z.coerce.bigint().min(BigInt('-9223372036854775808'), { error: 'Invalid value: Expected int64 to be >= -9223372036854775808' }).max(BigInt('9223372036854775807'), { error: 'Invalid value: Expected int64 to be <= 9223372036854775807' });
+
+export const zActivityListPath = z.object({
+    entityName: z.string(),
+    entityId: z.string()
+});
+
+export const zActivityListQuery = z.object({
+    pageSize: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).optional().default(100)
+});
+
+/**
+ * The request has succeeded.
+ */
+export const zActivityListResponse = zGetActivityResponse;
 
 export const zAnalyticsQueryBody = zJsonQueryAst;
 

@@ -4,6 +4,14 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type ActivityEntryDto = {
+    auditId: string;
+    operation: string;
+    actorId: string | null;
+    occurredAt: string;
+    changes: unknown;
+};
+
 export type AnalyticsQueryResponse = {
     columns: Array<string>;
     rows: Array<Array<unknown>>;
@@ -304,6 +312,10 @@ export type FilterQuery = {
     member: string;
     operator: string;
     values: Array<unknown>;
+};
+
+export type GetActivityResponse = {
+    items: Array<ActivityEntryDto>;
 };
 
 export type GetBioticketHistoryRequest = {
@@ -780,7 +792,43 @@ export type UpsertMarketPriceRequest = {
     version: number;
 };
 
+export type GetActivityRequestEntityId = string;
+
+export type GetActivityRequestEntityName = string;
+
+export type GetActivityRequestPageSize = number;
+
 export type GetEventsSinceRequest = number;
+
+export type ActivityListData = {
+    body?: never;
+    path: {
+        entityName: string;
+        entityId: string;
+    };
+    query?: {
+        pageSize?: number;
+    };
+    url: '/api/v1/activity/{entityName}/{entityId}';
+};
+
+export type ActivityListErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ProblemDetails;
+};
+
+export type ActivityListError = ActivityListErrors[keyof ActivityListErrors];
+
+export type ActivityListResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: GetActivityResponse;
+};
+
+export type ActivityListResponse = ActivityListResponses[keyof ActivityListResponses];
 
 export type AnalyticsQueryData = {
     body: JsonQueryAst;

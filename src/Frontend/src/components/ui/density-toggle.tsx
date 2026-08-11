@@ -1,4 +1,5 @@
 import { usePreferences, type Density } from '../../stores/preferences';
+import { Button } from './button';
 
 const densities: readonly Density[] = ['condensed', 'regular', 'relaxed'];
 
@@ -9,15 +10,15 @@ export function DensityToggle() {
   const setReduceMotion = usePreferences((state) => state.setReduceMotion);
 
   return (
-    <fieldset className="flex gap-1" aria-label="Table density">
+    <fieldset data-slot="density-toggle" aria-label="Table density">
       {densities.map((option) => (
-        <button className="secondary capitalize" aria-pressed={density === option} key={option} onClick={() => setDensity(option)} type="button">
+        <Button intent="ghost" size="sm" aria-pressed={density === option} key={option} onClick={() => setDensity(option)} type="button">
           {option}
-        </button>
+        </Button>
       ))}
-      <button className="secondary" aria-pressed={reduceMotion} onClick={() => setReduceMotion(!reduceMotion)} type="button">
+      <Button intent="ghost" size="sm" aria-pressed={reduceMotion} onClick={() => setReduceMotion(!reduceMotion)} type="button">
         Reduce motion
-      </button>
+      </Button>
     </fieldset>
   );
 }

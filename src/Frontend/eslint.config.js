@@ -63,6 +63,9 @@ export default tseslint.config(
     },
     settings: {
       'import/resolver': { typescript: { alwaysTryTypes: true } },
+      'jsx-a11y': {
+        components: { Input: 'input', NumberInput: 'input' },
+      },
       tailwindcss: {
         cssConfigPath: './src/styles.css',
         functions: ['cva', 'cx', 'cn', 'tv'],

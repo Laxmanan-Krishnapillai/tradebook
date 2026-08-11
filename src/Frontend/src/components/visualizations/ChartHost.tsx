@@ -42,6 +42,7 @@ export function ChartHost({ widget, theme = defaultTheme, refreshRateMs }: Chart
     catch (error) { return { mappingError: error instanceof Error ? error.message : 'Invalid visualization binding.' }; }
   }, [query.data, widget.chartType, widget.visualEncodings]);
   const spec = useMemo(() => ({ chartType: widget.chartType, encodings: widget.visualEncodings, style: widget.styleOverrides }), [widget.chartType, widget.visualEncodings, widget.styleOverrides]);
+  const primaryUnit = widget.visualEncodings.yAxis[0]?.split('_').at(-1)?.toUpperCase();
   const errorMessage = query.isError ? `Unable to load ${widget.title}.` : mapped.mappingError;
   const markRenderReady = useCallback((source: SeriesData) => {
     setRenderReceipt((current) => ({
@@ -58,13 +59,22 @@ export function ChartHost({ widget, theme = defaultTheme, refreshRateMs }: Chart
   const renderState = !mapped.data
     ? 'loading'
     : renderReceipt.source === mapped.data ? 'ready' : 'rendering';
-  return <section aria-label={widget.title}><h2>{widget.title}</h2><div
+  return <section data-slot="dashboard-widget" data-chart-type={widget.chartType} aria-label={widget.title}>
+    <header data-slot="dashboard-widget-header">
+      <h2>{widget.title}</h2>
+      {widget.chartType !== 'KPI_CARD' && widget.queryAst.timeDimensions?.length
+        ? <p>{primaryUnit} · {widget.semanticModelRef}</p>
+        : null}
+    </header>
+    <div
     ref={ref}
-    style={{ minHeight: 200 }}
+    data-slot="dashboard-chart-canvas"
+    style={{ minHeight: widget.chartType === 'KPI_CARD' ? 44 : 200 }}
     aria-busy={renderState !== 'ready'}
     data-chart-widget-id={widget.id}
     data-chart-render-state={renderState}
     data-chart-render-sequence={renderReceipt.sequence}
     data-chart-render-completed-at-ms={renderState === 'ready' ? renderReceipt.completedAtMs : undefined}
-  /></section>;
+  />
+  </section>;
 }
