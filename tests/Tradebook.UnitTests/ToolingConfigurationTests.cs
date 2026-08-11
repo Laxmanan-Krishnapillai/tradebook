@@ -410,6 +410,18 @@ public sealed class ToolingConfigurationTests
                 RegexTimeout
             )
         );
+        foreach (
+            var argument in new[]
+            {
+                "VITE_ENTRA_TENANT_ID=$ENTRA_TENANT_ID",
+                "VITE_ENTRA_SPA_CLIENT_ID=$ENTRA_SPA_CLIENT_ID",
+                "VITE_ENTRA_API_CLIENT_ID=$ENTRA_API_CLIENT_ID",
+                "VITE_ENTRA_REDIRECT_ORIGIN=$ENTRA_REDIRECT_ORIGIN",
+            }
+        )
+        {
+            Assert.Contains($"--build-arg \"{argument}\"", workflow, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

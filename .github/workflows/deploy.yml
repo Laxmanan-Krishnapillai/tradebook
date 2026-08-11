@@ -28,6 +28,10 @@ jobs:
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
       REGISTRY_NAME: ${{ vars.AZURE_CONTAINER_REGISTRY }}
+      ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+      ENTRA_SPA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
+      ENTRA_API_CLIENT_ID: ${{ vars.ENTRA_API_CLIENT_ID }}
+      ENTRA_REDIRECT_ORIGIN: ${{ vars.ENTRA_REDIRECT_ORIGIN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,9 +72,22 @@ jobs:
       - name: Build and push immutable images
         shell: bash
         run: |
+          for variable_name in ENTRA_TENANT_ID ENTRA_SPA_CLIENT_ID ENTRA_API_CLIENT_ID ENTRA_REDIRECT_ORIGIN; do
+            if [[ -z "${!variable_name}" ]]; then
+              echo "The production environment must define $variable_name before building the SPA." >&2
+              exit 1
+            fi
+          done
           az acr login --name "$REGISTRY_NAME"
           login_server="$(az acr show --name "$REGISTRY_NAME" --query loginServer --output tsv)"
-          docker build --target runtime --tag "$login_server/tradebook-api:$DEPLOY_SHA" .
+          docker build \
+            --target runtime \
+            --build-arg "VITE_ENTRA_TENANT_ID=$ENTRA_TENANT_ID" \
+            --build-arg "VITE_ENTRA_SPA_CLIENT_ID=$ENTRA_SPA_CLIENT_ID" \
+            --build-arg "VITE_ENTRA_API_CLIENT_ID=$ENTRA_API_CLIENT_ID" \
+            --build-arg "VITE_ENTRA_REDIRECT_ORIGIN=$ENTRA_REDIRECT_ORIGIN" \
+            --tag "$login_server/tradebook-api:$DEPLOY_SHA" \
+            .
           docker build --target database-ops --tag "$login_server/tradebook-database-ops:$DEPLOY_SHA" .
           docker push "$login_server/tradebook-api:$DEPLOY_SHA"
           docker push "$login_server/tradebook-database-ops:$DEPLOY_SHA"
