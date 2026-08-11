@@ -95,12 +95,6 @@ export const zEntityChangedEventDto = z.object({
     payloadJson: z.string()
 });
 
-export const zFilterQuery = z.object({
-    member: z.string(),
-    operator: z.string(),
-    values: z.array(z.unknown())
-});
-
 export const zGetActivityResponse = z.object({
     items: z.array(zActivityEntryDto)
 });
@@ -186,6 +180,13 @@ export const zGetTransferHistoryRequest = z.object({
     toMonth: z.string().nullish(),
     page: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }),
     pageSize: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
+});
+
+export const zInAppAgentStatusResponse = z.object({
+    enabled: z.boolean(),
+    readOnly: z.boolean(),
+    transport: z.string(),
+    runPath: z.string()
 });
 
 export const zLoginRequest = z.object({
@@ -569,6 +570,28 @@ export const zProblemDetailsResponse = z.object({
     detail: z.string().nullable()
 });
 
+export const zQueryIdentifier = z.string().max(128);
+
+export const zQuerySelectedMemberList = z.array(zQueryIdentifier).max(64);
+
+export const zQueryStringFilterValue = z.string().max(1024);
+
+export const zQueryFilterValue = z.union([
+    zQueryStringFilterValue,
+    z.number(),
+    z.boolean()
+]);
+
+export const zQueryFilterValueList = z.array(zQueryFilterValue).max(256);
+
+export const zFilterQuery = z.object({
+    member: zQueryIdentifier,
+    operator: z.string(),
+    values: zQueryFilterValueList
+});
+
+export const zQueryFilterList = z.array(zFilterQuery).max(64);
+
 export const zRequestGooBatchExportRequest = z.object({
     gooCertificateTransactionId: z.string(),
     version: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' })
@@ -587,9 +610,11 @@ export const zSaveDashboardResponse = z.object({
 });
 
 export const zSortQuery = z.object({
-    member: z.string(),
-    direction: z.string()
+    member: zQueryIdentifier,
+    direction: zQueryIdentifier
 });
+
+export const zQuerySortList = z.array(zSortQuery).max(16);
 
 export const zTaxTariffDetailsDto = z.object({
     taxTariffId: z.string(),
@@ -618,19 +643,21 @@ export const zGetTaxTariffHistoryResponse = z.object({
 });
 
 export const zTimeDimensionQuery = z.object({
-    dimension: z.string(),
-    granularity: z.string(),
-    dateRange: z.array(z.string()).nullish()
+    dimension: zQueryIdentifier,
+    granularity: zQueryIdentifier,
+    dateRange: z.array(zQueryStringFilterValue).nullish()
 });
 
+export const zQueryTimeDimensionList = z.array(zTimeDimensionQuery).max(16);
+
 export const zJsonQueryAst = z.object({
-    modelName: z.string(),
-    measures: z.array(z.string()).nullish(),
-    metrics: z.array(z.string()).nullish(),
-    dimensions: z.array(z.string()).nullish(),
-    timeDimensions: z.array(zTimeDimensionQuery).nullish(),
-    filters: z.array(zFilterQuery).nullish(),
-    sorts: z.array(zSortQuery).nullish(),
+    modelName: zQueryIdentifier,
+    measures: zQuerySelectedMemberList.nullish(),
+    metrics: zQuerySelectedMemberList.nullish(),
+    dimensions: zQuerySelectedMemberList.nullish(),
+    timeDimensions: zQueryTimeDimensionList.nullish(),
+    filters: zQueryFilterList.nullish(),
+    sorts: zQuerySortList.nullish(),
     limit: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish(),
     offset: z.int().min(-2147483648, { error: 'Invalid value: Expected int32 to be >= -2147483648' }).max(2147483647, { error: 'Invalid value: Expected int32 to be <= 2147483647' }).nullish()
 });
@@ -818,6 +845,11 @@ export const zActivityListQuery = z.object({
  * The request has succeeded.
  */
 export const zActivityListResponse = zGetActivityResponse;
+
+/**
+ * The request has succeeded.
+ */
+export const zAgentStatusResponse = zInAppAgentStatusResponse;
 
 export const zAnalyticsQueryBody = zJsonQueryAst;
 

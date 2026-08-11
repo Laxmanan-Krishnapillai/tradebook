@@ -13,6 +13,8 @@ import type { PhysicalDeliveryDetailsDto } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
+import { changedFields, draftValuesEquivalent, shouldAdoptRefreshedDraft } from "../../lib/editor/detailDraftPolicy";
+import { clearMutationConflictForEntity } from "../../lib/mutations/mutationCoordinator";
 import {
   useCreateDelivery,
   useDeleteDelivery,
@@ -103,7 +105,6 @@ export function DeliveriesPage() {
   const [panelDeliveryStatus, setPanelDeliveryStatus] = useState<(typeof statuses)[number]>(statuses[0]);
   const attempted = useRef<object>({});
   const commandStack = useCommandStack();
-  const [, setHistoryRevision] = useState(0);
   const onConflict = useCallback(
     (id: string, serverState?: PhysicalDeliveryDetailsDto) =>
       setConflict({ id, serverState, attempted: attempted.current }),
@@ -139,23 +140,22 @@ export function DeliveriesPage() {
   const setSelection = useCallback((nextSelectedRowIds: Set<string>) => {
     setSelectedRowIds(nextSelectedRowIds);
   }, []);
-  const refreshHistory = useCallback(
-    () => setHistoryRevision((value) => value + 1),
-    [],
-  );
+  const openDeliveryPanel = useCallback((delivery: PhysicalDeliveryDetailsDto) => {
+    setActiveDelivery(delivery);
+    setPanelDeliveryVolume(delivery.volumeRealisedMwh?.toString() ?? '');
+    setPanelDeliveryStatus(delivery.status as (typeof statuses)[number]);
+  }, []);
   const undo = useCallback(async () => {
     if (!(await commandStack.undo()))
       setError("Nothing could be undone. The server may have a newer version.");
-    refreshHistory();
-  }, [commandStack, refreshHistory]);
+  }, [commandStack]);
   const redo = useCallback(async () => {
     try {
       if (!(await commandStack.redo())) setError("Nothing to redo.");
     } catch (failure) {
       onMutationError(failure);
     }
-    refreshHistory();
-  }, [commandStack, onMutationError, refreshHistory]);
+  }, [commandStack, onMutationError]);
 
   const saveDelivery = useCallback(
     async (
@@ -172,12 +172,12 @@ export function DeliveriesPage() {
         return;
       }
       const changes = { ...requested, volumeRealisedMwh };
-      attempted.current = changes;
       let version = delivery.version;
       const before = {
         volumeRealisedMwh: delivery.volumeRealisedMwh,
         status: delivery.status,
       } as UpdateDeliveryVariables["changes"];
+      const intent = changedFields(before, changes);
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Update ${delivery.contractInstanceId}`,
@@ -188,6 +188,7 @@ export function DeliveriesPage() {
             id: delivery.deliveryId,
             version,
             changes,
+            intent,
           });
           version = updated.version;
         },
@@ -197,18 +198,18 @@ export function DeliveriesPage() {
             id: delivery.deliveryId,
             version,
             changes: before,
+            intent,
           });
           version = updated.version;
         },
       };
       try {
         await commandStack.execute(command);
-        refreshHistory();
       } catch {
         /* mutation callbacks surface the error */
       }
     },
-    [commandStack, refreshHistory, updateMutation],
+    [commandStack, updateMutation],
   );
 
   const cancelDelivery = useCallback(
@@ -242,18 +243,18 @@ export function DeliveriesPage() {
             id: delivery.deliveryId,
             version,
             changes,
+            intent: ['status'],
           });
           version = restored.version;
         },
       };
       try {
         await commandStack.execute(command);
-        refreshHistory();
       } catch {
         /* mutation callbacks surface the error */
       }
     },
-    [commandStack, deleteMutation, refreshHistory, updateMutation],
+    [commandStack, deleteMutation, updateMutation],
   );
 
   const columns = useMemo<ColumnDef<PhysicalDeliveryDetailsDto>[]>(
@@ -265,7 +266,7 @@ export function DeliveriesPage() {
           <Button
             intent="ghost"
             type="button"
-            onClick={() => setActiveDelivery(row.original)}
+            onClick={() => openDeliveryPanel(row.original)}
             aria-label={`Open delivery ${row.original.contractInstanceId}`}
           >
             {row.original.contractInstanceId}
@@ -290,7 +291,7 @@ export function DeliveriesPage() {
         cell: ({ row }) => <TableEditableCell label="Status" options={statuses} value={row.original.status} onCommit={(value) => saveDelivery(row.original, { volumeRealisedMwh: row.original.volumeRealisedMwh, status: value })} />,
       },
     ],
-    [saveDelivery],
+    [openDeliveryPanel, saveDelivery],
   );
 
   const submitCreate = async (validatedRequest: CreateDeliveryVariables) => {
@@ -340,7 +341,6 @@ export function DeliveriesPage() {
       await commandStack.execute(command);
       closeCreate();
       setCreateRequest(initialCreate);
-      refreshHistory();
     } catch {
       /* mutation callbacks surface the error */
     }
@@ -350,10 +350,20 @@ export function DeliveriesPage() {
     if (!activeDelivery) return;
     const refreshed = deliveries.find((delivery) => delivery.deliveryId === activeDelivery.deliveryId);
     if (!refreshed) return;
+    const dirty = !draftValuesEquivalent(panelDeliveryVolume, activeDelivery.volumeRealisedMwh?.toString() ?? '')
+      || panelDeliveryStatus !== activeDelivery.status;
+    const refreshedMatchesDraft = draftValuesEquivalent(panelDeliveryVolume, refreshed.volumeRealisedMwh?.toString() ?? '')
+      && panelDeliveryStatus === refreshed.status;
+    if (!shouldAdoptRefreshedDraft({
+      activeVersion: activeDelivery.version,
+      refreshedVersion: refreshed.version,
+      dirty,
+      refreshedMatchesDraft,
+    })) return;
     setActiveDelivery(refreshed);
     setPanelDeliveryVolume(refreshed.volumeRealisedMwh?.toString() ?? "");
     setPanelDeliveryStatus(refreshed.status as (typeof statuses)[number]);
-  }, [activeDelivery, deliveries]);
+  }, [activeDelivery, deliveries, panelDeliveryStatus, panelDeliveryVolume]);
 
   const submitPanelSave = useCallback(async () => {
     if (!activeDelivery) return;
@@ -371,7 +381,7 @@ export function DeliveriesPage() {
   }, [activeDelivery, cancelDelivery]);
 
   const panelDirty = Boolean(activeDelivery) && (
-    panelDeliveryVolume !== (activeDelivery?.volumeRealisedMwh?.toString() ?? '')
+    !draftValuesEquivalent(panelDeliveryVolume, activeDelivery?.volumeRealisedMwh?.toString() ?? '')
     || panelDeliveryStatus !== activeDelivery?.status
   );
 
@@ -442,7 +452,7 @@ export function DeliveriesPage() {
           columns={columns}
           ariaLabel="Deliveries"
           getRowId={(row) => row.deliveryId}
-          onRowOpen={setActiveDelivery}
+          onRowOpen={openDeliveryPanel}
           selectedRowIds={selectedRowIds}
           onSelectedRowIdsChange={setSelection}
         />
@@ -544,7 +554,10 @@ export function DeliveriesPage() {
             entityId={conflict.id}
             serverState={conflict.serverState}
             attemptedChanges={conflict.attempted}
-            onClose={() => setConflict(undefined)}
+            onClose={() => {
+              clearMutationConflictForEntity(conflict.id);
+              setConflict(undefined);
+            }}
           />
         </div>
       )}

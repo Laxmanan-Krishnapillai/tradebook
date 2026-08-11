@@ -33,8 +33,8 @@ export function createDefaultDashboard(dashboardId: string): DashboardSpecificat
         { widgetId: 'volume-total', x: 6, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
         { widgetId: 'invoice-total', x: 12, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
         { widgetId: 'delivery-count', x: 18, y: 0, w: 6, h: 2, minW: 4, minH: 2 },
-        { widgetId: 'monthly-revenue', x: 0, y: 2, w: 15, h: 16, minW: 8, minH: 6 },
-        { widgetId: 'delivery-volume', x: 15, y: 2, w: 9, h: 16, minW: 8, minH: 6 }
+        { widgetId: 'monthly-revenue', x: 0, y: 2, w: 15, h: 14, minW: 8, minH: 6 },
+        { widgetId: 'delivery-volume', x: 15, y: 2, w: 9, h: 14, minW: 8, minH: 6 }
       ]
     },
     widgets: [
@@ -73,18 +73,18 @@ export function createDefaultDashboard(dashboardId: string): DashboardSpecificat
       {
         id: 'monthly-revenue',
         title: 'Monthly revenue',
-        chartType: 'BAR',
+        chartType: 'AREA',
         semanticModelRef: 'delivery_pnl_analytics',
         queryAst: { modelName: 'delivery_pnl_analytics', measures: ['revenue_eur'], timeDimensions: [{ dimension: 'supply_month', granularity: 'month' }], sorts: [{ member: 'supply_month_month', direction: 'asc' }], limit: 120 },
         visualEncodings: { xAxis: 'supply_month_month', yAxis: ['revenue_eur'] },
-        styleOverrides: { showLegend: false, showGridlines: true, opacity: 0.25 }
+        styleOverrides: { showLegend: false, showGridlines: true, opacity: 0.14, strokeWidth: 2 }
       },
       {
         id: 'delivery-volume',
         title: 'Volume by contract',
         chartType: 'BAR',
         semanticModelRef: 'delivery_pnl_analytics',
-        queryAst: { modelName: 'delivery_pnl_analytics', dimensions: ['contract_instance_id'], measures: ['volume_mwh'], sorts: [{ member: 'volume_mwh', direction: 'desc' }], limit: 20 },
+        queryAst: { modelName: 'delivery_pnl_analytics', dimensions: ['contract_instance_id'], measures: ['volume_mwh'], sorts: [{ member: 'volume_mwh', direction: 'desc' }], limit: 8 },
         visualEncodings: { xAxis: 'contract_instance_id', yAxis: ['volume_mwh'] },
         styleOverrides: { showLegend: false, showGridlines: true }
       }
@@ -204,8 +204,10 @@ export function DashboardPage() {
     ? `live ${lastEvent.aggregateType} #${lastEvent.sequenceId}`
     : `saved v${draft.version}`;
 
-  return <section data-slot="dashboard-page" data-editing={isEditing || undefined}>
-    <h1 className="sr-only">Dashboard</h1>
+  const dashboardThemeClass = draft.theme === 'SYSTEM' ? undefined : draft.theme.toLowerCase();
+
+  return <section className={dashboardThemeClass} data-slot="dashboard-page" data-dashboard-theme={draft.theme.toLowerCase()} data-editing={isEditing || undefined} aria-labelledby="dashboard-page-title">
+    <h1 id="dashboard-page-title" className="sr-only">Dashboard</h1>
     <header data-slot="dashboard-header">
       <div>
         <h2>{draft.title}</h2>
@@ -227,7 +229,11 @@ export function DashboardPage() {
           <p>Theme</p>
           <Select
             label="Theme"
-            options={['LIGHT', 'DARK', 'SYSTEM']}
+            options={[
+              { label: 'Follow app', value: 'SYSTEM' },
+              { label: 'Light', value: 'LIGHT' },
+              { label: 'Dark', value: 'DARK' },
+            ]}
             value={draft.theme}
             onValueChange={(value) => setDraft((current) => ({ ...current, theme: value as DashboardSpecification['theme'] }))}
           />

@@ -102,6 +102,29 @@ describe('Task 23 design system', () => {
     expect(source('src/styles.css')).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
+  it('keeps the system theme live and exposes an explicit appearance preference', () => {
+    let systemDark = false;
+    let themeListener: (() => void) | undefined;
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      get matches() { return systemDark; },
+      addEventListener: vi.fn((_event: string, listener: () => void) => { themeListener = listener; }),
+      removeEventListener: vi.fn(),
+    })));
+
+    render(<MotionProvider><DensityToggle /></MotionProvider>);
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    systemDark = true;
+    themeListener?.();
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Light' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(usePreferences.getState().theme).toBe('light');
+    fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(usePreferences.getState().theme).toBe('dark');
+  });
+
   it('DS-09 supplies layout-matched skeleton and designed empty treatments', () => {
     render(<><Skeleton data-testid="skeleton" /><TableSkeleton rows={2} columns={3} /><EmptyState title="No trades" description="Create a trade to begin." /></>);
     expect(screen.getByTestId('skeleton').getAttribute('aria-hidden')).toBe('true');

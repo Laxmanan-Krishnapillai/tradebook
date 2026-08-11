@@ -130,7 +130,7 @@ The solution targets `net9.0` on SDK `9.0.316`. .NET 9 reaches **end-of-support 
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.3" />
     <PackageVersion Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.1.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Microsoft.OpenApi" Version="2.11.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
@@ -186,7 +186,7 @@ package is the newest version published in August 2026.
 | `Microsoft.AspNetCore.SignalR.Client` | `10.0.3` | IntegrationTests | Runtime-aligned realtime client |
 | `Microsoft.AspNetCore.SignalR.Protocols.MessagePack` | `10.0.10` | Api, IntegrationTests | Replaces the vulnerable 10.0.3 dependency path and resolves MessagePack 2.5.302 |
 | `Microsoft.Extensions.Caching.Hybrid` | `10.1.0` | Api, Infrastructure | 10.0.3 was never published; 10.1.0 is the smallest exact replacement for the nearest-match restore |
-| `Microsoft.Extensions.Hosting.Abstractions` | `10.0.9` | Infrastructure | FastEndpoints.JobQueues 8.2 requires `>=10.0.9`; 10.0.3 causes NU1109 |
+| `Microsoft.Extensions.Hosting.Abstractions` | `10.0.10` | Infrastructure | ModelContextProtocol 2.1 requires `>=10.0.10`; lower central pins cause NU1109 |
 | `Microsoft.NET.Test.Sdk` | `17.14.1` | All test projects | Shared test-host target |
 | `Microsoft.OpenApi` | `2.11.0` | Transitive-only | Security pin for GHSA-v5pm-xwqc-g5wc; no project references it directly |
 | `Npgsql` | `10.0.3` | Infrastructure | .NET 10 line; PostgreSQL `date` values map to `DateOnly` |

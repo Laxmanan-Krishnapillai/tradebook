@@ -53,7 +53,10 @@ describe('ChartHost', () => {
       </QueryClientProvider>
     );
 
+    expect(screen.getByRole('status', { name: 'Loading Volumes' })).toBeTruthy();
     await waitFor(() => expect(adapters[0].update).toHaveBeenCalledOnce());
+    expect(screen.getByText('MWh · Top 1')).toBeTruthy();
+    expect(screen.queryByText(/delivery_pnl_analytics/)).toBeNull();
     view.rerender(
       <QueryClientProvider client={queryClient}>
         <ChartHost widget={widget(2)} />

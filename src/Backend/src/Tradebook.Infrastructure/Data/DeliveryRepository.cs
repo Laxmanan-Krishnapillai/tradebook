@@ -54,12 +54,11 @@ public sealed class DeliveryRepository(
         CancellationToken cancellationToken
     )
     {
-        var page = Math.Max(1, request.Page);
-        var pageSize = Math.Clamp(request.PageSize, 1, 200);
+        var (page, pageSize, offset) = RepositoryMutation.Page(request.Page, request.PageSize);
         var parameters = new
         {
             Limit = pageSize,
-            Offset = (page - 1) * pageSize,
+            Offset = offset,
             request.ContractId,
             ContractInstanceId = string.IsNullOrWhiteSpace(request.ContractInstanceId)
                 ? null
@@ -105,7 +104,7 @@ public sealed class DeliveryRepository(
                 total,
                 page,
                 pageSize,
-                page * pageSize < total
+                offset + items.Count < total
             );
         }
     }

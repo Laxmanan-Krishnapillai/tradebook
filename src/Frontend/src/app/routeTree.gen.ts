@@ -24,6 +24,9 @@ import { Route as AuthenticatedMarketPricesRouteImport } from './routes/_authent
 import { Route as AuthenticatedTaxTariffsRouteImport } from './routes/_authenticated.tax-tariffs'
 import { Route as AuthenticatedTransfersRouteImport } from './routes/_authenticated.transfers'
 
+const AuthenticatedAssistantLazyRouteImport = createFileRoute(
+  '/_authenticated/assistant',
+)()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
 )()
@@ -45,6 +48,14 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAssistantLazyRoute =
+  AuthenticatedAssistantLazyRouteImport.update({
+    id: '/assistant',
+    path: '/assistant',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated.assistant.lazy').then((d) => d.Route),
+  )
 const AuthenticatedBioticketsRoute = AuthenticatedBioticketsRouteImport.update({
   id: '/biotickets',
   path: '/biotickets',
@@ -138,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/market-prices': typeof AuthenticatedMarketPricesRoute
   '/tax-tariffs': typeof AuthenticatedTaxTariffsRoute
   '/transfers': typeof AuthenticatedTransfersRoute
+  '/assistant': typeof AuthenticatedAssistantLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/workflow': typeof AuthenticatedWorkflowLazyRoute
 }
@@ -153,6 +165,7 @@ export interface FileRoutesByTo {
   '/market-prices': typeof AuthenticatedMarketPricesRoute
   '/tax-tariffs': typeof AuthenticatedTaxTariffsRoute
   '/transfers': typeof AuthenticatedTransfersRoute
+  '/assistant': typeof AuthenticatedAssistantLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/workflow': typeof AuthenticatedWorkflowLazyRoute
 }
@@ -170,6 +183,7 @@ export interface FileRoutesById {
   '/_authenticated/market-prices': typeof AuthenticatedMarketPricesRoute
   '/_authenticated/tax-tariffs': typeof AuthenticatedTaxTariffsRoute
   '/_authenticated/transfers': typeof AuthenticatedTransfersRoute
+  '/_authenticated/assistant': typeof AuthenticatedAssistantLazyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
   '/_authenticated/workflow': typeof AuthenticatedWorkflowLazyRoute
 }
@@ -187,6 +201,7 @@ export interface FileRouteTypes {
     | '/market-prices'
     | '/tax-tariffs'
     | '/transfers'
+    | '/assistant'
     | '/dashboard'
     | '/workflow'
   fileRoutesByTo: FileRoutesByTo
@@ -202,6 +217,7 @@ export interface FileRouteTypes {
     | '/market-prices'
     | '/tax-tariffs'
     | '/transfers'
+    | '/assistant'
     | '/dashboard'
     | '/workflow'
   id:
@@ -218,6 +234,7 @@ export interface FileRouteTypes {
     | '/_authenticated/market-prices'
     | '/_authenticated/tax-tariffs'
     | '/_authenticated/transfers'
+    | '/_authenticated/assistant'
     | '/_authenticated/dashboard'
     | '/_authenticated/workflow'
   fileRoutesById: FileRoutesById
@@ -250,6 +267,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/assistant': {
+      id: '/_authenticated/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AuthenticatedAssistantLazyRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/biotickets': {
       id: '/_authenticated/biotickets'
@@ -341,6 +365,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMarketPricesRoute: typeof AuthenticatedMarketPricesRoute
   AuthenticatedTaxTariffsRoute: typeof AuthenticatedTaxTariffsRoute
   AuthenticatedTransfersRoute: typeof AuthenticatedTransfersRoute
+  AuthenticatedAssistantLazyRoute: typeof AuthenticatedAssistantLazyRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
   AuthenticatedWorkflowLazyRoute: typeof AuthenticatedWorkflowLazyRoute
 }
@@ -355,6 +380,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMarketPricesRoute: AuthenticatedMarketPricesRoute,
   AuthenticatedTaxTariffsRoute: AuthenticatedTaxTariffsRoute,
   AuthenticatedTransfersRoute: AuthenticatedTransfersRoute,
+  AuthenticatedAssistantLazyRoute: AuthenticatedAssistantLazyRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
   AuthenticatedWorkflowLazyRoute: AuthenticatedWorkflowLazyRoute,
 }

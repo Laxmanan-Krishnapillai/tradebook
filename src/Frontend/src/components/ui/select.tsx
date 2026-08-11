@@ -1,9 +1,13 @@
 import { Select as BaseSelect } from '@base-ui/react/select';
+import type { SelectRootChangeEventDetails } from '@base-ui/react/select';
 import { Check, ChevronDown } from 'lucide-react';
 
 export interface SelectProps {
+  appearance?: 'cell' | 'default';
   disabled?: boolean;
   label: string;
+  modal?: boolean;
+  onOpenChange?: (open: boolean, reason: SelectRootChangeEventDetails['reason']) => void;
   options: readonly SelectOptionValue[];
   value: string;
   onValueChange: (value: string) => void;
@@ -48,11 +52,17 @@ function SelectPopup({ options }: { options: readonly SelectOptionValue[] }) {
   );
 }
 
-export function Select({ disabled, label, options, value, onValueChange }: SelectProps) {
+export function Select({ appearance = 'default', disabled, label, modal, onOpenChange, options, value, onValueChange }: SelectProps) {
   const items = normalizedOptions(options);
   return (
-    <BaseSelect.Root disabled={disabled} value={value} onValueChange={(next) => onValueChange(next ?? '')}>
-      <BaseSelect.Trigger aria-label={label} className="ui-select-trigger">
+    <BaseSelect.Root
+      disabled={disabled}
+      modal={modal}
+      value={value}
+      onOpenChange={(open, details) => onOpenChange?.(open, details.reason)}
+      onValueChange={(next) => onValueChange(next ?? '')}
+    >
+      <BaseSelect.Trigger aria-label={label} className="ui-select-trigger" data-appearance={appearance}>
         <BaseSelect.Value>{(selected: string) => items.find((item) => item.value === selected)?.label ?? selected}</BaseSelect.Value>
         <BaseSelect.Icon><ChevronDown aria-hidden="true" size={14} /></BaseSelect.Icon>
       </BaseSelect.Trigger>

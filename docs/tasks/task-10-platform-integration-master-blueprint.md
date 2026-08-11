@@ -99,7 +99,7 @@
 
 #### 1. Boundary A: PostgreSQL 17 -> .NET 10 REPR API Integration
 - **Mechanism**: `NpgsqlDataSource` connection pooling combined with Dapper.
-- **Auth**: every mutation endpoint is configured with a named policy (e.g. `Policies("TraderPolicy")`); the actor identity comes from the JWT `sub` claim **only** — never from the request body (D11).
+- **Auth**: every mutation endpoint is configured with a named policy (e.g. `Policies("TraderPolicy")`); the actor identity comes from the validated Entra JWT `oid` claim **only after `tid` validation** — never from the request body (D11).
 - **Atomic Transaction Guarantee**: Every write command executes within a single PostgreSQL transaction wrapping:
   1. Primary domain entity mutation (e.g. `INSERT INTO physical_deliveries ...`).
   2. Bi-Temporal audit log append (`INSERT INTO audit_log ...` with `valid_time` and `system_time`).
@@ -108,7 +108,7 @@
 
 ```csharp
 // Transactional execution contract — one PostgreSQL transaction per write command.
-// actorId is parsed from the JWT `sub` claim (D11) — never taken from the request body.
+// actorId is parsed from the validated Entra JWT `oid` claim (D11) — never taken from the request body.
 public async Task<CreatePhysicalDeliveryResponse> ExecuteAtomicDeliveryMutationAsync(
     CreatePhysicalDeliveryCommand cmd,
     Guid actorId,
@@ -410,7 +410,7 @@ public static IEndpointRouteBuilder MapTradebookHealthEndpoints(
 }
 ```
 
-Business endpoints use their own named policies (e.g. `Policies("TraderPolicy")`) and read the actor from the JWT `sub` claim only. The health routes are exactly `/health/live` and `/health/ready` — no other health route exists.
+Business endpoints use their own named policies (e.g. `Policies("TraderPolicy")`) and read the actor from the validated Entra JWT `oid` claim only after `tid` validation. The health routes are exactly `/health/live` and `/health/ready` — no other health route exists.
 
 ---
 
@@ -443,7 +443,7 @@ The matrix below maps every domain of the Tradebook platform to its functional r
 | Domain ID | Platform Domain | Functional Requirement | Target Behavior / Baseline | Automated Verification Command | Pass Criteria | Sentinel Audit Verification Step |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **SEC-01** | **Bi-Temporal Audit & Backups** | Append-only `audit_log`; nightly dump provably restorable | Restored per-table row counts match the source exactly | `./scripts/backup-restore-rehearsal.sh` | Script exits 0; any count mismatch fails | Run the §3.1 overlap query — zero overlapping `system_time` ranges |
-| **API-02** | **.NET 10 Backend** | FastEndpoints REPR slices in a standard JIT container (D7); JWT on business/realtime endpoints | Container builds and starts; anonymous probes green | `dotnet build src/Backend/Tradebook.sln -c Release` | Build succeeds; `/health/ready` returns 200 | Verify only health and login are anonymous; actor comes from JWT `sub` |
+| **API-02** | **.NET 10 Backend** | FastEndpoints REPR slices in a standard JIT container (D7); JWT on business/realtime endpoints | Container builds and starts; anonymous probes green | `dotnet build src/Backend/Tradebook.sln -c Release` | Build succeeds; `/health/ready` returns 200 | Verify only health and login are anonymous; actor comes from validated Entra `tid` + `oid` |
 | **MSG-03** | **Real-Time Push** | `OutboxDispatcher` (LISTEN `outbox_new_event`) -> `EntityChanged` fan-out; catch-up via `GET /api/v1/events?afterSequence=N` | At-least-once delivery with client dedup; catch-up pages complete and ordered | `dotnet test tests/Tradebook.IntegrationTests/Tradebook.IntegrationTests.csproj --filter "FullyQualifiedName~RealTime"` | Task 03 tests T1–T7 green | WebSocket trace shows binary MessagePack frames on `/hubs/dashboard` |
 | **ANA-04** | **Semantic Layer** | JSON AST -> `SemanticQueryCompiler` -> parameterized SQL (D4) | Identifier whitelist enforced; filter values parameterized (D11) | `dotnet test tests/Tradebook.UnitTests/Tradebook.UnitTests.csproj --filter "FullyQualifiedName~SemanticQueryCompiler"` | Injection attempts rejected; valid ASTs compile | Inspect generated SQL: zero interpolated user strings |
 | **UI-05** | **React 19 SPA** | Optimistic mutations with rollback; 409 conflict prompt (D5) | Latency recorded as data — no absolute render gate (D10) | `npx playwright test` (from `tests/e2e`) | Tier 1–3 specs green incl. the concurrent-edit 409 spec | Verify the conflict prompt shows server state; no silent overwrite |

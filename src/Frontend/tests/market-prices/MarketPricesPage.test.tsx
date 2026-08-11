@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MarketPricesPage } from '../../src/components/market-prices/MarketPricesPage';
 import { CommandStackProvider } from '../../src/lib/commands/CommandStackContext';
+import { queryKeys } from '../../src/lib/query/queryKeys';
 import { replaceAnimatedNumber } from '../helpers/animatedNumberInput';
 
 interface MarketPriceRow {
@@ -164,5 +165,25 @@ describe('MarketPricesPage list workspace', () => {
     expect(body.ttfEurMwh).toBe('44.4');
     expect(body.version).toBe(2);
     expect(screen.queryByRole('heading', { name: 'Update market price 2026-01-03' })).toBeTruthy();
+  });
+
+  it('preserves a dirty price draft and adopts its normalized successful value', async () => {
+    const price: MarketPriceRow = {
+      priceDate: '2026-01-03', ttfEurMwh: '33', euaEurMwh: '11', version: 2, createdAt: '2026-01-03T00:00:00Z',
+    };
+    stubMarketPricesApi([price]);
+    const queryClient = renderPage();
+    await screen.findByText('2026-01-03');
+    fireEvent.click(screen.getByRole('button', { name: 'Open market price 2026-01-03' }));
+    await changeAnimatedNumber('TTF EUR/MWh', '44.4');
+
+    const key = queryKeys.marketPrices.list({ page: 1, pageSize: 100 });
+    queryClient.setQueryData(key, responseWithRows([{ ...price, ttfEurMwh: '40', version: 3 }]));
+    await waitFor(() => expect((screen.getByRole('textbox', { name: 'TTF EUR/MWh' }) as HTMLElement).textContent).toContain('44.4'));
+    expect(screen.getByText('Unsaved')).toBeTruthy();
+
+    queryClient.setQueryData(key, responseWithRows([{ ...price, ttfEurMwh: '44.400000', version: 4 }]));
+    await waitFor(() => expect(screen.getByText('v4')).toBeTruthy());
+    expect(screen.queryByText('Unsaved')).toBeNull();
   });
 });

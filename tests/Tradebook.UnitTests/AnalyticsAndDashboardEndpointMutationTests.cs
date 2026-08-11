@@ -18,14 +18,26 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
     private static readonly string[] VolumeMeasures = ["volume_mwh"];
 
     [Fact]
+    public void AnalyticsWireValuesNormalizeOnlyDecimals()
+    {
+        var marker = new object();
+
+        Assert.Equal("1234.56", AnalyticsQueryRunner.NormalizeWireValue(1234.56m));
+        Assert.Same(marker, AnalyticsQueryRunner.NormalizeWireValue(marker));
+        Assert.Null(AnalyticsQueryRunner.NormalizeWireValue(null));
+    }
+
+    [Fact]
     public async Task AnalyticsSemanticValidationFailureReturns400WithoutOpeningPostgres()
     {
         var connections = new ThrowingConnectionFactory(
             new InvalidOperationException("Postgres must not be opened.")
         );
         var endpoint = Factory.Create<AnalyticsQueryEndpoint>(
-            new SemanticQueryCompiler(new SemanticModelLoader()),
-            connections
+            new AnalyticsQueryRunner(
+                new SemanticQueryCompiler(new SemanticModelLoader()),
+                connections
+            )
         );
         var query = new JsonQueryAst(
             "delivery_pnl_analytics",
@@ -42,6 +54,9 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         await endpoint.HandleAsync(query, default);
 
         Assert.Equal(400, endpoint.HttpContext.Response.StatusCode);
+        var failure = Assert.Single(endpoint.ValidationFailures);
+        Assert.Equal("GeneralErrors", failure.PropertyName);
+        Assert.Equal("Query selects no dimensions, measures or metrics.", failure.ErrorMessage);
         Assert.Equal(0, connections.OpenCalls);
     }
 
@@ -51,8 +66,10 @@ public sealed class AnalyticsAndDashboardEndpointMutationTests
         var marker = new InvalidOperationException("analytics-db-marker");
         var connections = new ThrowingConnectionFactory(marker);
         var endpoint = Factory.Create<AnalyticsQueryEndpoint>(
-            new SemanticQueryCompiler(new SemanticModelLoader()),
-            connections
+            new AnalyticsQueryRunner(
+                new SemanticQueryCompiler(new SemanticModelLoader()),
+                connections
+            )
         );
         using var cancellation = new CancellationTokenSource();
         var query = new JsonQueryAst(

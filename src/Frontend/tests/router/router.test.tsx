@@ -106,7 +106,7 @@ describe('production route tree', () => {
 
   it.each([
     '/deliveries', '/contracts', '/market-prices', '/dashboard', '/capacity-bookings', '/transfers',
-    '/biotickets', '/goo-certificates', '/tax-tariffs', '/hedges', '/workflow',
+    '/biotickets', '/goo-certificates', '/tax-tariffs', '/hedges', '/workflow', '/assistant',
   ])('deep-links to %s with the production route tree', routeChunkColdLoadTimeout, async (path) => {
     const router = await load(path, validSession);
     expect(router.state.location.pathname).toBe(path);
@@ -124,6 +124,7 @@ describe('production route tree', () => {
   it('accepts only whitelisted internal login return targets', () => {
     expect(validateInternalReturnPath('/dashboard?ignored=true')).toBe('/dashboard');
     expect(validateInternalReturnPath('/workflow')).toBe('/workflow');
+    expect(validateInternalReturnPath('/assistant')).toBe('/assistant');
     expect(validateInternalReturnPath('https://evil.example/deliveries')).toBeUndefined();
     expect(validateInternalReturnPath('//evil.example/deliveries')).toBeUndefined();
     expect(validateInternalReturnPath('/deliveries\\evil')).toBeUndefined();

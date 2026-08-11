@@ -66,4 +66,32 @@ public sealed class HistoryFilterNullabilityIntegrationTests(PostgresTestFixture
             .ConfigureAwait(true);
         Assert.NotNull(transfers);
     }
+
+    [Fact]
+    public async Task ExtremePageNumbersDoNotOverflowHistoryOffsets()
+    {
+        var connections = new NpgsqlConnectionFactory(
+            Options.Create(new DatabaseOptions { ConnectionString = Postgres.ConnectionString })
+        );
+        await using var configuredConnections = connections.ConfigureAwait(true);
+        var publisher = new RecordingTransactionalEventPublisher();
+
+        var contracts = await new ContractRepository(connections, publisher)
+            .GetHistoryAsync(
+                new GetContractHistoryRequest { Page = int.MaxValue, PageSize = int.MaxValue },
+                CancellationToken.None
+            )
+            .ConfigureAwait(true);
+        var deliveries = await new DeliveryRepository(connections, publisher)
+            .GetHistoryAsync(
+                new GetDeliveryHistoryRequest { Page = int.MaxValue, PageSize = int.MaxValue },
+                CancellationToken.None
+            )
+            .ConfigureAwait(true);
+
+        Assert.Empty(contracts.Items);
+        Assert.False(contracts.HasNextPage);
+        Assert.Empty(deliveries.Items);
+        Assert.False(deliveries.HasNextPage);
+    }
 }

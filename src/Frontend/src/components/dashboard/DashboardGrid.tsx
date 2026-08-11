@@ -1,5 +1,5 @@
 import { Responsive, WidthProvider, type Layout } from 'react-grid-layout';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentProps, ComponentType } from 'react';
 import type { DashboardSpecification, ThemeTokens } from '../../types/visualizations';
 import { ChartHost } from '../visualizations/ChartHost';
@@ -11,12 +11,34 @@ const DashboardResponsiveGrid = ResponsiveGrid as ComponentType<ComponentProps<t
   isResizable?: boolean;
   margin?: [number, number];
 }>;
-const light: ThemeTokens = { background: '#ffffff', textPrimary: '#29272d', textSecondary: '#7b7880', gridLine: '#efedf0', axisLine: '#d8d5db', seriesPalette: ['#6c63c8', '#8c84d6', '#b2ade3'], positive: '#3f9b70', negative: '#d26052', fontFamily: 'Instrument Sans Variable, system-ui' };
-const dark: ThemeTokens = { background: '#141416', textPrimary: '#f0eef1', textSecondary: '#96929b', gridLine: '#29282d', axisLine: '#3d3a42', seriesPalette: ['#9188df', '#68c695', '#dfa84f'], positive: '#68c695', negative: '#ed7569', fontFamily: 'Instrument Sans Variable, system-ui' };
 
-function dashboardTheme(theme: DashboardSpecification['theme'], systemDark: boolean): ThemeTokens {
-  const darkMode = theme === 'DARK' || (theme === 'SYSTEM' && systemDark);
-  return darkMode ? dark : light;
+function resolveColor(scope: HTMLElement, variable: string): string {
+  const view = scope.ownerDocument.defaultView;
+  if (!view) return '';
+  const probe = scope.ownerDocument.createElement('span');
+  probe.style.color = `var(${variable})`;
+  probe.style.display = 'none';
+  scope.appendChild(probe);
+  const resolved = view.getComputedStyle(probe).color;
+  probe.remove();
+  return resolved && !resolved.startsWith('var(')
+    ? resolved
+    : view.getComputedStyle(scope).getPropertyValue(variable).trim();
+}
+
+export function resolveDashboardThemeTokens(scope: HTMLElement): ThemeTokens {
+  const styles = scope.ownerDocument.defaultView?.getComputedStyle(scope);
+  return {
+    background: resolveColor(scope, '--surface-raised'),
+    textPrimary: resolveColor(scope, '--foreground'),
+    textSecondary: resolveColor(scope, '--muted-foreground'),
+    gridLine: resolveColor(scope, '--border'),
+    axisLine: resolveColor(scope, '--border-strong'),
+    seriesPalette: [resolveColor(scope, '--accent-500'), resolveColor(scope, '--buy-500'), resolveColor(scope, '--warn-500')],
+    positive: resolveColor(scope, '--buy-500'),
+    negative: resolveColor(scope, '--sell-500'),
+    fontFamily: styles?.fontFamily || 'system-ui',
+  };
 }
 
 function useSystemDarkMode(enabled: boolean): boolean {
@@ -41,26 +63,33 @@ function useSystemDarkMode(enabled: boolean): boolean {
 
 export function DashboardGrid({ dashboard, onChange, editable = false }: { dashboard: DashboardSpecification; onChange: (dashboard: DashboardSpecification) => void; editable?: boolean }) {
   const systemDark = useSystemDarkMode(dashboard.theme === 'SYSTEM');
+  const themeScope = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useState<ThemeTokens>();
   const layout: Layout[] = dashboard.gridLayout.items.map((item) => ({ i: item.widgetId, x: item.x, y: item.y, w: item.w, h: item.h, minW: item.minW, minH: item.minH, static: item.static }));
   const updateLayout = (next: Layout[]) => {
     const currentById = new Map(dashboard.gridLayout.items.map((item) => [item.widgetId, item]));
     const items = next.map((item) => ({ ...currentById.get(item.i), widgetId: item.i, x: item.x, y: item.y, w: item.w, h: item.h }));
     if (JSON.stringify(items) !== JSON.stringify(dashboard.gridLayout.items)) onChange({ ...dashboard, gridLayout: { ...dashboard.gridLayout, items } });
   };
-  const theme = dashboardTheme(dashboard.theme, systemDark);
-  return <DashboardResponsiveGrid
-    data-testid="dashboard-grid"
-    className="grid"
-    layouts={{ lg: layout }}
-    breakpoints={{ lg: 1200, md: 996, sm: 768 }}
-    cols={{ lg: dashboard.gridLayout.columns, md: dashboard.gridLayout.columns, sm: dashboard.gridLayout.columns }}
-    rowHeight={dashboard.gridLayout.rowHeight}
-    margin={[0, 0]}
-    containerPadding={[0, 0]}
-    isDraggable={editable}
-    isResizable={editable}
-    onLayoutChange={updateLayout}
-  >
-    {dashboard.widgets.map((widget) => <div key={widget.id} data-widget-type={widget.chartType} data-editable={editable || undefined}><ChartHost widget={widget} theme={theme} refreshRateMs={dashboard.refreshRateMs} /></div>)}
-  </DashboardResponsiveGrid>;
+  const themeClass = dashboard.theme === 'SYSTEM' ? undefined : dashboard.theme.toLowerCase();
+  useLayoutEffect(() => {
+    if (themeScope.current) setTheme(resolveDashboardThemeTokens(themeScope.current));
+  }, [dashboard.theme, systemDark]);
+  return <div ref={themeScope} className={themeClass} data-slot="dashboard-theme-scope" data-dashboard-theme={dashboard.theme.toLowerCase()}>
+    <DashboardResponsiveGrid
+      data-testid="dashboard-grid"
+      className="dashboard-grid"
+      layouts={{ lg: layout }}
+      breakpoints={{ lg: 1200, md: 996, sm: 768 }}
+      cols={{ lg: dashboard.gridLayout.columns, md: dashboard.gridLayout.columns, sm: dashboard.gridLayout.columns }}
+      rowHeight={dashboard.gridLayout.rowHeight}
+      margin={[12, 12]}
+      containerPadding={[12, 12]}
+      isDraggable={editable}
+      isResizable={editable}
+      onLayoutChange={updateLayout}
+    >
+      {dashboard.widgets.map((widget) => <div key={widget.id} data-widget-type={widget.chartType} data-editable={editable || undefined}><ChartHost widget={widget} theme={theme} refreshRateMs={dashboard.refreshRateMs} /></div>)}
+    </DashboardResponsiveGrid>
+  </div>;
 }

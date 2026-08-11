@@ -9,10 +9,17 @@ export function MotionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const root = document.documentElement;
-    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    root.classList.toggle('dark', theme === 'dark' || (theme === 'system' && systemDark));
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => root.classList.toggle('dark', theme === 'dark' || (theme === 'system' && systemTheme.matches));
+    applyTheme();
+    if (theme === 'system') systemTheme.addEventListener?.('change', applyTheme);
+    return () => systemTheme.removeEventListener?.('change', applyTheme);
+  }, [theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
     root.classList.toggle('reduce-motion', reduceMotion);
-  }, [reduceMotion, theme]);
+  }, [reduceMotion]);
 
   return (
     <LazyMotion features={domAnimation} strict>

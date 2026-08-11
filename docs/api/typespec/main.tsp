@@ -115,9 +115,63 @@ model DashboardPayload { dashboardId: string; version: int64; layout: unknown; }
   @put @route("/{dashboardId}") save(@path dashboardId: string, @body request: DashboardPayload): ApiResult<DashboardPayload>;
 }
 
-model TimeDimensionQuery { dimension: string; granularity: string; dateRange?: string[] | null; }
-model FilterQuery { member: string; operator: string; values: unknown[]; }
-model SortQuery { member: string; direction: string; }
-model JsonQueryAst { modelName: string; measures?: string[] | null; metrics?: string[] | null; dimensions?: string[] | null; timeDimensions?: TimeDimensionQuery[] | null; filters?: FilterQuery[] | null; sorts?: SortQuery[] | null; limit?: int32 | null; offset?: int32 | null; }
+@maxLength(128)
+scalar QueryIdentifier extends string;
+
+@maxItems(64)
+model QuerySelectedMemberList is Array<QueryIdentifier>;
+
+@maxLength(1024)
+scalar QueryStringFilterValue extends string;
+
+union QueryFilterValue {
+  stringValue: QueryStringFilterValue,
+  numberValue: float64,
+  booleanValue: boolean,
+}
+
+@maxItems(256)
+model QueryFilterValueList is Array<QueryFilterValue>;
+
+model TimeDimensionQuery {
+  dimension: QueryIdentifier;
+  granularity: QueryIdentifier;
+  dateRange?: QueryStringFilterValue[] | null;
+}
+
+@maxItems(16)
+model QueryTimeDimensionList is Array<TimeDimensionQuery>;
+
+model FilterQuery {
+  member: QueryIdentifier;
+  operator: string;
+  values: QueryFilterValueList;
+}
+
+@maxItems(64)
+model QueryFilterList is Array<FilterQuery>;
+
+model SortQuery {
+  member: QueryIdentifier;
+  direction: QueryIdentifier;
+}
+
+@maxItems(16)
+model QuerySortList is Array<SortQuery>;
+
+model JsonQueryAst {
+  modelName: QueryIdentifier;
+  measures?: QuerySelectedMemberList | null;
+  metrics?: QuerySelectedMemberList | null;
+  dimensions?: QuerySelectedMemberList | null;
+  timeDimensions?: QueryTimeDimensionList | null;
+  filters?: QueryFilterList | null;
+  sorts?: QuerySortList | null;
+  limit?: int32 | null;
+  offset?: int32 | null;
+}
 model AnalyticsQueryResponse { columns: string[]; rows: unknown[][]; }
 @route("/api/v1/analytics/query") interface Analytics { @post query(@body request: JsonQueryAst): ApiResult<AnalyticsQueryResponse>; }
+
+model InAppAgentStatusResponse { enabled: boolean; readOnly: boolean; transport: string; runPath: string; }
+@route("/api/v1/agent/status") interface Agent { @get status(): ApiResult<InAppAgentStatusResponse>; }

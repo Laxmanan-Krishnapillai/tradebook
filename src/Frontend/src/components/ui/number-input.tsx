@@ -8,6 +8,7 @@ export interface NumberInputProps {
   autoFocus?: boolean;
   className?: string;
   decimalScale?: number;
+  focusOnMount?: boolean;
   id?: string;
   max?: number | string;
   maxLength?: number;
@@ -31,6 +32,7 @@ export function NumberInput({
   'aria-invalid': ariaInvalid,
   'aria-label': ariaLabel,
   className,
+  focusOnMount,
   max,
   min,
   onBlur,
@@ -53,6 +55,10 @@ export function NumberInput({
     if (ariaInvalid !== undefined) editor.setAttribute('aria-invalid', String(ariaInvalid));
     else editor.removeAttribute('aria-invalid');
   }, [ariaDescribedBy, ariaInvalid, ariaLabel]);
+
+  useEffect(() => {
+    if (focusOnMount) editorRef.current?.focus({ preventScroll: true });
+  }, [focusOnMount]);
 
   const numericMin = min === undefined ? undefined : Number(min);
   const numericMax = max === undefined ? undefined : Number(max);

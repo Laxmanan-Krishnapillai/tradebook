@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DeliveriesPage } from '../../src/components/deliveries/DeliveriesPage';
 import { CommandStackProvider } from '../../src/lib/commands/CommandStackContext';
+import { queryKeys } from '../../src/lib/query/queryKeys';
 import { useUiStore } from '../../src/lib/state/useUiStore';
 import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/types.gen';
 import { replaceAnimatedNumber } from '../helpers/animatedNumberInput';
@@ -204,6 +205,37 @@ describe('DeliveriesPage interactions', () => {
     const [, deleteInit] = fetchMock.mock.calls.find(([, request]) => request?.method === 'DELETE')!;
     const deletedBody = JSON.parse(String(deleteInit?.body)) as Record<string, unknown>;
     expect(deletedBody).toMatchObject({ reason: 'Cancelled from Tradebook UI' });
+    queryClient.clear();
+  });
+
+  it('does not overwrite a dirty delivery draft when history refreshes', async () => {
+    stubDeliveriesApi();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CommandStackProvider>
+          <DeliveriesPage />
+        </CommandStackProvider>
+      </QueryClientProvider>,
+    );
+    const row = await screen.findByText('INST-ALPHA').then((node) => node.closest('tr'));
+    fireEvent.click(row!);
+    await changeAnimatedNumber('Volume realised MWh', '99');
+
+    queryClient.setQueryData(queryKeys.deliveries.list({ page: 1, pageSize: 100 }), {
+      items: [{ ...sampleDeliveries[0], volumeRealisedMwh: '88', version: 5 }, sampleDeliveries[1]],
+      totalCount: 2, page: 1, pageSize: 100, hasNextPage: false,
+    });
+
+    await waitFor(() => expect((screen.getByRole('textbox', { name: 'Volume realised MWh' }) as HTMLElement).textContent).toContain('99'));
+    expect(screen.getByText('Review and save your changes.')).toBeTruthy();
+
+    queryClient.setQueryData(queryKeys.deliveries.list({ page: 1, pageSize: 100 }), {
+      items: [{ ...sampleDeliveries[0], volumeRealisedMwh: '99.000000', version: 6 }, sampleDeliveries[1]],
+      totalCount: 2, page: 1, pageSize: 100, hasNextPage: false,
+    });
+    await waitFor(() => expect(screen.getByText('v6')).toBeTruthy());
+    expect(screen.queryByText('Unsaved')).toBeNull();
     queryClient.clear();
   });
 });

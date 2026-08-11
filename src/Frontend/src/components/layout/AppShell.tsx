@@ -23,6 +23,7 @@ const recordNavigation = [
 const workspaceNavigation = [
   ["/dashboard", "Dashboard"],
   ['/workflow', 'Workflow'],
+  ['/assistant', 'Assistant'],
 ] as const satisfies readonly (readonly [AuthenticatedRoutePath, string])[];
 
 const selectorSpring = { bounce: 0.05, duration: 0.25, type: 'spring' } as const;

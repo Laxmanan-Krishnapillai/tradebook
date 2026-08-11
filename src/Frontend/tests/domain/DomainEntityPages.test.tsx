@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CapacityBookingsPage } from '../../src/components/domain/DomainEntityPages';
 import { CommandStackProvider } from '../../src/lib/commands/CommandStackContext';
 import type { CapacityBookingDetailsDto } from '../../src/api/generated/types.gen';
+import { queryKeys } from '../../src/lib/query/queryKeys';
 
 interface PageResponse<T> {
   items: T[];
@@ -104,8 +105,9 @@ describe('CapacityBookingsPage domain workspace', () => {
     renderPage();
     await screen.findByText('2 records');
     fireEvent.click(screen.getByRole('button', { name: 'Open Capacity bookings Instance-Alpha' }));
-    expect(screen.getByRole('heading', { name: 'Capacity bookings Instance-Alpha' })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Start area'), { target: { value: 'NO1' } });
+    const dialog = screen.getByRole('heading', { name: 'Capacity bookings Instance-Alpha' }).closest<HTMLElement>('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+    fireEvent.change(within(dialog!).getByLabelText('Start area'), { target: { value: 'NO1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => (init?.method ?? 'GET').toUpperCase() === 'PUT')).toBe(true));
     const [saveUrl, saveInit] = fetchMock.mock.calls.find(([, request]) => (request?.method ?? 'GET').toUpperCase() === 'PUT')!;
@@ -125,12 +127,38 @@ describe('CapacityBookingsPage domain workspace', () => {
     await screen.findByText('2 records');
 
     expect(screen.getAllByTitle('Month is read-only').length).toBe(2);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit Start area' })[0]);
-    fireEvent.change(screen.getByLabelText('Start area'), { target: { value: 'NO2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Start area' }));
+    const startArea = screen.getAllByRole('textbox', { name: 'Start area' })[0];
+    fireEvent.click(startArea);
+    fireEvent.change(startArea, { target: { value: 'NO2' } });
+    fireEvent.keyDown(startArea, { key: 'Enter' });
 
     await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => (init?.method ?? 'GET').toUpperCase() === 'PUT')).toBe(true));
     const [, saveInit] = fetchMock.mock.calls.find(([, init]) => (init?.method ?? 'GET').toUpperCase() === 'PUT')!;
     expect(parseRequestBody(saveInit).startArea).toBe('NO2');
+  });
+
+  it('preserves a dirty generic detail draft across refreshes and adopts its matching result', async () => {
+    stubCapacityApi(rows);
+    const queryClient = renderPage();
+    await screen.findByText('2 records');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Capacity bookings Instance-Alpha' }));
+    const dialog = screen.getByRole('heading', { name: 'Capacity bookings Instance-Alpha' }).closest<HTMLElement>('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+    fireEvent.change(within(dialog!).getByLabelText('Start area'), { target: { value: 'NO1' } });
+
+    const key = queryKeys.capacityBookings.list({ page: 1, pageSize: 100 });
+    queryClient.setQueryData(key, {
+      items: [{ ...rows[0], startArea: 'REMOTE', version: 2 }, rows[1]],
+      totalCount: 2, page: 1, pageSize: 100, hasNextPage: false,
+    });
+    await waitFor(() => expect((within(dialog!).getByLabelText('Start area') as HTMLInputElement).value).toBe('NO1'));
+    expect(screen.getByText('Unsaved')).toBeTruthy();
+
+    queryClient.setQueryData(key, {
+      items: [{ ...rows[0], startArea: 'NO1', version: 3 }, rows[1]],
+      totalCount: 2, page: 1, pageSize: 100, hasNextPage: false,
+    });
+    await waitFor(() => expect(screen.getByText('v3')).toBeTruthy());
+    expect(screen.queryByText('Unsaved')).toBeNull();
   });
 });

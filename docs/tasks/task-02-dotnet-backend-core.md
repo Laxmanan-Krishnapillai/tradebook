@@ -1277,7 +1277,7 @@ app.Run();
 | `BackOfficePolicy` | `BackOffice`, `Admin` | Corrections, soft deletes, invoice-status transitions |
 | `AdminPolicy` | `Admin` | Reference-data upserts (market prices, tax tariffs), user administration |
 
-**Actor identity**: every repository call takes an `actorId` resolved from the JWT `sub` claim on `HttpContext.User` — never from a request DTO or body. `set_config('app.actor_id', ...)` (§3.3) is always fed this claim value so the Task 01 audit trigger records the authenticated user. Request DTOs MUST NOT contain actor/company identity fields.
+**Actor identity**: every repository call takes an `actorId` resolved from the Entra JWT `oid` claim on `HttpContext.User` only after `tid` validation — never from a request DTO or body. `set_config('app.actor_id', ...)` (§3.3) is always fed this claim value so the Task 01 audit trigger records the authenticated user. Request DTOs MUST NOT contain actor/company identity fields.
 
 ---
 
@@ -1338,7 +1338,7 @@ To execute Task 02 without errors or contract drift, subagents must perform the 
 | HTTP Method | Route Path | Request DTO | Response DTO | Auth Policy | Status Codes | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **POST** | `/api/v1/auth/login` | `LoginRequest` | `LoginResponse` | anonymous (sole API exception, §3.8) | 200, 400, 401 | Verifies credentials against the `users` table; issues JWT with `sub` + role claims. |
-| **POST** | `/api/v1/deliveries` | `CreatePhysicalDeliveryRequest` | `CreatePhysicalDeliveryResponse` | `TraderPolicy` | 201, 400, 401, 403, 500 | Creates delivery record; `app.actor_id` set from the JWT `sub` claim so the bi-temporal audit trigger writes `audit_log`; outbox event enqueued atomically. |
+| **POST** | `/api/v1/deliveries` | `CreatePhysicalDeliveryRequest` | `CreatePhysicalDeliveryResponse` | `TraderPolicy` | 201, 400, 401, 403, 500 | Creates delivery record; `app.actor_id` set from the validated Entra JWT `oid` claim so the bi-temporal audit trigger writes `audit_log`; outbox event enqueued atomically. |
 | **GET** | `/api/v1/deliveries` | `GetDeliveryHistoryRequest` | `GetDeliveryHistoryResponse` | `ReadPolicy` | 200, 400, 401 | Paginated Dapper history query with contract, instance, book type, status, and month filters. |
 | **GET** | `/api/v1/deliveries/{deliveryId}` | Route Params | `PhysicalDeliveryDetailsDto` | `ReadPolicy` | 200, 401, 404 | `HybridCache`-backed delivery lookup. |
 | **PUT** | `/api/v1/deliveries/{deliveryId}` | `UpdatePhysicalDeliveryRequest` | `PhysicalDeliveryDetailsDto` | `TraderPolicy` | 200, 401, 403, 404, 409 | Version-checked atomic update (`WHERE id = $id AND version = $expected`); zero rows → HTTP 409 returning the current server state. |
@@ -1446,7 +1446,7 @@ dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj -c Release
 ### 7.2 Acceptance Criteria Checklist
 - [ ] `dotnet build src/Backend/Tradebook.sln` completes with zero warnings and zero errors.
 - [ ] Unauthenticated requests to any `/api/v1/*` route except `/api/v1/auth/login` return 401; `/health/live` and `/health/ready` are the only anonymous non-login routes (D11).
-- [ ] `CreatePhysicalDeliveryEndpoint` executes an atomic PostgreSQL transaction inserting into `physical_deliveries`, writing `audit_log` via the generic bi-temporal trigger (`app.actor_id` sourced from the JWT `sub` claim), and inserting into `outbox_events` (`aggregate_type = 'PhysicalDelivery'`) in the same transaction.
+- [ ] `CreatePhysicalDeliveryEndpoint` executes an atomic PostgreSQL transaction inserting into `physical_deliveries`, writing `audit_log` via the generic bi-temporal trigger (`app.actor_id` sourced from the validated Entra JWT `oid` claim), and inserting into `outbox_events` (`aggregate_type = 'PhysicalDelivery'`) in the same transaction.
 - [ ] `UpdatePhysicalDeliveryEndpoint` enforces `version`-checked optimistic concurrency; a stale version returns HTTP 409 carrying the current server state.
 - [ ] `DeletePhysicalDeliveryEndpoint` performs a soft delete (status transition + outbox event); no physical row deletion occurs.
 - [ ] `GetDeliveryByIdEndpoint` serves repeat reads from `HybridCache`, verified by a query-count assertion (no latency gate — D10).

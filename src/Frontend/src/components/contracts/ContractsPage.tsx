@@ -11,6 +11,8 @@ import type {
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
+import { changedFields, shouldAdoptRefreshedDraft } from "../../lib/editor/detailDraftPolicy";
+import { clearMutationConflictForEntity } from "../../lib/mutations/mutationCoordinator";
 import {
   useCreateContract,
   useDeleteContract,
@@ -170,24 +172,7 @@ function draftToChanges(contract: ContractDetailsDto, draft: ContractPanelDraft)
 }
 
 function hasUnsavedChanges(contract: ContractDetailsDto, draft: ContractPanelDraft): boolean {
-  return (
-    draft.contractName !== (contract.contractName ?? '') ||
-    draft.counterpartyId !== (contract.counterpartyId ?? '') ||
-    draft.productType !== (contract.productType ?? '') ||
-    draft.action !== (contract.action ?? '') ||
-    draft.companyShorthand !== (contract.companyShorthand ?? '') ||
-    draft.countryCode !== (contract.countryCode ?? '') ||
-    draft.countryDialCode !== (contract.countryDialCode == null ? '' : String(contract.countryDialCode)) ||
-    draft.sourcingCenter !== (contract.sourcingCenter ?? '') ||
-    draft.salesCenter !== (contract.salesCenter ?? '') ||
-    draft.balancingGroup !== (contract.balancingGroup ?? '') ||
-    draft.gooQuality !== (contract.gooQuality ?? '') ||
-    draft.subsidyStatus !== (contract.subsidyStatus ?? '') ||
-    draft.priceMechanismGas !== (contract.priceMechanismGas ?? '') ||
-    draft.fixedPriceGasEurMwh !== (contract.fixedPriceGasEurMwh ?? '') ||
-    draft.contractType !== (contract.contractType ?? '') ||
-    draft.comment !== (contract.comment ?? '')
-  );
+  return changedFields(toDraft(contract), draft).length > 0;
 }
 
 export function ContractsPage() {
@@ -234,19 +219,25 @@ export function ContractsPage() {
   const totalCount = history.data?.totalCount ?? 0;
 
   useEffect(() => {
-    if (!activeContract) return;
+    if (!activeContract || !panelContractDraft) return;
     const refreshed = contracts.find((contract) => contract.contractId === activeContract.contractId);
     if (!refreshed) return;
+    if (!shouldAdoptRefreshedDraft({
+      activeVersion: activeContract.version,
+      refreshedVersion: refreshed.version,
+      dirty: hasUnsavedChanges(activeContract, panelContractDraft),
+      refreshedMatchesDraft: !hasUnsavedChanges(refreshed, panelContractDraft),
+    })) return;
     setActiveContract(refreshed);
     setPanelContractDraft(toDraft(refreshed));
-  }, [activeContract, contracts]);
+  }, [activeContract, contracts, panelContractDraft]);
 
   const save = useCallback(
     async (contract: ContractDetailsDto, changes: ContractChanges) => {
       setError("");
-      attempted.current = changes;
       let version = contract.version;
       const before = currentChanges(contract);
+      const intent = changedFields(before, changes);
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Update ${contract.contractName}`,
@@ -258,6 +249,7 @@ export function ContractsPage() {
               id: contract.contractId,
               version,
               changes,
+              intent,
             } satisfies EntityUpdateVariables<ContractChanges>)
           ).version;
         },
@@ -268,6 +260,7 @@ export function ContractsPage() {
               id: contract.contractId,
               version,
               changes: before,
+              intent,
             })
           ).version;
         },
@@ -284,7 +277,6 @@ export function ContractsPage() {
   const deactivate = useCallback(
     async (contract: ContractDetailsDto) => {
       const reason = "Deactivated from Tradebook UI";
-      attempted.current = { reason };
       let version = contract.version;
       const restore = { ...currentChanges(contract), isActive: true };
       const command: Command = {
@@ -311,6 +303,7 @@ export function ContractsPage() {
               id: contract.contractId,
               version,
               changes: restore,
+              intent: ['isActive'],
             })
           ).version;
         },
@@ -367,7 +360,6 @@ export function ContractsPage() {
 
   const submitCreate = async (validatedRequest: CreateContractRequest) => {
     setError("");
-    attempted.current = validatedRequest;
     try {
       const request = { ...validatedRequest };
       let created: ContractDetailsDto | undefined;
@@ -575,7 +567,10 @@ export function ContractsPage() {
             entityId={conflict.id}
             serverState={conflict.serverState}
             attemptedChanges={conflict.attempted}
-            onClose={() => setConflict(undefined)}
+            onClose={() => {
+              clearMutationConflictForEntity(conflict.id);
+              setConflict(undefined);
+            }}
           />
         </div>
       )}

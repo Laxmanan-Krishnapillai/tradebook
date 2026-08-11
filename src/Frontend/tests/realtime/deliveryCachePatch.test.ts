@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { PhysicalDeliveryDetailsDto } from '../../src/api/generated/types.gen';
 import { reconcileRealtimeEvent } from '../../src/hooks/useRealtimeQuerySync';
 import { ApiError } from '../../src/lib/api/client';
+import { acquireMutationScope, mutationScopeKey } from '../../src/lib/mutations/mutationCoordinator';
 import { queryKeys } from '../../src/lib/query/queryKeys';
+import { getAuthSessionIdentity } from '../../src/lib/state/useAuthStore';
 
 const event = { eventId: 'event', sequenceId: 2, aggregateType: 'PhysicalDelivery', aggregateId: 'delivery', eventType: 'Updated', payloadJson: JSON.stringify({ aggregateId: 'delivery', version: 3 }) };
 const canonical = { deliveryId: 'delivery', contractId: 'contract', contractInstanceId: 'contract-1-2026', bookType: 'Sales', supplyMonth: '2026-01-01', status: 'Cancelled', version: 3, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' } as PhysicalDeliveryDetailsDto;
@@ -27,6 +29,37 @@ describe('realtime cache reconciliation', () => {
     await reconcileRealtimeEvent(client, event, loader);
     expect(loader).not.toHaveBeenCalled();
     expect(client.getQueryData<{ items: PhysicalDeliveryDetailsDto[] }>(key)?.items[0].version).toBe(4);
+  });
+
+  it('does not regress a newer detail cache when a canonical load completes late', async () => {
+    const client = new QueryClient();
+    const newer = { ...canonical, status: 'Completed - Payment Received/Sent', version: 4 };
+    client.setQueryData(queryKeys.deliveries.detail(canonical.deliveryId), newer);
+    const loader = vi.fn(async () => canonical);
+
+    await reconcileRealtimeEvent(
+      client,
+      { ...event, payloadJson: JSON.stringify({ version: 5 }) },
+      loader,
+    );
+
+    expect(loader).toHaveBeenCalledOnce();
+    expect(client.getQueryData(queryKeys.deliveries.detail(canonical.deliveryId))).toEqual(newer);
+  });
+
+  it('waits for a pending mutation of the same delivery before reconciling realtime state', async () => {
+    const client = new QueryClient();
+    const scopeKey = mutationScopeKey(queryKeys.deliveries.all, getAuthSessionIdentity(), canonical.deliveryId);
+    const releaseMutation = await acquireMutationScope(scopeKey);
+    const loader = vi.fn(async () => canonical);
+
+    const reconciliation = reconcileRealtimeEvent(client, event, loader);
+    await Promise.resolve();
+    expect(loader).not.toHaveBeenCalled();
+
+    releaseMutation();
+    await reconciliation;
+    expect(loader).toHaveBeenCalledOnce();
   });
 
   it('invalidates the matching domain and analytics caches for non-delivery events', async () => {

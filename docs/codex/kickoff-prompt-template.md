@@ -8,7 +8,7 @@ GOAL
 
 CONTEXT (binding repo rules — see AGENTS.md)
 - JWT auth on every endpoint except /health/live, /health/ready, and POST
-  /api/v1/auth/login. Derive the actor from the JWT `sub` claim only.
+  /api/v1/auth/login. Derive the actor from the validated Entra JWT `oid` claim only after checking `tid`.
 - Bind SQL values as parameters and whitelist every dynamic identifier.
 - Never hand-edit src/Frontend/src/api/generated/. Change C# DTOs and regenerate.
 - Integration tests use PostgreSQL 17 via Testcontainers with Respawn; derive from

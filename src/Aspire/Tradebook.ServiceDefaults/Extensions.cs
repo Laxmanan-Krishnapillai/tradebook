@@ -42,6 +42,7 @@ public static class Extensions
             .Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
                 metrics
+                    .AddMeter("Npgsql")
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation()

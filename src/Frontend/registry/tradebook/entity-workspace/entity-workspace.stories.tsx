@@ -3,7 +3,7 @@ import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useEffect, useMemo } from 'react';
 import { tokenProvider } from '../../../src/lib/auth/tokenProvider';
-import type { GetDeliveryHistoryResponse, PhysicalDeliveryDetailsDto, UpdateDeliveryRequest, CreatePhysicalDeliveryRequest } from '../../../src/api/generated/types.gen';
+import type { CreatePhysicalDeliveryRequest, GetDeliveryHistoryResponse, PhysicalDeliveryDetailsDto, UpdatePhysicalDeliveryRequest } from '../../../src/api/generated/types.gen';
 import { queryKeys } from '../../../src/lib/query/queryKeys';
 import { createAppRouter } from '../../../src/app/router';
 
@@ -155,11 +155,15 @@ function createMockFetch() {
       if (method === 'PUT') {
         const targetId = pathname.split('/').at(-1);
         if (!targetId) return response({}, 404);
-        const request = JSON.parse(String(init.body ?? '{}')) as UpdateDeliveryRequest;
+        const request = JSON.parse(String(init.body ?? '{}')) as UpdatePhysicalDeliveryRequest;
         const target = byId(targetId);
         if (!target) return response({}, 404);
+        const changes = {
+          ...(request.volumeRealisedMwh !== undefined ? { volumeRealisedMwh: request.volumeRealisedMwh } : {}),
+          ...(request.status !== undefined ? { status: request.status } : {}),
+        };
         rows = rows.map((row) =>
-          row.deliveryId === targetId ? { ...row, ...request.changes, version: row.version + 1 } : row,
+          row.deliveryId === targetId ? { ...row, ...changes, version: row.version + 1 } : row,
         );
         const updated = byId(targetId) ?? target;
         return response(updated);

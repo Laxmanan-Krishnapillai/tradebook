@@ -681,6 +681,11 @@ public sealed class ToolingConfigurationTests
         AddTask17Versions(versions);
         AddTask21Versions(versions);
         Assert.True(
+            versions.TryAdd("ModelContextProtocol.AspNetCore", "2.1.0"),
+            "Task 25 MCP package must have exactly one central package pin."
+        );
+        AddTask26Versions(versions);
+        Assert.True(
             versions.TryAdd("Bogus", "35.6.5"),
             "Bogus must have exactly one central package pin."
         );
@@ -967,6 +972,25 @@ public sealed class ToolingConfigurationTests
             Assert.True(
                 versions.TryAdd(package.Key, package.Value),
                 $"Task 21 package '{package.Key}' duplicates an existing central pin."
+            );
+        }
+    }
+
+    private static void AddTask26Versions(Dictionary<string, string> versions)
+    {
+        var task26Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Azure.AI.OpenAI"] = "2.9.0-beta.1",
+            ["Azure.Identity"] = "1.21.0",
+            ["Microsoft.Agents.AI"] = "1.17.0",
+            ["Microsoft.Agents.AI.Hosting.AGUI.AspNetCore"] = "1.17.0-preview.260804.1",
+            ["Microsoft.Agents.AI.OpenAI"] = "1.17.0",
+        };
+        foreach (var package in task26Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"Task 26 package '{package.Key}' must have exactly one central package pin."
             );
         }
     }

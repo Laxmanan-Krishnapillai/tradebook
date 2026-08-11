@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Tradebook.Api.Features.Agent;
 using Tradebook.Api.Features.Analytics;
 using Tradebook.Core.Analytics;
 using Tradebook.Core.Domain.ValueObjects.Ids;
@@ -70,6 +71,7 @@ namespace Tradebook.Api;
 [JsonSerializable(typeof(GetEventsSinceResponse))]
 [JsonSerializable(typeof(JsonQueryAst))]
 [JsonSerializable(typeof(AnalyticsQueryResponse))]
+[JsonSerializable(typeof(InAppAgentStatusResponse))]
 [JsonSerializable(typeof(ActivityEntryDto))]
 [JsonSerializable(typeof(GetActivityResponse))]
 [JsonSerializable(typeof(SaveDashboardRequest))]

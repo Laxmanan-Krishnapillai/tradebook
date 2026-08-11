@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import type { GetMarketPriceHistoryResponse } from "../../api/generated/types.gen";
 import type { MarketPriceDetailsDto } from "../../api/generated/types.gen";
@@ -8,6 +8,8 @@ import type { UpsertMarketPriceRequest } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
+import { changedFields, draftValuesEquivalent, shouldAdoptRefreshedDraft } from "../../lib/editor/detailDraftPolicy";
+import { clearMutationConflictForEntity } from "../../lib/mutations/mutationCoordinator";
 import {
     useDeleteMarketPrice,
     useUpsertMarketPrice,
@@ -175,6 +177,27 @@ export function MarketPricesPage() {
     );
     const totalCount = history.data?.totalCount ?? 0;
 
+    useEffect(() => {
+        if (!activePrice || !activeRequest) return;
+        const refreshed = prices.find((price) => price.priceDate === activePrice.priceDate);
+        if (!refreshed) return;
+        const activeValues = marketRecordToPriceRequest(activePrice, activePrice.ttfEurMwh ?? "0");
+        const refreshedValues = marketRecordToPriceRequest(refreshed, refreshed.ttfEurMwh ?? "0");
+        const valuesMatchDraft = (values: UpsertMarketPriceRequest) => marketPriceFields.every((field) => (
+            draftValuesEquivalent(values[field.key], activeRequest[field.key])
+        ));
+        const dirty = !valuesMatchDraft(activeValues);
+        const refreshedMatchesDraft = valuesMatchDraft(refreshedValues);
+        if (!shouldAdoptRefreshedDraft({
+            activeVersion: activePrice.version,
+            refreshedVersion: refreshed.version,
+            dirty,
+            refreshedMatchesDraft,
+        })) return;
+        setActivePrice(refreshed);
+        setActiveRequest(refreshedValues);
+    }, [activePrice, activeRequest, prices]);
+
     const openPricePanel = useCallback((price: MarketPriceDetailsDto) => {
         setActivePrice(price);
         setActiveRequest(
@@ -207,6 +230,7 @@ export function MarketPricesPage() {
                 price,
                 price.ttfEurMwh ?? "0",
             );
+            const intent = changedFields(before, request).filter((key) => key !== 'version');
             const command: Command = {
                 id: crypto.randomUUID(),
                 description: `Update market price ${price.priceDate}`,
@@ -217,13 +241,14 @@ export function MarketPricesPage() {
                         await upsertMutation.mutateAsync({
                             ...request,
                             version,
+                            intent,
                         })
                     ).version;
                 },
                 undo: async () => {
                     attempted.current = before;
                     version = (
-                        await upsertMutation.mutateAsync({ ...before, version })
+                        await upsertMutation.mutateAsync({ ...before, version, intent })
                     ).version;
                 },
             };
@@ -296,7 +321,7 @@ export function MarketPricesPage() {
             const edited = activeRequest;
             const current = edited[field.key as keyof UpsertMarketPriceRequest];
             const before = original[field.key as keyof UpsertMarketPriceRequest];
-            return current !== before;
+            return !draftValuesEquivalent(current, before);
         })
         : false;
 
@@ -652,7 +677,10 @@ export function MarketPricesPage() {
                         entityId={conflict.id}
                         serverState={conflict.serverState}
                         attemptedChanges={conflict.attempted}
-                        onClose={() => setConflict(undefined)}
+                        onClose={() => {
+                            clearMutationConflictForEntity(conflict.id);
+                            setConflict(undefined);
+                        }}
                     />
                 </div>
             )}

@@ -23,6 +23,8 @@ import type { UpdateTransferRequest } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
+import { changedFields, draftValuesEquivalent, shouldAdoptRefreshedDraft } from "../../lib/editor/detailDraftPolicy";
+import { clearMutationConflictForEntity } from "../../lib/mutations/mutationCoordinator";
 import { useContractOptions } from "../../lib/query/useContractOptions";
 import {
     domainQueryKeys,
@@ -361,18 +363,35 @@ function DomainCrudPage<
     const selectedCount = selectedRowIds.size;
 
     useEffect(() => {
-        if (!activeEntity || !activeId) return;
+        if (!activeEntity || !activeChanges || !activeId) return;
         const refreshed = entities.find(
             (entity) => props.idOf(entity) === activeId,
         );
-        if (!refreshed) {
-            setActiveEntity(undefined);
-            setActiveChanges(undefined);
-            return;
-        }
+        if (!refreshed) return;
+        const dirty = props.editFields.some(
+            (field) =>
+                !draftValuesEquivalent(
+                    fieldValue(activeChanges, field.key),
+                    fieldValue(props.changesFromEntity(activeEntity), field.key),
+                ),
+        );
+        const refreshedChanges = props.changesFromEntity(refreshed);
+        const refreshedMatchesDraft = props.editFields.every(
+            (field) =>
+                draftValuesEquivalent(
+                    fieldValue(activeChanges, field.key),
+                    fieldValue(refreshedChanges, field.key),
+                ),
+        );
+        if (!shouldAdoptRefreshedDraft({
+            activeVersion: activeEntity.version,
+            refreshedVersion: refreshed.version,
+            dirty,
+            refreshedMatchesDraft,
+        })) return;
         setActiveEntity(refreshed);
-        setActiveChanges(props.changesFromEntity(refreshed));
-    }, [activeEntity, activeId, entities, props]);
+        setActiveChanges(refreshedChanges);
+    }, [activeChanges, activeEntity, activeId, entities, props]);
 
     const openEntityPanel = useCallback(
         (entity: T) => {
@@ -416,6 +435,7 @@ function DomainCrudPage<
                 return;
             }
             const before = props.changesFromEntity(entity);
+            const intent = changedFields(before, changes);
             let current = entity;
             const command: Command = {
                 id: crypto.randomUUID(),
@@ -427,6 +447,7 @@ function DomainCrudPage<
                         id: props.idOf(current),
                         version: current.version,
                         changes,
+                        intent,
                     });
                 },
                 undo: async () => {
@@ -435,6 +456,7 @@ function DomainCrudPage<
                         id: props.idOf(current),
                         version: current.version,
                         changes: before,
+                        intent,
                     });
                 },
             };
@@ -478,6 +500,7 @@ function DomainCrudPage<
                               id: props.idOf(current),
                               version: current.version,
                               changes: restoreChanges,
+                              intent: props.editFields.map((field) => field.key) as (keyof TChanges)[],
                           })
                         : await props.createMutation.mutateAsync(
                               props.createFromEntity(entity),
@@ -515,6 +538,7 @@ function DomainCrudPage<
                         id: props.idOf(current),
                         version: current.version,
                         changes: before,
+                        intent: props.editFields.map((field) => field.key) as (keyof TChanges)[],
                     });
                 },
             };
@@ -672,8 +696,10 @@ function DomainCrudPage<
         if (!activeEntity || !activeChanges) return false;
         return props.editFields.some(
             (field) =>
-                fieldValue(activeChanges, field.key) !==
-                fieldValue(props.changesFromEntity(activeEntity), field.key),
+                !draftValuesEquivalent(
+                    fieldValue(activeChanges, field.key),
+                    fieldValue(props.changesFromEntity(activeEntity), field.key),
+                ),
         );
     }, [activeChanges, activeEntity, props]);
 
@@ -914,7 +940,10 @@ function DomainCrudPage<
                         entityId={props.feedback.conflict.id}
                         serverState={props.feedback.conflict.serverState}
                         attemptedChanges={props.feedback.conflict.attempted}
-                        onClose={() => props.feedback.setConflict(undefined)}
+                        onClose={() => {
+                            clearMutationConflictForEntity(props.feedback.conflict!.id);
+                            props.feedback.setConflict(undefined);
+                        }}
                     />
                 </div>
             )}

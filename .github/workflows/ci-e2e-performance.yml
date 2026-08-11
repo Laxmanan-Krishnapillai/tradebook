@@ -17,11 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           global-json-file: global.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '22', cache: npm, cache-dependency-path: tests/e2e/package-lock.json }
       - run: docker compose up -d --wait
       - run: psql "$DATABASE_URL" -f tests/e2e/seed/seed-100k-deliveries.sql
@@ -42,7 +42,7 @@ jobs:
         working-directory: tests/e2e
       - run: npx playwright test --grep-invert @nightly
         working-directory: tests/e2e
-      - uses: grafana/setup-k6-action@v1.2.1
+      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1.2.1
       - name: Authenticate k6
         run: |
           API_JWT=$(curl -fsS -H 'Content-Type: application/json' -d '{"username":"e2e-trader","password":"Tradebook-E2E-Only-2026!"}' http://127.0.0.1:5000/api/v1/auth/login | jq -r .accessToken)
@@ -70,7 +70,7 @@ jobs:
             echo 'Baseline placeholders retained until the documented D10 reference-machine recording.'
           fi
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: task-09-reports
           path: |
@@ -80,8 +80,8 @@ jobs:
   harness-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '22' }
       - run: node --test tests/performance/test/*.test.mjs
       - run: npm ci && npm run typecheck

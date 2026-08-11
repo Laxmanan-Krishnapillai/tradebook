@@ -114,8 +114,9 @@ export default tseslint.config(
       'boundaries/element-types': ['error', {
         default: 'disallow',
         rules: [
-          { from: 'app', allow: ['app', 'route', 'feature-*', 'providers', 'shared-ui', 'stores', 'hook', 'lib', 'generated-contract', 'type', 'style'] },
-          { from: 'route', allow: ['route', 'feature-*', 'shared-ui', 'hook', 'lib', 'generated-contract', 'type', 'style'] },
+          { from: 'app', allow: ['app', 'route', 'feature', 'feature-*', 'providers', 'shared-ui', 'stores', 'hook', 'lib', 'generated-contract', 'type', 'style'] },
+          { from: 'route', allow: ['route', 'feature', 'feature-*', 'shared-ui', 'hook', 'lib', 'generated-contract', 'type', 'style'] },
+          { from: 'feature', allow: ['feature', 'shared-ui', 'hook', 'lib', 'generated-contract', 'type'] },
           { from: 'feature-auth', allow: ['feature-auth', 'shared-ui', 'hook', 'lib', 'generated-contract', 'type'] },
           { from: 'feature-contracts', allow: ['feature-contracts', 'shared-ui', 'hook', 'lib', 'generated-contract', 'type'] },
           { from: 'feature-dashboard', allow: ['feature-dashboard', 'shared-ui', 'hook', 'lib', 'generated-contract', 'type'] },

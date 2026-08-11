@@ -6,12 +6,18 @@ namespace Tradebook.Infrastructure.Data;
 
 public sealed class NpgsqlConnectionFactory : INpgsqlConnectionFactory, IAsyncDisposable
 {
+    internal const string DataSourceName = "Tradebook";
+
     private readonly NpgsqlDataSource _dataSource;
 
     public NpgsqlConnectionFactory(IOptions<DatabaseOptions> options)
     {
         VogenTypeHandlers.RegisterAll();
-        _dataSource = NpgsqlDataSource.Create(options.Value.ConnectionString);
+        var builder = new NpgsqlDataSourceBuilder(options.Value.ConnectionString)
+        {
+            Name = DataSourceName,
+        };
+        _dataSource = builder.Build();
     }
 
     public ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken) =>

@@ -20,7 +20,23 @@ public sealed class AuthenticationIntegrationTests(PostgresTestFixture postgres)
             (await client.GetAsync("/api/v1/deliveries")).StatusCode
         );
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
+
+        using var readinessTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        HttpStatusCode readinessStatus;
+        do
+        {
+            using var readiness = await client.GetAsync("/health/ready", readinessTimeout.Token);
+            readinessStatus = readiness.StatusCode;
+            if (readinessStatus == HttpStatusCode.OK)
+            {
+                break;
+            }
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, readinessStatus);
+            await Task.Delay(TimeSpan.FromMilliseconds(100), readinessTimeout.Token);
+        } while (true);
+
+        Assert.Equal(HttpStatusCode.OK, readinessStatus);
     }
 
     [Fact]

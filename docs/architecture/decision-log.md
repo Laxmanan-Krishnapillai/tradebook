@@ -2,7 +2,7 @@
 
 **Status**: Authoritative. Where this log conflicts with older statements in `architecture/master-architecture-blueprint.md`, `tasks/*.md`, `review/*.md`, or `research/*.md`, **this log wins**.
 **Date**: 2026-08-06 (post-adversarial-review de-scope)
-**Amended**: 2026-08-07 (Task 17 durable-messaging modernization)
+**Amended**: 2026-08-07 (Task 17 durable-messaging modernization), 2026-08-11 (Task 25 AI-native foundation)
 
 ---
 
@@ -111,11 +111,12 @@ Single repository: `src/Backend`, `src/Frontend`, `src/Database`, `infra/`, `tes
 
 | Contract | Owner | Consumers |
 | :--- | :--- | :--- |
-| REST API endpoints + DTOs (TypeGen source, one pinned version) | Task 02 | Tasks 05, 06, 09 |
+| REST API endpoints + DTOs (TypeSpec source, one pinned version) | Task 02 | Tasks 05, 06, 09 |
 | DB schema + `audit_log` triggers | Task 01 | Tasks 02, 17 |
 | Wolverine outbox/inbox + SignalR hub/groups + client event envelope | Task 17 | Task 05 |
 | Semantic AST + `POST /api/v1/analytics/query` | Task 04 | Task 06 (its divergent `SemanticQueryAST`/`/api/v1/semantic/query` is void) |
 | `ChartAdapter` contract + registry | Task 06 | dashboards |
+| Capability plane + shared analytics runner contracts (MCP/REST/in-app binding) | Task 25 | REST handlers, MCP handlers, in-app agent runtime, dashboards |
 | docker-compose + Terraform Tier 1 | Task 07 | Tasks 09, 10 |
 | **Removed contracts — delete on sight** | — | `/api/v1/mutations/batch`, Dexie mutation schema, `perform3WayMerge`, NATS subjects/streams, Merkle proof formats |
 
@@ -133,6 +134,7 @@ Single repository: `src/Backend`, `src/Frontend`, `src/Database`, `infra/`, `tes
 | 08 | Minor | Remove AOT references; formally own ArchUnitNET |
 | 09 | Moderate | Baseline-regression gates replace absolute numbers; drop offline-replay scenarios; NBomber replaced by k6 (commercial-license issue) |
 | 10 | Moderate | Drop Merkle/WORM, NATS, and batch-endpoint verification; remove `|| true` from verify scripts |
+| 25 | Major | Introduce shared capability-plane architecture for REST + MCP + in-app agents; add external MCP + object-ID claim security + shared analytics runner gate |
 
 ---
 
@@ -265,3 +267,30 @@ Aspire.Hosting.Testing owns full-graph smoke coverage; Testcontainers and Respaw
 the isolated database-test mechanism. Aspire and `azd` may generate Azure Container Apps
 deployment artifacts, but the Task 07 Terraform remains the production infrastructure
 source of truth for Container Apps, PostgreSQL Flexible Server 17, and Key Vault.
+
+## D22 â€” AI-native capability plane and interoperability (2026-08-11)
+
+Task 25 creates a reusable **capability plane** that is the shared execution surface for
+REST, external MCP, and in-app AI agents.
+
+- `actor` is derived only from the Entra JWT `oid` GUID after `tid` matches the configured
+  tenant. Endpoints, MCP tools, and in-app agent runtimes must not read actor identity
+  from `sub`, email/name claims, route parameters, or session-derived aliases.
+- No feature may use endpoint-to-endpoint loopback or direct repository/DbContext/SQL access.
+  Every MCP and agent call must execute through application capability handlers, and every
+  capability handler must be callable from REST and reusable by MCP and in-app agents.
+- TypeSpec remains the REST contract authority. New user-visible functionality is
+  acceptable only if it is represented in TypeSpec and included in the **capability coverage gate**
+  (REST contract coverage → capability-plane registration parity).
+- External MCP is implemented with the official C# MCP SDK 2.1 using a **stateless**
+  Streamable HTTP `/mcp` transport. Existing JWT authorization is applied first.
+  RFC9728/Entra OAuth resource metadata must be complete before production.
+- In-app execution direction is Microsoft Agent Framework 1.17 + AG-UI hosting 1.17 preview,
+  behind a feature flag. Versions for implementation planning: assistant-ui 0.15.13,
+  react-ag-ui 0.0.53, ag-ui client 0.0.57. Durable runs, approvals, and audit trail state
+  are persisted through PostgreSQL and Wolverine.
+- `DashboardSpecification` remains canonical for UI construction; constrained `json-render`
+  is the preferred ephemeral candidate. OpenUI is deferred to a later bakeoff and
+  must never produce raw model-authored markup.
+- Execution risk tiers are required: low-impact tools may be auto-run, high-impact tools
+  require explicit approval, and all mutations must be auditable without chain-of-thought capture.

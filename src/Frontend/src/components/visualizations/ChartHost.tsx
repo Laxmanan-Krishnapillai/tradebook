@@ -21,6 +21,12 @@ interface ChartHostProps {
   refreshRateMs?: number;
 }
 
+function metricUnit(member: string | undefined): string | undefined {
+  if (member?.endsWith('_eur')) return 'EUR';
+  if (member?.endsWith('_mwh')) return 'MWh';
+  return undefined;
+}
+
 export function ChartHost({ widget, theme = defaultTheme, refreshRateMs }: ChartHostProps) {
   const [renderReceipt, setRenderReceipt] = useState<{
     source?: SeriesData;
@@ -42,7 +48,13 @@ export function ChartHost({ widget, theme = defaultTheme, refreshRateMs }: Chart
     catch (error) { return { mappingError: error instanceof Error ? error.message : 'Invalid visualization binding.' }; }
   }, [query.data, widget.chartType, widget.visualEncodings]);
   const spec = useMemo(() => ({ chartType: widget.chartType, encodings: widget.visualEncodings, style: widget.styleOverrides }), [widget.chartType, widget.visualEncodings, widget.styleOverrides]);
-  const primaryUnit = widget.visualEncodings.yAxis[0]?.split('_').at(-1)?.toUpperCase();
+  const primaryUnit = metricUnit(widget.visualEncodings.yAxis[0]);
+  const pointCount = mapped.data?.series[0]?.x.length;
+  const chartContext = widget.queryAst.timeDimensions?.length
+    ? pointCount === undefined ? primaryUnit : [primaryUnit, `${pointCount} periods`].filter(Boolean).join(' · ')
+    : widget.queryAst.dimensions?.length && pointCount !== undefined
+      ? [primaryUnit, `Top ${pointCount}`].filter(Boolean).join(' · ')
+      : primaryUnit;
   const errorMessage = query.isError ? `Unable to load ${widget.title}.` : mapped.mappingError;
   const markRenderReady = useCallback((source: SeriesData) => {
     setRenderReceipt((current) => ({
@@ -55,26 +67,30 @@ export function ChartHost({ widget, theme = defaultTheme, refreshRateMs }: Chart
     enabled: errorMessage === undefined,
     onRenderReady: markRenderReady
   });
-  if (errorMessage) return <p role="alert">{errorMessage}</p>;
+  if (errorMessage) return <section data-slot="dashboard-widget" data-chart-type={widget.chartType} aria-label={widget.title}>
+    <header data-slot="dashboard-widget-header"><h2>{widget.title}</h2></header>
+    <p data-slot="dashboard-widget-error" role="alert">{errorMessage}</p>
+  </section>;
   const renderState = !mapped.data
     ? 'loading'
     : renderReceipt.source === mapped.data ? 'ready' : 'rendering';
   return <section data-slot="dashboard-widget" data-chart-type={widget.chartType} aria-label={widget.title}>
     <header data-slot="dashboard-widget-header">
       <h2>{widget.title}</h2>
-      {widget.chartType !== 'KPI_CARD' && widget.queryAst.timeDimensions?.length
-        ? <p>{primaryUnit} · {widget.semanticModelRef}</p>
-        : null}
+      {widget.chartType !== 'KPI_CARD' && chartContext ? <p>{chartContext}</p> : null}
     </header>
-    <div
-    ref={ref}
-    data-slot="dashboard-chart-canvas"
-    style={{ minHeight: widget.chartType === 'KPI_CARD' ? 44 : 200 }}
-    aria-busy={renderState !== 'ready'}
-    data-chart-widget-id={widget.id}
-    data-chart-render-state={renderState}
-    data-chart-render-sequence={renderReceipt.sequence}
-    data-chart-render-completed-at-ms={renderState === 'ready' ? renderReceipt.completedAtMs : undefined}
-  />
+    <div data-slot="dashboard-chart-frame">
+      <div
+        ref={ref}
+        data-slot="dashboard-chart-canvas"
+        style={{ minHeight: widget.chartType === 'KPI_CARD' ? 44 : 200 }}
+        aria-busy={renderState !== 'ready'}
+        data-chart-widget-id={widget.id}
+        data-chart-render-state={renderState}
+        data-chart-render-sequence={renderReceipt.sequence}
+        data-chart-render-completed-at-ms={renderState === 'ready' ? renderReceipt.completedAtMs : undefined}
+      />
+      {renderState === 'loading' ? <div data-slot="dashboard-chart-skeleton" role="status" aria-label={`Loading ${widget.title}`}><span /></div> : null}
+    </div>
   </section>;
 }

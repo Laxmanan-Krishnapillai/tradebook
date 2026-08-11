@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ContractsPage } from '../../src/components/contracts/ContractsPage';
 import { CommandStackProvider } from '../../src/lib/commands/CommandStackContext';
+import { queryKeys } from '../../src/lib/query/queryKeys';
 import type { ContractDetailsDto } from '../../src/api/generated/types.gen';
 
 function jsonResponse(payload: unknown, status = 200) {
@@ -89,8 +90,8 @@ describe('ContractsPage interactions', () => {
     expect(screen.getByText('2 of 2 contracts')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Search contracts'), { target: { value: 'Beta' } });
     expect(screen.getByText('1 of 2 contracts')).toBeTruthy();
-    expect(screen.getByText('Beta contract')).toBeTruthy();
-    expect(screen.queryByText('Alpha contract')).toBeNull();
+    expect(screen.getByDisplayValue('Beta contract')).toBeTruthy();
+    expect(screen.queryByDisplayValue('Alpha contract')).toBeNull();
     queryClient.clear();
   });
 
@@ -104,12 +105,45 @@ describe('ContractsPage interactions', () => {
         </CommandStackProvider>
       </QueryClientProvider>,
     );
-    const row = await screen.findByText('Alpha contract').then((node) => node.closest('tr'));
+    const row = await screen.findByDisplayValue('Alpha contract').then((node) => node.closest('tr'));
     expect(row).toBeTruthy();
     fireEvent.click(row!);
     await screen.findByRole('dialog', { name: 'Alpha contract' });
     fireEvent.click(screen.getByRole('button', { name: 'Close record' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Alpha contract' })).toBeNull());
+    queryClient.clear();
+  });
+
+  it('keeps a single-cell edit inline and out of the contract detail drawer', async () => {
+    stubContractApi();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CommandStackProvider>
+          <ContractsPage />
+        </CommandStackProvider>
+      </QueryClientProvider>,
+    );
+
+    const row = await screen.findByDisplayValue('Alpha contract').then((node) => node.closest('tr'));
+    expect(row).toBeTruthy();
+    const nameEditor = within(row!).getByRole('textbox', { name: 'Contract name' });
+    fireEvent.click(nameEditor);
+    await waitFor(() => expect(nameEditor.hasAttribute('readonly')).toBe(false));
+    expect(screen.queryByRole('dialog', { name: 'Alpha contract' })).toBeNull();
+
+    fireEvent.click(row!);
+    expect(nameEditor.hasAttribute('readonly')).toBe(true);
+    expect(screen.queryByRole('dialog', { name: 'Alpha contract' })).toBeNull();
+
+    fireEvent.click(within(row!).getByRole('combobox', { name: 'Product' }));
+    const productOption = await screen.findByRole('option', { name: 'GoO+Gas' });
+    fireEvent.pointerDown(productOption, { button: 0, pointerType: 'mouse' });
+    fireEvent.click(productOption);
+    expect(screen.queryByRole('dialog', { name: 'Alpha contract' })).toBeNull();
+
+    fireEvent.click(row!);
+    expect(await screen.findByRole('dialog', { name: 'Alpha contract' })).toBeTruthy();
     queryClient.clear();
   });
 
@@ -123,11 +157,12 @@ describe('ContractsPage interactions', () => {
         </CommandStackProvider>
       </QueryClientProvider>,
     );
-    const row = await screen.findByText('Alpha contract').then((node) => node.closest('tr'));
+    const row = await screen.findByDisplayValue('Alpha contract').then((node) => node.closest('tr'));
     expect(row).toBeTruthy();
     fireEvent.click(row!);
     await screen.findByRole('dialog', { name: 'Alpha contract' });
-    const nameInput = screen.getByLabelText('Contract name');
+    const dialog = screen.getByRole('dialog', { name: 'Alpha contract' });
+    const nameInput = within(dialog).getByLabelText('Contract name');
     fireEvent.change(nameInput, { target: { value: 'Alpha contract v2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([, request]) => request?.method === 'PUT')).toBe(true));
@@ -141,6 +176,38 @@ describe('ContractsPage interactions', () => {
     expect(String(deleteUrl)).toContain('/api/v1/contracts/c-1');
     const deletedBody = JSON.parse(String(deleteInit?.body)) as Record<string, unknown>;
     expect(deletedBody).toMatchObject({ reason: 'Deactivated from Tradebook UI' });
+    queryClient.clear();
+  });
+
+  it('preserves a dirty detail draft across newer cache refreshes', async () => {
+    stubContractApi();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CommandStackProvider>
+          <ContractsPage />
+        </CommandStackProvider>
+      </QueryClientProvider>,
+    );
+    const row = await screen.findByDisplayValue('Alpha contract').then((node) => node.closest('tr'));
+    fireEvent.click(row!);
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha contract' });
+    const name = within(dialog).getByRole('textbox', { name: 'Contract name' }) as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Local unsaved name' } });
+
+    const key = queryKeys.contracts.list({ page: 1, pageSize: 100 });
+    queryClient.setQueryData(key, {
+      items: [{ ...sampleContracts[0], contractName: 'Remote name', version: 4 }, sampleContracts[1]],
+      totalCount: 2, page: 1, pageSize: 100, hasNextPage: false,
+    });
+    await waitFor(() => expect((within(dialog).getByRole('textbox', { name: 'Contract name' }) as HTMLInputElement).value).toBe('Local unsaved name'));
+    expect(screen.getByText('Review and save your changes.')).toBeTruthy();
+
+    queryClient.setQueryData(key, {
+      items: [{ ...sampleContracts[0], contractName: 'Local unsaved name', version: 5 }, sampleContracts[1]],
+      totalCount: 2, page: 1, pageSize: 100, hasNextPage: false,
+    });
+    await screen.findByText('No unsaved changes.');
     queryClient.clear();
   });
 });
