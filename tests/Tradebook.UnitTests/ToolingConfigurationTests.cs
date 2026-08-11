@@ -425,6 +425,78 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
+    public void RuntimeImagePublishesViteAssetsWithTheApiStaticAssetManifest()
+    {
+        var dockerfile = File.ReadAllText(FindRepositoryFile("Dockerfile"));
+        var frontendCopy = dockerfile.IndexOf(
+            "COPY --from=frontend /src/Frontend/dist ./src/Backend/src/Tradebook.Api/wwwroot",
+            StringComparison.Ordinal
+        );
+        var apiPublishStage = dockerfile.IndexOf(
+            "FROM backend AS api-publish",
+            StringComparison.Ordinal
+        );
+        var apiPublish = dockerfile.IndexOf(
+            "RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj",
+            StringComparison.Ordinal
+        );
+
+        Assert.InRange(frontendCopy, apiPublishStage + 1, apiPublish - 1);
+        Assert.DoesNotContain(
+            "COPY --from=frontend /src/Frontend/dist ./wwwroot",
+            dockerfile,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "COPY --from=api-publish /app/publish ./",
+            dockerfile,
+            StringComparison.Ordinal
+        );
+
+        var databaseOperationsStage = dockerfile[
+            dockerfile.IndexOf(
+                "FROM postgres:17-bookworm AS database-ops",
+                StringComparison.Ordinal
+            )..dockerfile.IndexOf(
+                "FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime",
+                StringComparison.Ordinal
+            )
+        ];
+        Assert.Contains(
+            "COPY --from=backend /app/migrator/",
+            databaseOperationsStage,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain("--from=frontend", databaseOperationsStage, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "--from=api-publish",
+            databaseOperationsStage,
+            StringComparison.Ordinal
+        );
+    }
+
+    [Fact]
+    public void ApiMapsStaticAssetsBeforeTheSpaFallback()
+    {
+        var program = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "Backend",
+                "src",
+                "Tradebook.Api",
+                "Program.cs"
+            )
+        );
+        var staticAssets = program.IndexOf(
+            "app.MapStaticAssets().AllowAnonymous();",
+            StringComparison.Ordinal
+        );
+        var spaFallback = program.IndexOf("app.MapFallbackToFile", StringComparison.Ordinal);
+        Assert.InRange(staticAssets, 0, spaFallback - 1);
+    }
+
+    [Fact]
     public void SAFE09GlobalAnalyzersAreExactPrivateAndRepoWide()
     {
         var repositoryRoot = FindRepositoryRoot();
