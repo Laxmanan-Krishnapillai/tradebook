@@ -40,7 +40,7 @@ resource "azurerm_container_app" "api" {
   }
 
   template {
-    min_replicas = 1
+    min_replicas = 0
     max_replicas = 2
 
     container {
@@ -64,6 +64,10 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "Entra__ClientId"
         value = local.entra_api_client_id
+      }
+      env {
+        name  = "Networking__TrustedProxyCidr"
+        value = azurerm_subnet.container_apps.address_prefixes[0]
       }
 
       startup_probe {
