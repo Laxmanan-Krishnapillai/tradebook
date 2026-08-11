@@ -21,6 +21,7 @@ COPY src/Aspire/ ./src/Aspire/
 COPY src/Database/ ./src/Database/
 COPY tests/ ./tests/
 RUN dotnet restore src/Backend/Tradebook.sln
+COPY --from=frontend /src/Frontend/dist ./src/Backend/src/Tradebook.Api/wwwroot
 RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj -c Release -o /app/publish --no-restore
 RUN dotnet publish src/Backend/src/Tradebook.Migrations/Tradebook.Migrations.csproj -c Release -o /app/migrator --no-restore
 
@@ -60,7 +61,6 @@ RUN apt-get update \
     && groupadd --system tradebook \
     && useradd --system --gid tradebook --create-home tradebook
 COPY --from=backend /app/publish ./
-COPY --from=frontend /src/Frontend/dist ./wwwroot
 RUN chown -R tradebook:tradebook /app
 USER tradebook
 ENV ASPNETCORE_URLS=http://+:8080

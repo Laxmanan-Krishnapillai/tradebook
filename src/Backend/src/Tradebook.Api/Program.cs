@@ -109,6 +109,7 @@ app.UseFastEndpoints(config =>
 app.MapOpenApi().RequireAuthorization();
 app.MapTradebookHealthEndpoints();
 app.MapDashboardPushHub();
+app.MapStaticAssets().AllowAnonymous();
 
 // SPA hosting (Task 02 §3.7): serve the built frontend; unmatched /api/* and /hubs/*
 // return 404 instead of index.html.

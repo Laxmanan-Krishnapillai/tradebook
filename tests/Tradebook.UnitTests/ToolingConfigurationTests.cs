@@ -425,6 +425,44 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
+    public void RuntimeImagePublishesViteAssetsWithTheApiStaticAssetManifest()
+    {
+        var dockerfile = File.ReadAllText(FindRepositoryFile("Dockerfile"));
+        var frontendCopy = dockerfile.IndexOf(
+            "COPY --from=frontend /src/Frontend/dist ./src/Backend/src/Tradebook.Api/wwwroot",
+            StringComparison.Ordinal
+        );
+        var apiPublish = dockerfile.IndexOf(
+            "RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj",
+            StringComparison.Ordinal
+        );
+
+        Assert.InRange(frontendCopy, 0, apiPublish - 1);
+        Assert.DoesNotContain(
+            "COPY --from=frontend /src/Frontend/dist ./wwwroot",
+            dockerfile,
+            StringComparison.Ordinal
+        );
+
+        var program = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "Backend",
+                "src",
+                "Tradebook.Api",
+                "Program.cs"
+            )
+        );
+        var staticAssets = program.IndexOf(
+            "app.MapStaticAssets().AllowAnonymous();",
+            StringComparison.Ordinal
+        );
+        var spaFallback = program.IndexOf("app.MapFallbackToFile", StringComparison.Ordinal);
+        Assert.InRange(staticAssets, 0, spaFallback - 1);
+    }
+
+    [Fact]
     public void SAFE09GlobalAnalyzersAreExactPrivateAndRepoWide()
     {
         var repositoryRoot = FindRepositoryRoot();
