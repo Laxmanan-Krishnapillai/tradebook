@@ -473,7 +473,11 @@ public sealed class ToolingConfigurationTests
             databaseOperationsStage,
             StringComparison.Ordinal
         );
+    }
 
+    [Fact]
+    public void ApiMapsStaticAssetsBeforeTheSpaFallback()
+    {
         var program = File.ReadAllText(
             Path.Combine(
                 FindRepositoryRoot(),
