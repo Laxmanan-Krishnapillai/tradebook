@@ -98,7 +98,7 @@ public sealed class AnalyticsQueryEndpointTests(CustomWebApplicationFactory fact
         var descriptor = new SecurityTokenDescriptor
         {
             Subject = new System.Security.Claims.ClaimsIdentity([
-                new("sub", Guid.NewGuid().ToString()),
+                new("oid", Guid.NewGuid().ToString()),
                 new("role", "Trader"),
             ]),
             Issuer = "Tradebook",

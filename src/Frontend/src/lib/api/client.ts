@@ -1,4 +1,5 @@
 import { tokenProvider } from '../auth/tokenProvider';
+import { getAuthSessionIdentity } from '../state/useAuthStore';
 
 export class ApiError extends Error { constructor(public readonly status: number, public readonly problem?: unknown) { super(`HTTP ${status}`); } }
 class ReauthenticationRequiredError extends Error {}
@@ -11,8 +12,13 @@ const safeReplayMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase();
+  const sessionIdentity = getAuthSessionIdentity();
   const send = async (forceRefresh: boolean) => {
     const token = await tokenProvider.acquireForApi(forceRefresh);
+    if (init.signal?.aborted) throw init.signal.reason ?? new DOMException('The request was aborted.', 'AbortError');
+    if (sessionIdentity !== getAuthSessionIdentity()) {
+      throw new DOMException('The authenticated session changed before the request was sent.', 'AbortError');
+    }
     if (token.kind === 'interaction-required') throw new ReauthenticationRequiredError();
     const headers = new Headers(init.headers);
     headers.set('Accept', 'application/json');

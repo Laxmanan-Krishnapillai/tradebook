@@ -1,14 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from 'zod';
-import type { ContractDetailsDto } from "../../api/generated/types.gen";
-import type { CreateContractRequest } from "../../api/generated/types.gen";
-import type { GetContractHistoryResponse } from "../../api/generated/types.gen";
-import type { UpdateContractRequest } from "../../api/generated/types.gen";
+import type {
+  CreateContractRequest,
+  ContractDetailsDto,
+  GetContractHistoryResponse,
+  UpdateContractRequest,
+} from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
+import { changedFields, shouldAdoptRefreshedDraft } from "../../lib/editor/detailDraftPolicy";
+import { clearMutationConflictForEntity } from "../../lib/mutations/mutationCoordinator";
 import {
   useCreateContract,
   useDeleteContract,
@@ -18,6 +22,15 @@ import {
 import { queryKeys } from '../../lib/query/queryKeys';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
+import { Button } from "../ui/button";
+import { EntityCreateDrawer } from "../ui/entity-create-drawer";
+import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "../ui/frame";
+import { Input } from "../ui/input";
+import { NumberInput } from "../ui/number-input";
+import { RecordDetailPanel } from "../ui/record-detail-panel";
+import { RecordActivity } from "../ui/record-activity";
+import { TableEditableCell } from "../ui/table-editable-cell";
+import { Select } from "../ui/select";
 import { ValidatedForm } from '../ui/validated-form';
 
 const productTypes = [
@@ -76,40 +89,90 @@ function currentChanges(
   };
 }
 
-function ContractEditor({
-  contract,
-  onSave,
-  onDeactivate,
-}: {
-  contract: ContractDetailsDto;
-  onSave: (contract: ContractDetailsDto, changes: ContractChanges) => void;
-  onDeactivate: (contract: ContractDetailsDto) => void;
-}) {
-  const [name, setName] = useState(contract.contractName);
-  return (
-    <div className="grid grid-cols-4 items-center gap-2 max-[800px]:grid-cols-2">
-      <input
-        aria-label={`Contract name for ${contract.contractId}`}
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-      />
-      <button
-        type="button"
-        disabled={!name.trim() || name === contract.contractName}
-        onClick={() => onSave(contract, currentChanges(contract, name.trim()))}
-      >
-        Save
-      </button>
-      <button
-        type="button"
-        className="bg-red-700"
-        disabled={!contract.isActive}
-        onClick={() => onDeactivate(contract)}
-      >
-        Deactivate
-      </button>
-    </div>
-  );
+function matchesSearch(contract: ContractDetailsDto, term: string): boolean {
+  if (term === '') return true;
+  const lowered = term.toLowerCase();
+  const candidates: Array<unknown> = [
+    contract.contractName,
+    contract.counterpartyId,
+    contract.contractId,
+    contract.contractType,
+    contract.productType,
+    contract.action,
+    contract.comment,
+    contract.companyShorthand,
+    contract.countryCode,
+    contract.sourcingCenter,
+    contract.salesCenter,
+    contract.balancingGroup,
+  ];
+  return candidates.some((value) => String(value ?? '').toLowerCase().includes(lowered));
+}
+
+interface ContractPanelDraft {
+  contractName: string;
+  counterpartyId: string;
+  productType: string;
+  action: string;
+  companyShorthand: string;
+  countryCode: string;
+  countryDialCode: string;
+  sourcingCenter: string;
+  salesCenter: string;
+  balancingGroup: string;
+  gooQuality: string;
+  subsidyStatus: string;
+  priceMechanismGas: string;
+  fixedPriceGasEurMwh: string;
+  contractType: string;
+  comment: string;
+}
+
+function toDraft(contract: ContractDetailsDto): ContractPanelDraft {
+  return {
+    contractName: contract.contractName ?? '',
+    counterpartyId: contract.counterpartyId ?? '',
+    productType: contract.productType ?? '',
+    action: contract.action ?? '',
+    companyShorthand: contract.companyShorthand ?? '',
+    countryCode: contract.countryCode ?? '',
+    countryDialCode: contract.countryDialCode == null ? '' : String(contract.countryDialCode),
+    sourcingCenter: contract.sourcingCenter ?? '',
+    salesCenter: contract.salesCenter ?? '',
+    balancingGroup: contract.balancingGroup ?? '',
+    gooQuality: contract.gooQuality ?? '',
+    subsidyStatus: contract.subsidyStatus ?? '',
+    priceMechanismGas: contract.priceMechanismGas ?? '',
+    fixedPriceGasEurMwh: contract.fixedPriceGasEurMwh ?? '',
+    contractType: contract.contractType ?? '',
+    comment: contract.comment ?? '',
+  };
+}
+
+function draftToChanges(contract: ContractDetailsDto, draft: ContractPanelDraft): ContractChanges {
+  return {
+    contractName: draft.contractName.trim(),
+    counterpartyId: draft.counterpartyId.trim(),
+    productType: draft.productType.trim(),
+    action: draft.action.trim(),
+    companyShorthand: draft.companyShorthand.trim() === '' ? null : draft.companyShorthand.trim(),
+    countryCode: draft.countryCode.trim() === '' ? null : draft.countryCode.trim(),
+    countryDialCode: draft.countryDialCode.trim() === '' ? null : Number(draft.countryDialCode),
+    sourcingCenter: draft.sourcingCenter.trim() === '' ? null : draft.sourcingCenter.trim(),
+    salesCenter: draft.salesCenter.trim() === '' ? null : draft.salesCenter.trim(),
+    balancingGroup: draft.balancingGroup.trim() === '' ? null : draft.balancingGroup.trim(),
+    gooQuality: draft.gooQuality.trim() === '' ? null : draft.gooQuality.trim(),
+    subsidyStatus: draft.subsidyStatus.trim() === '' ? null : draft.subsidyStatus.trim(),
+    priceMechanismGas: draft.priceMechanismGas.trim() === '' ? null : draft.priceMechanismGas.trim(),
+    fixedPriceGasEurMwh: draft.fixedPriceGasEurMwh.trim() === '' ? null : draft.fixedPriceGasEurMwh.trim(),
+    contractType: draft.contractType.trim() === '' ? null : draft.contractType.trim(),
+    comment: draft.comment.trim() === '' ? null : draft.comment.trim(),
+    isActive: contract.isActive,
+  };
+}
+
+function hasUnsavedChanges(contract: ContractDetailsDto, draft: ContractPanelDraft): boolean {
+  return changedFields(toDraft(contract), draft).length > 0;
 }
 
 export function ContractsPage() {
@@ -119,6 +182,10 @@ export function ContractsPage() {
     useState<CreateContractRequest>(initialCreate);
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState<ConflictState>();
+  const [search, setSearch] = useState("");
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [activeContract, setActiveContract] = useState<ContractDetailsDto>();
+  const [panelContractDraft, setPanelContractDraft] = useState<ContractPanelDraft | null>(null);
   const attempted = useRef<object>({});
   const commandStack = useCommandStack();
   const onConflict = useCallback(
@@ -143,13 +210,34 @@ export function ContractsPage() {
     queryFn: ({ signal }) =>
       apiFetch<GetContractHistoryResponse>(`/api/v1/contracts?page=${page}&pageSize=100`, { signal }),
   });
+  const contracts = useMemo(() => history.data?.items ?? [], [history.data?.items]);
+  const searchableContracts = useMemo(() => {
+    const term = search.trim();
+    return contracts.filter((contract) => matchesSearch(contract, term.toLowerCase()));
+  }, [contracts, search]);
+  const selectedCount = selectedRowIds.size;
+  const totalCount = history.data?.totalCount ?? 0;
+
+  useEffect(() => {
+    if (!activeContract || !panelContractDraft) return;
+    const refreshed = contracts.find((contract) => contract.contractId === activeContract.contractId);
+    if (!refreshed) return;
+    if (!shouldAdoptRefreshedDraft({
+      activeVersion: activeContract.version,
+      refreshedVersion: refreshed.version,
+      dirty: hasUnsavedChanges(activeContract, panelContractDraft),
+      refreshedMatchesDraft: !hasUnsavedChanges(refreshed, panelContractDraft),
+    })) return;
+    setActiveContract(refreshed);
+    setPanelContractDraft(toDraft(refreshed));
+  }, [activeContract, contracts, panelContractDraft]);
 
   const save = useCallback(
     async (contract: ContractDetailsDto, changes: ContractChanges) => {
       setError("");
-      attempted.current = changes;
       let version = contract.version;
       const before = currentChanges(contract);
+      const intent = changedFields(before, changes);
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Update ${contract.contractName}`,
@@ -161,6 +249,7 @@ export function ContractsPage() {
               id: contract.contractId,
               version,
               changes,
+              intent,
             } satisfies EntityUpdateVariables<ContractChanges>)
           ).version;
         },
@@ -171,6 +260,7 @@ export function ContractsPage() {
               id: contract.contractId,
               version,
               changes: before,
+              intent,
             })
           ).version;
         },
@@ -187,7 +277,6 @@ export function ContractsPage() {
   const deactivate = useCallback(
     async (contract: ContractDetailsDto) => {
       const reason = "Deactivated from Tradebook UI";
-      attempted.current = { reason };
       let version = contract.version;
       const restore = { ...currentChanges(contract), isActive: true };
       const command: Command = {
@@ -214,6 +303,7 @@ export function ContractsPage() {
               id: contract.contractId,
               version,
               changes: restore,
+              intent: ['isActive'],
             })
           ).version;
         },
@@ -227,36 +317,49 @@ export function ContractsPage() {
     [commandStack, deleteMutation, updateMutation],
   );
 
-  const columns = useMemo<ColumnDef<ContractDetailsDto>[]>(
-    () => [
-      { accessorKey: "contractName", header: "Contract" },
-      { accessorKey: "productType", header: "Product" },
-      { accessorKey: "action", header: "Action" },
-      { accessorKey: "contractType", header: "Type" },
+  const setSelection = useCallback((nextSelectedRowIds: Set<string>) => {
+    setSelectedRowIds(nextSelectedRowIds);
+  }, []);
+
+  const openContractPanel = useCallback((contract: ContractDetailsDto) => {
+    setActiveContract(contract);
+    setPanelContractDraft(toDraft(contract));
+  }, []);
+
+  const closeContractPanel = useCallback(() => {
+    setActiveContract(undefined);
+    setPanelContractDraft(null);
+  }, []);
+
+  const saveContractField = useCallback(async (
+    contract: ContractDetailsDto,
+    key: keyof ContractPanelDraft,
+    value: string,
+  ) => {
+    const draft = { ...toDraft(contract), [key]: value };
+    await save(contract, draftToChanges(contract, draft));
+  }, [save]);
+
+  const columns = useMemo<ColumnDef<ContractDetailsDto>[]>(() => [
+      {
+        accessorKey: "contractName",
+        header: "Contract",
+        cell: ({ row }) => <TableEditableCell label="Contract name" value={row.original.contractName} onCommit={(value) => saveContractField(row.original, 'contractName', value)} />,
+      },
+      { accessorKey: "productType", header: "Product", cell: ({ row }) => <TableEditableCell label="Product" options={productTypes} value={row.original.productType} onCommit={(value) => saveContractField(row.original, 'productType', value)} /> },
+      { accessorKey: "action", header: "Action", cell: ({ row }) => <TableEditableCell label="Action" options={actions} value={row.original.action} onCommit={(value) => saveContractField(row.original, 'action', value)} /> },
+      { accessorKey: "contractType", header: "Type", cell: ({ row }) => <TableEditableCell label="Contract type" options={contractTypes} value={row.original.contractType ?? 'External'} onCommit={(value) => saveContractField(row.original, 'contractType', value)} /> },
       {
         accessorKey: "isActive",
-        header: "Active",
-        cell: ({ getValue }) => (getValue() ? "Yes" : "No"),
-      },
-      {
-        id: "edit",
-        header: "Edit",
-        cell: ({ row }) => (
-          <ContractEditor
-            key={row.original.version}
-            contract={row.original}
-            onSave={(contract, changes) => void save(contract, changes)}
-            onDeactivate={(contract) => void deactivate(contract)}
-          />
+        header: "Status",
+        cell: ({ getValue }) => (
+          <TableEditableCell label="Status" readOnly value={getValue() ? "Active" : "Inactive"} />
         ),
       },
-    ],
-    [deactivate, save],
-  );
+  ], [saveContractField]);
 
   const submitCreate = async (validatedRequest: CreateContractRequest) => {
     setError("");
-    attempted.current = validatedRequest;
     try {
       const request = { ...validatedRequest };
       let created: ContractDetailsDto | undefined;
@@ -301,28 +404,53 @@ export function ContractsPage() {
     }
   };
 
+  const submitPanelSave = useCallback(async () => {
+    if (!activeContract || !panelContractDraft) return;
+    if (!panelContractDraft.contractName.trim()) return;
+    await save(activeContract, draftToChanges(activeContract, panelContractDraft));
+  }, [activeContract, panelContractDraft, save]);
+
+  const submitPanelDeactivate = useCallback(async () => {
+    if (!activeContract) return;
+    await deactivate(activeContract);
+  }, [activeContract, deactivate]);
+
   return (
     <section>
       <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
         <div>
-          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Master data</p>
+          <p className="eyebrow">Master data</p>
           <h2>Contracts</h2>
           <p>
             {history.data
               ? `${history.data.totalCount} records`
-              : "Loading contract history…"}
+              : "Loading contracts…"}
           </p>
         </div>
-        <button
-          data-testid="btn-create-contract"
-          type="button"
-          onClick={() => setShowCreate(true)}
-        >
+        <Button type="button" onClick={() => setShowCreate(true)} data-testid="btn-create-contract">
           Create contract
-        </button>
+        </Button>
       </header>
+      <section className="toolbar" aria-label="Contract list toolbar">
+        <label>
+          Search contracts
+          <Input
+            aria-label="Search contracts"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            type="search"
+            placeholder="Search contract name, counterparty, type..."
+          />
+        </label>
+        <div aria-label="Selection">
+          {selectedCount} selected
+        </div>
+        <div aria-label="Record count">
+          {searchableContracts.length} of {totalCount} contracts
+        </div>
+      </section>
       {error && (
-        <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">
+        <p role="alert" className="error-banner">
           {error}
         </p>
       )}
@@ -330,9 +458,13 @@ export function ContractsPage() {
       {!history.isError && (
         <VirtualizedDataTable
           testId="virtual-contracts-grid"
-          data={history.data?.items ?? []}
+          data={searchableContracts}
           columns={columns}
+          ariaLabel="Contracts"
           getRowId={(row) => row.contractId}
+          onRowOpen={openContractPanel}
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={setSelection}
         />
       )}
       {history.data && (
@@ -342,18 +474,16 @@ export function ContractsPage() {
           <button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
         </nav>
       )}
-      {showCreate && (
-        <section
-          className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Create contract"
-        >
+      <EntityCreateDrawer
+        description="Create a contract and define its commercial classification."
+        onOpenChange={setShowCreate}
+        open={showCreate}
+        title="Create contract"
+      >
           <ValidatedForm schema={createContractSchema} values={createRequest} onValid={submitCreate}>
-            <h3>Create contract</h3>
             <label>
               Contract name
-              <input
+              <Input
                 required
                 maxLength={100}
                 value={createRequest.contractName}
@@ -367,7 +497,7 @@ export function ContractsPage() {
             </label>
             <label>
               Counterparty ID
-              <input
+              <Input
                 required
                 value={createRequest.counterpartyId}
                 onChange={(event) =>
@@ -378,57 +508,36 @@ export function ContractsPage() {
                 }
               />
             </label>
-            <label>
-              Product type
-              <select
+            <div data-slot="entity-create-field">
+              <span>Product type</span>
+              <Select
+                label="Product type"
+                options={productTypes}
                 value={createRequest.productType}
-                onChange={(event) =>
-                  setCreateRequest((value) => ({
-                    ...value,
-                    productType: event.target.value,
-                  }))
-                }
-              >
-                {productTypes.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Action
-              <select
+                onValueChange={(productType) => setCreateRequest((value) => ({ ...value, productType }))}
+              />
+            </div>
+            <div data-slot="entity-create-field">
+              <span>Action</span>
+              <Select
+                label="Action"
+                options={actions}
                 value={createRequest.action}
-                onChange={(event) =>
-                  setCreateRequest((value) => ({
-                    ...value,
-                    action: event.target.value,
-                  }))
-                }
-              >
-                {actions.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Contract type
-              <select
-                value={createRequest.contractType ?? "External"}
-                onChange={(event) =>
-                  setCreateRequest((value) => ({
-                    ...value,
-                    contractType: event.target.value,
-                  }))
-                }
-              >
-                {contractTypes.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
+                onValueChange={(action) => setCreateRequest((value) => ({ ...value, action }))}
+              />
+            </div>
+            <div data-slot="entity-create-field">
+              <span>Contract type</span>
+              <Select
+                label="Contract type"
+                options={contractTypes}
+                value={createRequest.contractType ?? 'External'}
+                onValueChange={(contractType) => setCreateRequest((value) => ({ ...value, contractType }))}
+              />
+            </div>
             <label>
               Comment
-              <input
+              <Input
                 value={createRequest.comment ?? ""}
                 onChange={(event) =>
                   setCreateRequest((value) => ({
@@ -438,10 +547,10 @@ export function ContractsPage() {
                 }
               />
             </label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div data-slot="entity-create-drawer-actions" className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="bg-gray-200 text-gray-800"
+                className="secondary"
                 onClick={() => setShowCreate(false)}
               >
                 Close
@@ -451,17 +560,282 @@ export function ContractsPage() {
               </button>
             </div>
           </ValidatedForm>
-        </section>
-      )}
+      </EntityCreateDrawer>
       {conflict && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
+        <div className="modal">
           <ConflictDialog
             entityId={conflict.id}
             serverState={conflict.serverState}
             attemptedChanges={conflict.attempted}
-            onClose={() => setConflict(undefined)}
+            onClose={() => {
+              clearMutationConflictForEntity(conflict.id);
+              setConflict(undefined);
+            }}
           />
         </div>
+      )}
+      {activeContract && panelContractDraft && (
+        <RecordDetailPanel
+          open={Boolean(activeContract)}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeContractPanel();
+            }
+          }}
+          eyebrow="Contract"
+          title={activeContract.contractName}
+          description="Edit contract details and save the updated values."
+          recordId={activeContract.contractId}
+          version={activeContract.version}
+          dirty={hasUnsavedChanges(activeContract, panelContractDraft)}
+          properties={(
+            <div data-slot="record-field-grid">
+              <div data-slot="record-field">
+                <span>Contract name</span>
+                <Input
+                  aria-label="Contract name"
+                  value={panelContractDraft.contractName}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, contractName: event.target.value } : draft,
+                    )
+                  }
+                />
+              </div>
+              <div data-slot="record-field">
+                <span>Counterparty ID</span>
+                <Input
+                  aria-label="Counterparty ID"
+                  value={panelContractDraft.counterpartyId}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, counterpartyId: event.target.value } : draft,
+                    )
+                  }
+                />
+              </div>
+              <div data-slot="record-field">
+                <span>Product</span>
+                <Select
+                  label="Product type"
+                  options={productTypes}
+                  value={panelContractDraft.productType}
+                  onValueChange={(value) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, productType: value } : draft,
+                    )
+                  }
+                />
+              </div>
+              <div data-slot="record-field">
+                <span>Action</span>
+                <Select
+                  label="Action"
+                  options={actions}
+                  value={panelContractDraft.action}
+                  onValueChange={(value) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, action: value } : draft,
+                    )
+                  }
+                />
+              </div>
+              <div data-slot="record-field">
+                <span>Contract type</span>
+                <Select
+                  label="Contract type"
+                  options={contractTypes}
+                  value={panelContractDraft.contractType}
+                  onValueChange={(value) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, contractType: value } : draft,
+                    )
+                  }
+                />
+              </div>
+              <label data-slot="record-field">
+                <span>Company shorthand</span>
+                <Input
+                  aria-label="Company shorthand"
+                  value={panelContractDraft.companyShorthand}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, companyShorthand: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Country code</span>
+                <Input
+                  aria-label="Country code"
+                  value={panelContractDraft.countryCode}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, countryCode: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Country dial code</span>
+                <NumberInput
+                  aria-label="Country dial code"
+                  value={panelContractDraft.countryDialCode}
+                  onValueChange={(value) =>
+                    setPanelContractDraft((draft) =>
+                      draft
+                        ? { ...draft, countryDialCode: value }
+                        : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Sourcing center</span>
+                <Input
+                  aria-label="Sourcing center"
+                  value={panelContractDraft.sourcingCenter}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, sourcingCenter: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Sales center</span>
+                <Input
+                  aria-label="Sales center"
+                  value={panelContractDraft.salesCenter}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, salesCenter: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Balancing group</span>
+                <Input
+                  aria-label="Balancing group"
+                  value={panelContractDraft.balancingGroup}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, balancingGroup: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>GoO quality</span>
+                <Input
+                  aria-label="GoO quality"
+                  value={panelContractDraft.gooQuality}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, gooQuality: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Subsidy status</span>
+                <Input
+                  aria-label="Subsidy status"
+                  value={panelContractDraft.subsidyStatus}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, subsidyStatus: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Price mechanism gas</span>
+                <Input
+                  aria-label="Price mechanism gas"
+                  value={panelContractDraft.priceMechanismGas}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, priceMechanismGas: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Fixed price Gas EUR/MWh</span>
+                <Input
+                  aria-label="Fixed price Gas EUR/MWh"
+                  value={panelContractDraft.fixedPriceGasEurMwh}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, fixedPriceGasEurMwh: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+              <label data-slot="record-field">
+                <span>Comment</span>
+                <textarea
+                  aria-label="Comment"
+                  value={panelContractDraft.comment}
+                  onChange={(event) =>
+                    setPanelContractDraft((draft) =>
+                      draft ? { ...draft, comment: event.target.value } : draft,
+                    )
+                  }
+                />
+              </label>
+            </div>
+          )}
+          context={(
+            <div data-slot="record-field-grid">
+              <Frame>
+                <FrameHeader>
+                  <FrameTitle>Read-only details</FrameTitle>
+                  <FrameDescription>Values tracked by Tradebook.</FrameDescription>
+                </FrameHeader>
+                <FramePanel>
+                  <dl data-slot="record-facts">
+                    <div>
+                      <dt>Status</dt>
+                      <dd>{activeContract.isActive ? "Active" : "Inactive"}</dd>
+                    </div>
+                    <div>
+                      <dt>Created</dt>
+                      <dd>{new Date(activeContract.createdAt).toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Updated</dt>
+                      <dd>{new Date(activeContract.updatedAt).toLocaleString()}</dd>
+                    </div>
+                  </dl>
+                </FramePanel>
+              </Frame>
+            </div>
+          )}
+          activity={<RecordActivity entityId={activeContract.contractId} entityName="contracts" />}
+          actions={(
+            <>
+              <Button
+                type="button"
+                disabled={updateMutation.isPending || !hasUnsavedChanges(activeContract, panelContractDraft) || !panelContractDraft.contractName.trim()}
+                onClick={() => void submitPanelSave()}
+              >
+                Save
+              </Button>
+              <Button
+                intent="danger"
+                type="button"
+                disabled={deleteMutation.isPending || !activeContract.isActive}
+                onClick={() => void submitPanelDeactivate()}
+              >
+                Deactivate
+              </Button>
+            </>
+          )}
+        />
       )}
     </section>
   );

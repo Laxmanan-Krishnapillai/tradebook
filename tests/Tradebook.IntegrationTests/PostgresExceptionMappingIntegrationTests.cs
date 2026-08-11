@@ -128,7 +128,7 @@ public sealed class PostgresExceptionMappingIntegrationTests(PostgresTestFixture
             Issuer = "Tradebook",
             Audience = "Tradebook",
             Subject = new ClaimsIdentity([
-                new Claim("sub", actorId.ToString()),
+                new Claim("oid", actorId.ToString()),
                 new Claim("role", "Trader"),
             ]),
             Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(5),

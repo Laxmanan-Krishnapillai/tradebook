@@ -591,6 +591,244 @@ public sealed class SemanticQueryCompilerTests
         );
     }
 
+    [Fact]
+    public void ExcessiveSelectedMembersAreRejectedBeforeSqlCompilation()
+    {
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(measures: Enumerable.Repeat("revenue_eur", 65).ToArray()))
+        );
+
+        Assert.Equal(
+            "Query can contain at most 64 selected dimensions, measures and metrics.",
+            exception.Message
+        );
+    }
+
+    [Fact]
+    public void MaximumSelectedMembersReachSemanticValidation()
+    {
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(measures: Enumerable.Repeat("revenue_eur", 64).ToArray()))
+        );
+
+        Assert.Equal("Result column 'revenue_eur' is selected more than once.", exception.Message);
+    }
+
+    [Fact]
+    public void ExcessiveTimeDimensionsAreRejectedBeforeSqlCompilation()
+    {
+        var timeDimensions = Enumerable
+            .Repeat(new TimeDimensionQuery("supply_month", "month", null), 17)
+            .ToArray();
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(timeDimensions: timeDimensions))
+        );
+
+        Assert.Equal("Query can contain at most 16 time dimensions.", exception.Message);
+    }
+
+    [Fact]
+    public void MaximumTimeDimensionsReachSemanticValidation()
+    {
+        var timeDimensions = Enumerable
+            .Repeat(new TimeDimensionQuery("supply_month", "month", null), 16)
+            .ToArray();
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(timeDimensions: timeDimensions))
+        );
+
+        Assert.Equal(
+            "Result column 'supply_month_month' is selected more than once.",
+            exception.Message
+        );
+    }
+
+    [Fact]
+    public void ExcessiveFiltersAreRejectedBeforeParameterBinding()
+    {
+        var filters = Enumerable
+            .Range(0, 65)
+            .Select(index => new FilterQuery("book_type", FilterOperator.Equals, [$"type-{index}"]))
+            .ToArray();
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(filters: filters))
+        );
+
+        Assert.Equal("Query can contain at most 64 filters.", exception.Message);
+    }
+
+    [Fact]
+    public void ExcessiveValuesInOneFilterAreRejectedBeforeParameterBinding()
+    {
+        var values = Enumerable.Range(0, 257).Select(index => (object)$"type-{index}").ToArray();
+        var filters = new[] { new FilterQuery("book_type", FilterOperator.In, values) };
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(filters: filters))
+        );
+
+        Assert.Equal(
+            "Query can contain at most 256 values for filter 'book_type'.",
+            exception.Message
+        );
+    }
+
+    [Fact]
+    public void ExcessiveTotalFilterValuesAreRejectedBeforeParameterBinding()
+    {
+        var filters = Enumerable
+            .Range(0, 5)
+            .Select(filterIndex => new FilterQuery(
+                "book_type",
+                FilterOperator.In,
+                Enumerable
+                    .Range(0, 205)
+                    .Select(valueIndex => (object)$"type-{filterIndex}-{valueIndex}")
+                    .ToArray()
+            ))
+            .ToArray();
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(filters: filters))
+        );
+
+        Assert.Equal("Query can contain at most 1024 total filter values.", exception.Message);
+    }
+
+    [Fact]
+    public void ExcessiveSortsAreRejectedBeforeSqlCompilation()
+    {
+        var sorts = Enumerable.Repeat(new SortQuery("revenue_eur", "asc"), 17).ToArray();
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(sorts: sorts))
+        );
+
+        Assert.Equal("Query can contain at most 16 sorts.", exception.Message);
+    }
+
+    [Fact]
+    public void ExcessiveStringFilterValueIsRejectedBeforeEscapingAndBinding()
+    {
+        var filters = new[]
+        {
+            new FilterQuery("book_type", FilterOperator.Contains, [new string('x', 1_025)]),
+        };
+
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(Query(filters: filters))
+        );
+
+        Assert.Equal(
+            "Filter value for 'book_type' exceeds the maximum length of 1024.",
+            exception.Message
+        );
+    }
+
+    [Theory]
+    [InlineData("model", "model name")]
+    [InlineData("measure", "measure")]
+    [InlineData("metric", "metric")]
+    [InlineData("dimension", "dimension")]
+    [InlineData("time-member", "time dimension member")]
+    [InlineData("granularity", "time dimension granularity")]
+    [InlineData("filter", "filter member")]
+    [InlineData("sort-member", "sort member")]
+    [InlineData("sort-direction", "sort direction")]
+    public void ExcessiveIdentifierLengthsAreRejectedBeforeLookup(string field, string description)
+    {
+        var exception = Assert.Throws<SemanticValidationException>(() =>
+            _compiler.Compile(QueryWithOversizedIdentifier(field))
+        );
+
+        Assert.Equal($"Query {description} cannot exceed 128 characters.", exception.Message);
+    }
+
+    [Fact]
+    public void MaximumFilterSortAndStringValueLimitsCompile()
+    {
+        var filters = Enumerable
+            .Range(0, 64)
+            .Select(index => new FilterQuery(
+                "book_type",
+                FilterOperator.Equals,
+                [index == 0 ? new string('x', 1_024) : $"type-{index}"]
+            ))
+            .ToArray();
+        var sorts = Enumerable.Repeat(new SortQuery("revenue_eur", "asc"), 16).ToArray();
+
+        var compiled = _compiler.Compile(
+            Query(filters: filters, sorts: sorts, offset: int.MaxValue)
+        );
+
+        Assert.Equal(66, compiled.Parameters.Count);
+        Assert.Equal(int.MaxValue, compiled.Parameters["@p65"]);
+    }
+
+    [Fact]
+    public void MaximumPerFilterAndTotalValueLimitsCompile()
+    {
+        var values = Enumerable.Range(0, 256).Select(index => (object)$"type-{index}").ToArray();
+        var filters = Enumerable
+            .Range(0, 4)
+            .Select(_ => new FilterQuery("book_type", FilterOperator.In, values))
+            .ToArray();
+
+        var compiled = _compiler.Compile(Query(filters: filters));
+
+        Assert.Equal(1_026, compiled.Parameters.Count);
+        Assert.Contains("@p1023", compiled.SqlText, StringComparison.Ordinal);
+    }
+
+    private static JsonQueryAst Query(
+        string modelName = "delivery_pnl_analytics",
+        IReadOnlyList<string>? measures = null,
+        IReadOnlyList<string>? metrics = null,
+        IReadOnlyList<string>? dimensions = null,
+        IReadOnlyList<TimeDimensionQuery>? timeDimensions = null,
+        IReadOnlyList<FilterQuery>? filters = null,
+        IReadOnlyList<SortQuery>? sorts = null,
+        int? offset = null
+    ) =>
+        new(
+            modelName,
+            measures ?? ["revenue_eur"],
+            metrics,
+            dimensions,
+            timeDimensions,
+            filters,
+            sorts,
+            null,
+            offset
+        );
+
+    private static JsonQueryAst QueryWithOversizedIdentifier(string field)
+    {
+        var oversized = new string('x', 129);
+        return field switch
+        {
+            "model" => Query(modelName: oversized),
+            "measure" => Query(measures: [oversized]),
+            "metric" => Query(metrics: [oversized]),
+            "dimension" => Query(dimensions: [oversized]),
+            "time-member" => Query(
+                timeDimensions: [new TimeDimensionQuery(oversized, "month", null)]
+            ),
+            "granularity" => Query(
+                timeDimensions: [new TimeDimensionQuery("supply_month", oversized, null)]
+            ),
+            "filter" => Query(
+                filters: [new FilterQuery(oversized, FilterOperator.Equals, ["value"])]
+            ),
+            "sort-member" => Query(sorts: [new SortQuery(oversized, "asc")]),
+            "sort-direction" => Query(sorts: [new SortQuery("revenue_eur", oversized)]),
+            _ => throw new ArgumentOutOfRangeException(nameof(field), field, null),
+        };
+    }
+
     private static JsonElement Json(string json)
     {
         using var document = JsonDocument.Parse(json);

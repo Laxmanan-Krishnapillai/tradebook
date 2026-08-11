@@ -19,8 +19,8 @@
     "tailwindcss",
     "shadcn",
     "@argos-ci/cli",
-    "@fontsource-variable/inter",
-    "@fontsource-variable/roboto-mono",
+    "@fontsource-variable/instrument-sans",
+    "@fontsource/ibm-plex-mono",
     "tw-animate-css"
   ],
   "vite": {

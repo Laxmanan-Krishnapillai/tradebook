@@ -58,11 +58,11 @@ function WorkflowStepNode({ id, data }: NodeProps<WorkflowNode>) {
     : undefined;
 
   return (
-    <div ref={setNodeRef} className={`min-w-44 rounded-xl border bg-white shadow-lg ${isDragging ? 'z-2 border-brand-600 shadow-xl' : 'border-gray-400'}`} style={style}>
+    <div ref={setNodeRef} className={`min-w-44 rounded-md border bg-card ${isDragging ? 'z-2 border-brand-600' : 'border-border'}`} style={style}>
       <Handle type="target" position={Position.Left} />
       <button
         type="button"
-        className="flex w-full cursor-grab flex-col items-start gap-1 bg-transparent p-4 text-left text-gray-900 active:cursor-grabbing"
+        className="flex w-full cursor-grab flex-col items-start gap-1 border-0 bg-transparent p-4 text-left text-foreground active:cursor-grabbing"
         aria-label={`Move ${data.label}`}
         {...attributes}
         {...listeners}
@@ -108,13 +108,13 @@ function WorkflowCanvasContent() {
     <section className="min-w-0">
       <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
         <div>
-          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Operations</p>
+          <p className="eyebrow">Operations</p>
           <h2>Workflow canvas</h2>
           <p id="workflow-canvas-help">Drag steps to arrange them. Drag between handles to connect them.</p>
         </div>
         <button type="button" onClick={addStep}>Add step</button>
       </header>
-      <div className="h-176 min-h-112 overflow-hidden rounded-xl border border-gray-200 bg-white" aria-describedby="workflow-canvas-help">
+      <div className="h-176 min-h-112 overflow-hidden rounded-md border border-border bg-background" aria-describedby="workflow-canvas-help">
         <ZoomAwareDndContext onDragEnd={handleDragEnd}>
           <ReactFlow<WorkflowNode, Edge>
             aria-label="Workflow editor"

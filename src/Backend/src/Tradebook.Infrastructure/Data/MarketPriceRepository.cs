@@ -95,9 +95,9 @@ public sealed class MarketPriceRepository(
             request.ToDate,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM market_prices WHERE (@FromDate IS NULL OR price_date >= @FromDate) AND (@ToDate IS NULL OR price_date <= @ToDate) ORDER BY price_date DESC LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM market_prices WHERE (@FromDate::date IS NULL OR price_date >= @FromDate) AND (@ToDate::date IS NULL OR price_date <= @ToDate) ORDER BY price_date DESC LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM market_prices WHERE (@FromDate IS NULL OR price_date >= @FromDate) AND (@ToDate IS NULL OR price_date <= @ToDate)";
+            "SELECT COUNT(*) FROM market_prices WHERE (@FromDate::date IS NULL OR price_date >= @FromDate) AND (@ToDate::date IS NULL OR price_date <= @ToDate)";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {

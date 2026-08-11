@@ -26,6 +26,22 @@ afterEach(() => {
 });
 
 describe('Task 23 design system', () => {
+  it('standardizes ShadCN generation and owned primitives on stable Base UI', () => {
+    const config = JSON.parse(source('components.json')) as { style?: string; iconLibrary?: string };
+    const packageManifest = JSON.parse(source('package.json')) as { dependencies?: Record<string, string> };
+
+    expect(config.style).toBe('base-nova');
+    expect(config.iconLibrary).toBe('lucide');
+    expect(packageManifest.dependencies?.['@base-ui/react']).toBe('1.7.0');
+    expect(packageManifest.dependencies?.['@base-ui-components/react']).toBeUndefined();
+
+    const uiSource = readdirSync(resolve(frontendRoot, 'src/components/ui'))
+      .filter((file) => file.endsWith('.tsx'))
+      .map((file) => source(`src/components/ui/${file}`))
+      .join('\n');
+    expect(uiSource).not.toContain('@base-ui-components/react');
+  });
+
   it('DS-02 and DS-05 render live numbers with stable OpenType numerals', () => {
     const { container, rerender } = render(<NumericCell animate value={1200} />);
     expect(container.firstElementChild?.classList.contains('tabular-nums')).toBe(true);
@@ -38,9 +54,21 @@ describe('Task 23 design system', () => {
 
   it('DS-04 keeps dark neutral hue stable while swapping lightness', () => {
     const css = source('src/styles.css');
-    expect(css).toMatch(/:root[\s\S]*--neutral-50: oklch\(0\.985 0\.002 265\)/);
-    expect(css).toMatch(/\.dark[\s\S]*--neutral-50: oklch\(0\.146 0\.006 265\)/);
+    expect(css).toMatch(/:root[\s\S]*--neutral-50: oklch\(0\.985 0\.002 285\)/);
+    expect(css).toMatch(/:root[\s\S]*--neutral-900: oklch\(0\.18 0\.007 285\)/);
+    expect(css).toMatch(/\.dark[\s\S]*--neutral-50: oklch\(0\.145 0\.006 285\)/);
+    expect(css).toMatch(/\.dark[\s\S]*--neutral-900: oklch\(0\.94 0\.003 285\)/);
     expect(css).not.toContain('filter: invert');
+  });
+
+  it('DS-14 loads redesigned typography tokens and font imports', () => {
+    const css = source('src/styles.css');
+    const fontsCss = source('src/styles/fonts.css');
+    expect(css).toContain('--font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;');
+    expect(css).toContain('--font-mono: "IBM Plex Mono", ui-monospace, monospace;');
+    expect(fontsCss).toContain('@import "@fontsource-variable/instrument-sans";');
+    expect(fontsCss).toContain('@import "@fontsource/ibm-plex-mono/400.css";');
+    expect(fontsCss).toContain('@import "@fontsource/ibm-plex-mono/500.css";');
   });
 
   it('DS-03, DS-07, DS-08, DS-09 and DS-12 preserve static design and performance contracts', () => {
@@ -74,6 +102,29 @@ describe('Task 23 design system', () => {
     expect(source('src/styles.css')).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
+  it('keeps the system theme live and exposes an explicit appearance preference', () => {
+    let systemDark = false;
+    let themeListener: (() => void) | undefined;
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      get matches() { return systemDark; },
+      addEventListener: vi.fn((_event: string, listener: () => void) => { themeListener = listener; }),
+      removeEventListener: vi.fn(),
+    })));
+
+    render(<MotionProvider><DensityToggle /></MotionProvider>);
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    systemDark = true;
+    themeListener?.();
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Light' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(usePreferences.getState().theme).toBe('light');
+    fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(usePreferences.getState().theme).toBe('dark');
+  });
+
   it('DS-09 supplies layout-matched skeleton and designed empty treatments', () => {
     render(<><Skeleton data-testid="skeleton" /><TableSkeleton rows={2} columns={3} /><EmptyState title="No trades" description="Create a trade to begin." /></>);
     expect(screen.getByTestId('skeleton').getAttribute('aria-hidden')).toBe('true');
@@ -90,6 +141,11 @@ describe('Task 23 design system', () => {
   });
 
   it('DS-11 toggles condensed regular and relaxed table density', () => {
+    const gridSource = source('src/components/grid/VirtualizedDataTable.tsx');
+    expect(gridSource).toContain('condensed: 34');
+    expect(gridSource).toContain('regular: 42');
+    expect(gridSource).toContain('relaxed: 48');
+
     render(<><DensityToggle /><Table><tbody><TableRow><TableCell>Trade</TableCell></TableRow></tbody></Table></>);
     fireEvent.click(screen.getByRole('button', { name: 'condensed' }));
     expect(screen.getByRole('table').getAttribute('data-density')).toBe('condensed');
