@@ -14,30 +14,21 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedBioticketsRouteImport } from './routes/_authenticated.biotickets'
+import { Route as AuthenticatedCapacityBookingsRouteImport } from './routes/_authenticated.capacity-bookings'
 import { Route as AuthenticatedContractsRouteImport } from './routes/_authenticated.contracts'
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated.deliveries'
+import { Route as AuthenticatedGooCertificatesRouteImport } from './routes/_authenticated.goo-certificates'
+import { Route as AuthenticatedHedgesRouteImport } from './routes/_authenticated.hedges'
 import { Route as AuthenticatedMarketPricesRouteImport } from './routes/_authenticated.market-prices'
+import { Route as AuthenticatedTaxTariffsRouteImport } from './routes/_authenticated.tax-tariffs'
+import { Route as AuthenticatedTransfersRouteImport } from './routes/_authenticated.transfers'
 
-const AuthenticatedBioticketsLazyRouteImport = createFileRoute(
-  '/_authenticated/biotickets',
-)()
-const AuthenticatedCapacityBookingsLazyRouteImport = createFileRoute(
-  '/_authenticated/capacity-bookings',
+const AuthenticatedAssistantLazyRouteImport = createFileRoute(
+  '/_authenticated/assistant',
 )()
 const AuthenticatedDashboardLazyRouteImport = createFileRoute(
   '/_authenticated/dashboard',
-)()
-const AuthenticatedGooCertificatesLazyRouteImport = createFileRoute(
-  '/_authenticated/goo-certificates',
-)()
-const AuthenticatedHedgesLazyRouteImport = createFileRoute(
-  '/_authenticated/hedges',
-)()
-const AuthenticatedTaxTariffsLazyRouteImport = createFileRoute(
-  '/_authenticated/tax-tariffs',
-)()
-const AuthenticatedTransfersLazyRouteImport = createFileRoute(
-  '/_authenticated/transfers',
 )()
 const AuthenticatedWorkflowLazyRouteImport = createFileRoute(
   '/_authenticated/workflow',
@@ -57,16 +48,23 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedBioticketsLazyRoute =
-  AuthenticatedBioticketsLazyRouteImport.update({
-    id: '/biotickets',
-    path: '/biotickets',
+const AuthenticatedAssistantLazyRoute =
+  AuthenticatedAssistantLazyRouteImport.update({
+    id: '/assistant',
+    path: '/assistant',
     getParentRoute: () => AuthenticatedRoute,
   } as any).lazy(() =>
-    import('./routes/_authenticated.biotickets.lazy').then((d) => d.Route),
+    import('./routes/_authenticated.assistant.lazy').then((d) => d.Route),
   )
-const AuthenticatedCapacityBookingsLazyRoute =
-  AuthenticatedCapacityBookingsLazyRouteImport.update({
+const AuthenticatedBioticketsRoute = AuthenticatedBioticketsRouteImport.update({
+  id: '/biotickets',
+  path: '/biotickets',
+  getParentRoute: () => AuthenticatedRoute,
+} as any).lazy(() =>
+  import('./routes/_authenticated.biotickets.lazy').then((d) => d.Route),
+)
+const AuthenticatedCapacityBookingsRoute =
+  AuthenticatedCapacityBookingsRouteImport.update({
     id: '/capacity-bookings',
     path: '/capacity-bookings',
     getParentRoute: () => AuthenticatedRoute,
@@ -93,8 +91,8 @@ const AuthenticatedDeliveriesRoute = AuthenticatedDeliveriesRouteImport.update({
   path: '/deliveries',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedGooCertificatesLazyRoute =
-  AuthenticatedGooCertificatesLazyRouteImport.update({
+const AuthenticatedGooCertificatesRoute =
+  AuthenticatedGooCertificatesRouteImport.update({
     id: '/goo-certificates',
     path: '/goo-certificates',
     getParentRoute: () => AuthenticatedRoute,
@@ -103,7 +101,7 @@ const AuthenticatedGooCertificatesLazyRoute =
       (d) => d.Route,
     ),
   )
-const AuthenticatedHedgesLazyRoute = AuthenticatedHedgesLazyRouteImport.update({
+const AuthenticatedHedgesRoute = AuthenticatedHedgesRouteImport.update({
   id: '/hedges',
   path: '/hedges',
   getParentRoute: () => AuthenticatedRoute,
@@ -116,22 +114,20 @@ const AuthenticatedMarketPricesRoute =
     path: '/market-prices',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedTaxTariffsLazyRoute =
-  AuthenticatedTaxTariffsLazyRouteImport.update({
-    id: '/tax-tariffs',
-    path: '/tax-tariffs',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.tax-tariffs.lazy').then((d) => d.Route),
-  )
-const AuthenticatedTransfersLazyRoute =
-  AuthenticatedTransfersLazyRouteImport.update({
-    id: '/transfers',
-    path: '/transfers',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated.transfers.lazy').then((d) => d.Route),
-  )
+const AuthenticatedTaxTariffsRoute = AuthenticatedTaxTariffsRouteImport.update({
+  id: '/tax-tariffs',
+  path: '/tax-tariffs',
+  getParentRoute: () => AuthenticatedRoute,
+} as any).lazy(() =>
+  import('./routes/_authenticated.tax-tariffs.lazy').then((d) => d.Route),
+)
+const AuthenticatedTransfersRoute = AuthenticatedTransfersRouteImport.update({
+  id: '/transfers',
+  path: '/transfers',
+  getParentRoute: () => AuthenticatedRoute,
+} as any).lazy(() =>
+  import('./routes/_authenticated.transfers.lazy').then((d) => d.Route),
+)
 const AuthenticatedWorkflowLazyRoute =
   AuthenticatedWorkflowLazyRouteImport.update({
     id: '/workflow',
@@ -144,31 +140,33 @@ const AuthenticatedWorkflowLazyRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/biotickets': typeof AuthenticatedBioticketsRoute
+  '/capacity-bookings': typeof AuthenticatedCapacityBookingsRoute
   '/contracts': typeof AuthenticatedContractsRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
+  '/goo-certificates': typeof AuthenticatedGooCertificatesRoute
+  '/hedges': typeof AuthenticatedHedgesRoute
   '/market-prices': typeof AuthenticatedMarketPricesRoute
-  '/biotickets': typeof AuthenticatedBioticketsLazyRoute
-  '/capacity-bookings': typeof AuthenticatedCapacityBookingsLazyRoute
+  '/tax-tariffs': typeof AuthenticatedTaxTariffsRoute
+  '/transfers': typeof AuthenticatedTransfersRoute
+  '/assistant': typeof AuthenticatedAssistantLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
-  '/goo-certificates': typeof AuthenticatedGooCertificatesLazyRoute
-  '/hedges': typeof AuthenticatedHedgesLazyRoute
-  '/tax-tariffs': typeof AuthenticatedTaxTariffsLazyRoute
-  '/transfers': typeof AuthenticatedTransfersLazyRoute
   '/workflow': typeof AuthenticatedWorkflowLazyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/biotickets': typeof AuthenticatedBioticketsRoute
+  '/capacity-bookings': typeof AuthenticatedCapacityBookingsRoute
   '/contracts': typeof AuthenticatedContractsRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
+  '/goo-certificates': typeof AuthenticatedGooCertificatesRoute
+  '/hedges': typeof AuthenticatedHedgesRoute
   '/market-prices': typeof AuthenticatedMarketPricesRoute
-  '/biotickets': typeof AuthenticatedBioticketsLazyRoute
-  '/capacity-bookings': typeof AuthenticatedCapacityBookingsLazyRoute
+  '/tax-tariffs': typeof AuthenticatedTaxTariffsRoute
+  '/transfers': typeof AuthenticatedTransfersRoute
+  '/assistant': typeof AuthenticatedAssistantLazyRoute
   '/dashboard': typeof AuthenticatedDashboardLazyRoute
-  '/goo-certificates': typeof AuthenticatedGooCertificatesLazyRoute
-  '/hedges': typeof AuthenticatedHedgesLazyRoute
-  '/tax-tariffs': typeof AuthenticatedTaxTariffsLazyRoute
-  '/transfers': typeof AuthenticatedTransfersLazyRoute
   '/workflow': typeof AuthenticatedWorkflowLazyRoute
 }
 export interface FileRoutesById {
@@ -176,16 +174,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/biotickets': typeof AuthenticatedBioticketsRoute
+  '/_authenticated/capacity-bookings': typeof AuthenticatedCapacityBookingsRoute
   '/_authenticated/contracts': typeof AuthenticatedContractsRoute
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
+  '/_authenticated/goo-certificates': typeof AuthenticatedGooCertificatesRoute
+  '/_authenticated/hedges': typeof AuthenticatedHedgesRoute
   '/_authenticated/market-prices': typeof AuthenticatedMarketPricesRoute
-  '/_authenticated/biotickets': typeof AuthenticatedBioticketsLazyRoute
-  '/_authenticated/capacity-bookings': typeof AuthenticatedCapacityBookingsLazyRoute
+  '/_authenticated/tax-tariffs': typeof AuthenticatedTaxTariffsRoute
+  '/_authenticated/transfers': typeof AuthenticatedTransfersRoute
+  '/_authenticated/assistant': typeof AuthenticatedAssistantLazyRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardLazyRoute
-  '/_authenticated/goo-certificates': typeof AuthenticatedGooCertificatesLazyRoute
-  '/_authenticated/hedges': typeof AuthenticatedHedgesLazyRoute
-  '/_authenticated/tax-tariffs': typeof AuthenticatedTaxTariffsLazyRoute
-  '/_authenticated/transfers': typeof AuthenticatedTransfersLazyRoute
   '/_authenticated/workflow': typeof AuthenticatedWorkflowLazyRoute
 }
 export interface FileRouteTypes {
@@ -193,47 +192,50 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
-    | '/contracts'
-    | '/deliveries'
-    | '/market-prices'
     | '/biotickets'
     | '/capacity-bookings'
-    | '/dashboard'
+    | '/contracts'
+    | '/deliveries'
     | '/goo-certificates'
     | '/hedges'
+    | '/market-prices'
     | '/tax-tariffs'
     | '/transfers'
+    | '/assistant'
+    | '/dashboard'
     | '/workflow'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/contracts'
-    | '/deliveries'
-    | '/market-prices'
     | '/biotickets'
     | '/capacity-bookings'
-    | '/dashboard'
+    | '/contracts'
+    | '/deliveries'
     | '/goo-certificates'
     | '/hedges'
+    | '/market-prices'
     | '/tax-tariffs'
     | '/transfers'
+    | '/assistant'
+    | '/dashboard'
     | '/workflow'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
-    | '/_authenticated/contracts'
-    | '/_authenticated/deliveries'
-    | '/_authenticated/market-prices'
     | '/_authenticated/biotickets'
     | '/_authenticated/capacity-bookings'
-    | '/_authenticated/dashboard'
+    | '/_authenticated/contracts'
+    | '/_authenticated/deliveries'
     | '/_authenticated/goo-certificates'
     | '/_authenticated/hedges'
+    | '/_authenticated/market-prices'
     | '/_authenticated/tax-tariffs'
     | '/_authenticated/transfers'
+    | '/_authenticated/assistant'
+    | '/_authenticated/dashboard'
     | '/_authenticated/workflow'
   fileRoutesById: FileRoutesById
 }
@@ -266,18 +268,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/assistant': {
+      id: '/_authenticated/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AuthenticatedAssistantLazyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/biotickets': {
       id: '/_authenticated/biotickets'
       path: '/biotickets'
       fullPath: '/biotickets'
-      preLoaderRoute: typeof AuthenticatedBioticketsLazyRouteImport
+      preLoaderRoute: typeof AuthenticatedBioticketsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/capacity-bookings': {
       id: '/_authenticated/capacity-bookings'
       path: '/capacity-bookings'
       fullPath: '/capacity-bookings'
-      preLoaderRoute: typeof AuthenticatedCapacityBookingsLazyRouteImport
+      preLoaderRoute: typeof AuthenticatedCapacityBookingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/contracts': {
@@ -305,14 +314,14 @@ declare module '@tanstack/react-router' {
       id: '/_authenticated/goo-certificates'
       path: '/goo-certificates'
       fullPath: '/goo-certificates'
-      preLoaderRoute: typeof AuthenticatedGooCertificatesLazyRouteImport
+      preLoaderRoute: typeof AuthenticatedGooCertificatesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/hedges': {
       id: '/_authenticated/hedges'
       path: '/hedges'
       fullPath: '/hedges'
-      preLoaderRoute: typeof AuthenticatedHedgesLazyRouteImport
+      preLoaderRoute: typeof AuthenticatedHedgesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/market-prices': {
@@ -326,14 +335,14 @@ declare module '@tanstack/react-router' {
       id: '/_authenticated/tax-tariffs'
       path: '/tax-tariffs'
       fullPath: '/tax-tariffs'
-      preLoaderRoute: typeof AuthenticatedTaxTariffsLazyRouteImport
+      preLoaderRoute: typeof AuthenticatedTaxTariffsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/transfers': {
       id: '/_authenticated/transfers'
       path: '/transfers'
       fullPath: '/transfers'
-      preLoaderRoute: typeof AuthenticatedTransfersLazyRouteImport
+      preLoaderRoute: typeof AuthenticatedTransfersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/workflow': {
@@ -347,31 +356,32 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedBioticketsRoute: typeof AuthenticatedBioticketsRoute
+  AuthenticatedCapacityBookingsRoute: typeof AuthenticatedCapacityBookingsRoute
   AuthenticatedContractsRoute: typeof AuthenticatedContractsRoute
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
+  AuthenticatedGooCertificatesRoute: typeof AuthenticatedGooCertificatesRoute
+  AuthenticatedHedgesRoute: typeof AuthenticatedHedgesRoute
   AuthenticatedMarketPricesRoute: typeof AuthenticatedMarketPricesRoute
-  AuthenticatedBioticketsLazyRoute: typeof AuthenticatedBioticketsLazyRoute
-  AuthenticatedCapacityBookingsLazyRoute: typeof AuthenticatedCapacityBookingsLazyRoute
+  AuthenticatedTaxTariffsRoute: typeof AuthenticatedTaxTariffsRoute
+  AuthenticatedTransfersRoute: typeof AuthenticatedTransfersRoute
+  AuthenticatedAssistantLazyRoute: typeof AuthenticatedAssistantLazyRoute
   AuthenticatedDashboardLazyRoute: typeof AuthenticatedDashboardLazyRoute
-  AuthenticatedGooCertificatesLazyRoute: typeof AuthenticatedGooCertificatesLazyRoute
-  AuthenticatedHedgesLazyRoute: typeof AuthenticatedHedgesLazyRoute
-  AuthenticatedTaxTariffsLazyRoute: typeof AuthenticatedTaxTariffsLazyRoute
-  AuthenticatedTransfersLazyRoute: typeof AuthenticatedTransfersLazyRoute
   AuthenticatedWorkflowLazyRoute: typeof AuthenticatedWorkflowLazyRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedBioticketsRoute: AuthenticatedBioticketsRoute,
+  AuthenticatedCapacityBookingsRoute: AuthenticatedCapacityBookingsRoute,
   AuthenticatedContractsRoute: AuthenticatedContractsRoute,
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
+  AuthenticatedGooCertificatesRoute: AuthenticatedGooCertificatesRoute,
+  AuthenticatedHedgesRoute: AuthenticatedHedgesRoute,
   AuthenticatedMarketPricesRoute: AuthenticatedMarketPricesRoute,
-  AuthenticatedBioticketsLazyRoute: AuthenticatedBioticketsLazyRoute,
-  AuthenticatedCapacityBookingsLazyRoute:
-    AuthenticatedCapacityBookingsLazyRoute,
+  AuthenticatedTaxTariffsRoute: AuthenticatedTaxTariffsRoute,
+  AuthenticatedTransfersRoute: AuthenticatedTransfersRoute,
+  AuthenticatedAssistantLazyRoute: AuthenticatedAssistantLazyRoute,
   AuthenticatedDashboardLazyRoute: AuthenticatedDashboardLazyRoute,
-  AuthenticatedGooCertificatesLazyRoute: AuthenticatedGooCertificatesLazyRoute,
-  AuthenticatedHedgesLazyRoute: AuthenticatedHedgesLazyRoute,
-  AuthenticatedTaxTariffsLazyRoute: AuthenticatedTaxTariffsLazyRoute,
-  AuthenticatedTransfersLazyRoute: AuthenticatedTransfersLazyRoute,
   AuthenticatedWorkflowLazyRoute: AuthenticatedWorkflowLazyRoute,
 }
 

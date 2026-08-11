@@ -57,9 +57,9 @@ public sealed class BioticketRepository(
             request.ToMonth,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM bioticket_deliveries WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@BookType IS NULL OR book_type::text = @BookType) AND (@Status IS NULL OR status::text = @Status) AND (@FromMonth IS NULL OR contract_month >= @FromMonth) AND (@ToMonth IS NULL OR contract_month <= @ToMonth) ORDER BY contract_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM bioticket_deliveries WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@BookType::text IS NULL OR book_type::text = @BookType) AND (@Status::text IS NULL OR status::text = @Status) AND (@FromMonth::date IS NULL OR contract_month >= @FromMonth) AND (@ToMonth::date IS NULL OR contract_month <= @ToMonth) ORDER BY contract_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM bioticket_deliveries WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@BookType IS NULL OR book_type::text = @BookType) AND (@Status IS NULL OR status::text = @Status) AND (@FromMonth IS NULL OR contract_month >= @FromMonth) AND (@ToMonth IS NULL OR contract_month <= @ToMonth)";
+            "SELECT COUNT(*) FROM bioticket_deliveries WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@BookType::text IS NULL OR book_type::text = @BookType) AND (@Status::text IS NULL OR status::text = @Status) AND (@FromMonth::date IS NULL OR contract_month >= @FromMonth) AND (@ToMonth::date IS NULL OR contract_month <= @ToMonth)";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {

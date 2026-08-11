@@ -34,5 +34,6 @@ public static class VogenTypeHandlers
         SqlMapper.AddTypeHandler(new PriceTypeHandler());
         SqlMapper.AddTypeHandler(new QuantityTypeHandler());
         SqlMapper.AddTypeHandler(new AmountTypeHandler());
+        SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
     }
 }

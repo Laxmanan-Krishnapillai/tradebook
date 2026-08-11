@@ -983,7 +983,7 @@ public sealed class WolverineMessagingTests(PostgresTestFixture postgres)
             Issuer = "Tradebook",
             Audience = "Tradebook",
             Subject = new ClaimsIdentity([
-                new Claim("sub", TestActorId.ToString()),
+                new Claim("oid", TestActorId.ToString()),
                 new Claim(ClaimTypes.Role, "Admin"),
             ]),
             Expires = TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(10),

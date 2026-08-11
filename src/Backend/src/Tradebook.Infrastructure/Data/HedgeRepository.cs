@@ -51,9 +51,9 @@ public sealed class HedgeRepository(
             request.ToMonth,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM hedges WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@FromMonth IS NULL OR month >= @FromMonth) AND (@ToMonth IS NULL OR month <= @ToMonth) ORDER BY month DESC, id LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM hedges WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@FromMonth::date IS NULL OR month >= @FromMonth) AND (@ToMonth::date IS NULL OR month <= @ToMonth) ORDER BY month DESC, id LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM hedges WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@FromMonth IS NULL OR month >= @FromMonth) AND (@ToMonth IS NULL OR month <= @ToMonth)";
+            "SELECT COUNT(*) FROM hedges WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@FromMonth::date IS NULL OR month >= @FromMonth) AND (@ToMonth::date IS NULL OR month <= @ToMonth)";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {

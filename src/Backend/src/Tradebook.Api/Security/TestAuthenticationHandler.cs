@@ -32,14 +32,12 @@ internal sealed class TestAuthenticationHandler(
             if (token.ValidTo <= TimeProvider.System.GetUtcNow().UtcDateTime)
                 return Task.FromResult(AuthenticateResult.Fail("Expired test token."));
             var claims = token.Claims.ToList();
-            var subject = claims.FirstOrDefault(c => c.Type is "oid" or "sub")?.Value;
-            if (subject is null || !Guid.TryParse(subject, out _))
-                return Task.FromResult(
-                    AuthenticateResult.Fail("Test token subject must be a UUID.")
-                );
+            var objectId = claims.FirstOrDefault(c => c.Type is "oid")?.Value;
+            if (objectId is null || !Guid.TryParse(objectId, out _))
+                return Task.FromResult(AuthenticateResult.Fail("Test token oid must be a UUID."));
             claims.RemoveAll(c => c.Type is "oid" or "tid" or "tradebook_tenant" or "scp");
             claims.AddRange([
-                new("oid", subject),
+                new("oid", objectId),
                 new("tid", entra.Value.TenantId),
                 new("tradebook_tenant", entra.Value.TenantId),
                 new("scp", "access_as_user"),

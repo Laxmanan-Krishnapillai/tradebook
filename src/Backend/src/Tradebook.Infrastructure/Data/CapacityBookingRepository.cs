@@ -56,9 +56,9 @@ public sealed class CapacityBookingRepository(
             request.ToMonth,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM capacity_bookings WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@FromMonth IS NULL OR supply_month >= @FromMonth) AND (@ToMonth IS NULL OR supply_month <= @ToMonth) ORDER BY supply_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM capacity_bookings WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@FromMonth::date IS NULL OR supply_month >= @FromMonth) AND (@ToMonth::date IS NULL OR supply_month <= @ToMonth) ORDER BY supply_month DESC, contract_instance_id LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM capacity_bookings WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@FromMonth IS NULL OR supply_month >= @FromMonth) AND (@ToMonth IS NULL OR supply_month <= @ToMonth)";
+            "SELECT COUNT(*) FROM capacity_bookings WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@FromMonth::date IS NULL OR supply_month >= @FromMonth) AND (@ToMonth::date IS NULL OR supply_month <= @ToMonth)";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {

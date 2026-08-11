@@ -11,7 +11,7 @@ SELECT (substr(md5('task09-contract-' || n),1,8)||'-'||substr(md5('task09-contra
        'TASK09-' || n, '09000000-0000-4000-8000-000000000002', 'Gas', 'Buy'
 FROM generate_series(1, 100000) AS series(n) ON CONFLICT (contract_name) DO NOTHING;
 INSERT INTO physical_deliveries (contract_id, contract_instance_id, book_type, supply_month, volume_nominated_mwh, volume_realised_mwh, volume_mwh, price_mechanism, start_day, end_day)
-SELECT id, contract_name || '.Sourcing.2026-03', 'Sourcing', DATE '2026-03-01', 12000, 11840, 11840, 'Fixed', DATE '2026-03-01', DATE '2026-03-31'
+SELECT id, fn_generate_contract_instance(contract_name, DATE '2026-03-01'), 'Sourcing', DATE '2026-03-01', 12000, 11840, 11840, 'FIXED', DATE '2026-03-01', DATE '2026-03-31'
 FROM contracts WHERE contract_name LIKE 'TASK09-%' ON CONFLICT (contract_id, supply_month, book_type) DO NOTHING;
 COMMIT;
 \echo E2E_CONTRACT_ID=09000000-0000-4000-8000-000000000003

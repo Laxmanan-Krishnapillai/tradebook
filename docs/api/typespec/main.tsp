@@ -100,15 +100,78 @@ alias ApiResult<T> = T | ProblemDetails;
 model GetEventsSinceRequest { @query after: int64; }
 @route("/api/v1/events") interface Events { @get list(...GetEventsSinceRequest): ApiResult<GetEventsSinceResponse>; }
 
+model GetActivityRequest {
+  @path entityName: string;
+  @path entityId: string;
+  @query pageSize?: int32 = 100;
+}
+@route("/api/v1/activity") interface Activity {
+  @get @route("/{entityName}/{entityId}") list(...GetActivityRequest): ApiResult<GetActivityResponse>;
+}
+
 model DashboardPayload { dashboardId: string; version: int64; layout: unknown; }
 @route("/api/v1/dashboards") interface Dashboards {
   @get @route("/{dashboardId}") read(@path dashboardId: string): ApiResult<DashboardPayload>;
   @put @route("/{dashboardId}") save(@path dashboardId: string, @body request: DashboardPayload): ApiResult<DashboardPayload>;
 }
 
-model TimeDimensionQuery { dimension: string; granularity: string; dateRange?: string[] | null; }
-model FilterQuery { member: string; operator: string; values: unknown[]; }
-model SortQuery { member: string; direction: string; }
-model JsonQueryAst { modelName: string; measures?: string[] | null; metrics?: string[] | null; dimensions?: string[] | null; timeDimensions?: TimeDimensionQuery[] | null; filters?: FilterQuery[] | null; sorts?: SortQuery[] | null; limit?: int32 | null; offset?: int32 | null; }
+@maxLength(128)
+scalar QueryIdentifier extends string;
+
+@maxItems(64)
+model QuerySelectedMemberList is Array<QueryIdentifier>;
+
+@maxLength(1024)
+scalar QueryStringFilterValue extends string;
+
+union QueryFilterValue {
+  stringValue: QueryStringFilterValue,
+  numberValue: float64,
+  booleanValue: boolean,
+}
+
+@maxItems(256)
+model QueryFilterValueList is Array<QueryFilterValue>;
+
+model TimeDimensionQuery {
+  dimension: QueryIdentifier;
+  granularity: QueryIdentifier;
+  dateRange?: QueryStringFilterValue[] | null;
+}
+
+@maxItems(16)
+model QueryTimeDimensionList is Array<TimeDimensionQuery>;
+
+model FilterQuery {
+  member: QueryIdentifier;
+  operator: string;
+  values: QueryFilterValueList;
+}
+
+@maxItems(64)
+model QueryFilterList is Array<FilterQuery>;
+
+model SortQuery {
+  member: QueryIdentifier;
+  direction: QueryIdentifier;
+}
+
+@maxItems(16)
+model QuerySortList is Array<SortQuery>;
+
+model JsonQueryAst {
+  modelName: QueryIdentifier;
+  measures?: QuerySelectedMemberList | null;
+  metrics?: QuerySelectedMemberList | null;
+  dimensions?: QuerySelectedMemberList | null;
+  timeDimensions?: QueryTimeDimensionList | null;
+  filters?: QueryFilterList | null;
+  sorts?: QuerySortList | null;
+  limit?: int32 | null;
+  offset?: int32 | null;
+}
 model AnalyticsQueryResponse { columns: string[]; rows: unknown[][]; }
 @route("/api/v1/analytics/query") interface Analytics { @post query(@body request: JsonQueryAst): ApiResult<AnalyticsQueryResponse>; }
+
+model InAppAgentStatusResponse { enabled: boolean; readOnly: boolean; transport: string; runPath: string; }
+@route("/api/v1/agent/status") interface Agent { @get status(): ApiResult<InAppAgentStatusResponse>; }

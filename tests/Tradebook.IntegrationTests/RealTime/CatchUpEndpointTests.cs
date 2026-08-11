@@ -201,7 +201,7 @@ public sealed class CatchUpEndpointTests(PostgresTestFixture postgres)
             Subject = new ClaimsIdentity(
                 new[]
                 {
-                    new Claim("sub", (actorId ?? Guid.NewGuid()).ToString()),
+                    new Claim("oid", (actorId ?? Guid.NewGuid()).ToString()),
                     new Claim(ClaimTypes.Role, "Trader"),
                 }
             ),

@@ -162,6 +162,7 @@ describe('mutation safety and reconciliation', () => {
 
     const view = render(<QueryClientProvider client={client}><DashboardPage /></QueryClientProvider>);
     await screen.findByRole('heading', { name: 'Private dashboard' });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save dashboard' }));
 
     expect((await screen.findByTestId('conflict-prompt')).textContent).toContain('Server dashboard');

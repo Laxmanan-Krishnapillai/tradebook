@@ -1,6 +1,7 @@
 import type { JsonQueryAst } from '../../types/semanticAst';
 import type { ChartWidgetConfig, VisualEncodingSpec } from '../../types/visualizations';
 import type { SemanticValueMembers } from '../../lib/analytics/semanticModelCatalog';
+import { MultiSelect, Select } from '../ui/select';
 
 interface QueryBindingConfiguratorProps {
   widget: ChartWidgetConfig;
@@ -19,10 +20,6 @@ function queryResultColumns(query: JsonQueryAst): string[] {
 
 function selectedValues(widget: ChartWidgetConfig): string[] {
   return [...(widget.queryAst.measures ?? []), ...(widget.queryAst.metrics ?? [])];
-}
-
-function selectedOptions(event: React.ChangeEvent<HTMLSelectElement>): string[] {
-  return Array.from(event.currentTarget.selectedOptions, (option) => option.value);
 }
 
 function optionalBinding(binding: string | undefined, validColumns: ReadonlySet<string>): string | undefined {
@@ -76,73 +73,63 @@ export function QueryBindingConfigurator({
 
   return <fieldset>
     <legend>Query and visual encoding — {widget.title}</legend>
-    <label>
-      Measures and metrics
-      <select
-        aria-label="Measures and metrics"
-        multiple
-        required
+    <div data-slot="query-binding-field">
+      <span>Measures and metrics</span>
+      <MultiSelect
+        label="Measures and metrics"
         disabled={!semanticMembers}
+        options={[
+          ...(semanticMembers?.measures ?? []).map((member) => ({ label: `Measure · ${member}`, value: member })),
+          ...(semanticMembers?.metrics ?? []).map((member) => ({ label: `Metric · ${member}`, value: member })),
+        ]}
         value={valueColumns}
-        onChange={(event) => {
+        onValueChange={(values) => {
           if (!semanticMembers) return;
-          const values = selectedOptions(event);
           if (values.length > 0) onChange(updateValueBindings(widget, semanticMembers, values));
         }}
-      >
-        <optgroup label="Measures">
-          {(semanticMembers?.measures ?? []).map((member) => <option key={member} value={member}>{member}</option>)}
-        </optgroup>
-        <optgroup label="Metrics">
-          {(semanticMembers?.metrics ?? []).map((member) => <option key={member} value={member}>{member}</option>)}
-        </optgroup>
-      </select>
-    </label>
+      />
+    </div>
     {!semanticMembers ? <p role="status">This semantic model has no registered query-binding catalog.</p> : null}
-    <label>
-      X axis
-      <select
+    <div data-slot="query-binding-field">
+      <span>X axis</span>
+      <Select
+        label="X axis"
+        options={availableColumns}
         value={widget.visualEncodings.xAxis}
-        onChange={(event) => onChange({
+        onValueChange={(xAxis) => onChange({
           ...widget,
-          visualEncodings: { ...widget.visualEncodings, xAxis: event.target.value }
+          visualEncodings: { ...widget.visualEncodings, xAxis }
         })}
-      >
-        {availableColumns.map((column) => <option key={column}>{column}</option>)}
-      </select>
-    </label>
-    <label>
-      Y axes
-      <select
-        multiple
-        required
+      />
+    </div>
+    <div data-slot="query-binding-field">
+      <span>Y axes</span>
+      <MultiSelect
+        label="Y axes"
+        options={valueColumns}
         value={widget.visualEncodings.yAxis}
-        onChange={(event) => {
-          const yAxis = selectedOptions(event);
+        onValueChange={(yAxis) => {
           if (yAxis.length > 0) onChange({
             ...widget,
             visualEncodings: { ...widget.visualEncodings, yAxis }
           });
         }}
-      >
-        {valueColumns.map((column) => <option key={column}>{column}</option>)}
-      </select>
-    </label>
-    <label>
-      Tooltips
-      <select
-        multiple
+      />
+    </div>
+    <div data-slot="query-binding-field">
+      <span>Tooltips</span>
+      <MultiSelect
+        label="Tooltips"
+        options={availableColumns}
         value={widget.visualEncodings.tooltipFields ?? []}
-        onChange={(event) => onChange({
+        onValueChange={(tooltipFields) => onChange({
           ...widget,
           visualEncodings: {
             ...widget.visualEncodings,
-            tooltipFields: selectedOptions(event)
+            tooltipFields
           }
         })}
-      >
-        {availableColumns.map((column) => <option key={column}>{column}</option>)}
-      </select>
-    </label>
+      />
+    </div>
   </fieldset>;
 }

@@ -21,7 +21,7 @@ internal static class RepositoryMutation
             )
         );
 
-    public static (int Page, int PageSize, int Offset) Page(
+    public static (int Page, int PageSize, long Offset) Page(
         int page,
         int pageSize,
         int maximum = 200
@@ -29,6 +29,7 @@ internal static class RepositoryMutation
     {
         var normalizedPage = Math.Max(1, page);
         var normalizedSize = Math.Clamp(pageSize, 1, maximum);
-        return (normalizedPage, normalizedSize, (normalizedPage - 1) * normalizedSize);
+        var offset = checked(((long)normalizedPage - 1) * normalizedSize);
+        return (normalizedPage, normalizedSize, offset);
     }
 }

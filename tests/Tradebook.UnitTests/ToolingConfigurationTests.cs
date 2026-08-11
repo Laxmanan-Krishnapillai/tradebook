@@ -425,6 +425,78 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
+    public void RuntimeImagePublishesViteAssetsWithTheApiStaticAssetManifest()
+    {
+        var dockerfile = File.ReadAllText(FindRepositoryFile("Dockerfile"));
+        var frontendCopy = dockerfile.IndexOf(
+            "COPY --from=frontend /src/Frontend/dist ./src/Backend/src/Tradebook.Api/wwwroot",
+            StringComparison.Ordinal
+        );
+        var apiPublishStage = dockerfile.IndexOf(
+            "FROM backend AS api-publish",
+            StringComparison.Ordinal
+        );
+        var apiPublish = dockerfile.IndexOf(
+            "RUN dotnet publish src/Backend/src/Tradebook.Api/Tradebook.Api.csproj",
+            StringComparison.Ordinal
+        );
+
+        Assert.InRange(frontendCopy, apiPublishStage + 1, apiPublish - 1);
+        Assert.DoesNotContain(
+            "COPY --from=frontend /src/Frontend/dist ./wwwroot",
+            dockerfile,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "COPY --from=api-publish /app/publish ./",
+            dockerfile,
+            StringComparison.Ordinal
+        );
+
+        var databaseOperationsStage = dockerfile[
+            dockerfile.IndexOf(
+                "FROM postgres:17-bookworm AS database-ops",
+                StringComparison.Ordinal
+            )..dockerfile.IndexOf(
+                "FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime",
+                StringComparison.Ordinal
+            )
+        ];
+        Assert.Contains(
+            "COPY --from=backend /app/migrator/",
+            databaseOperationsStage,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain("--from=frontend", databaseOperationsStage, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "--from=api-publish",
+            databaseOperationsStage,
+            StringComparison.Ordinal
+        );
+    }
+
+    [Fact]
+    public void ApiMapsStaticAssetsBeforeTheSpaFallback()
+    {
+        var program = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "Backend",
+                "src",
+                "Tradebook.Api",
+                "Program.cs"
+            )
+        );
+        var staticAssets = program.IndexOf(
+            "app.MapStaticAssets().AllowAnonymous();",
+            StringComparison.Ordinal
+        );
+        var spaFallback = program.IndexOf("app.MapFallbackToFile", StringComparison.Ordinal);
+        Assert.InRange(staticAssets, 0, spaFallback - 1);
+    }
+
+    [Fact]
     public void SAFE09GlobalAnalyzersAreExactPrivateAndRepoWide()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -710,6 +782,15 @@ public sealed class ToolingConfigurationTests
 
         AddTask17Versions(versions);
         AddTask21Versions(versions);
+        Assert.True(
+            versions.TryAdd("ModelContextProtocol.AspNetCore", "2.1.0"),
+            "Task 25 MCP package must have exactly one central package pin."
+        );
+        AddTask26Versions(versions);
+        Assert.True(
+            versions.TryAdd("Bogus", "35.6.5"),
+            "Bogus must have exactly one central package pin."
+        );
 
         return versions;
     }
@@ -993,6 +1074,25 @@ public sealed class ToolingConfigurationTests
             Assert.True(
                 versions.TryAdd(package.Key, package.Value),
                 $"Task 21 package '{package.Key}' duplicates an existing central pin."
+            );
+        }
+    }
+
+    private static void AddTask26Versions(Dictionary<string, string> versions)
+    {
+        var task26Versions = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Azure.AI.OpenAI"] = "2.9.0-beta.1",
+            ["Azure.Identity"] = "1.21.0",
+            ["Microsoft.Agents.AI"] = "1.17.0",
+            ["Microsoft.Agents.AI.Hosting.AGUI.AspNetCore"] = "1.17.0-preview.260804.1",
+            ["Microsoft.Agents.AI.OpenAI"] = "1.17.0",
+        };
+        foreach (var package in task26Versions)
+        {
+            Assert.True(
+                versions.TryAdd(package.Key, package.Value),
+                $"Task 26 package '{package.Key}' must have exactly one central package pin."
             );
         }
     }

@@ -1,5 +1,5 @@
 import { createRouter, type RouterHistory } from '@tanstack/react-router';
-import { queryClient } from '../lib/query/queryClient';
+import { queryClient, QUERY_STALE_TIME_MS } from '../lib/query/queryClient';
 import {
   registerSessionNavigation,
   type AuthenticatedRoutePath,
@@ -26,7 +26,9 @@ export function createAppRouter(options: CreateAppRouterOptions = {}) {
     context,
     defaultViewTransition: true,
     defaultPreload: 'intent',
-    defaultPreloadStaleTime: 0,
+    defaultPreloadStaleTime: QUERY_STALE_TIME_MS,
+    defaultPendingMs: 120,
+    defaultPendingMinMs: 150,
   });
 
   if (options.bindSession !== false) {

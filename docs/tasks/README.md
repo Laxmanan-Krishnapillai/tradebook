@@ -51,6 +51,7 @@ The table below summarizes all 24 task specifications (the 11 original/remediati
 | **Task 22** | Test Platform Modernization — xUnit v3 / MTP & Property-Based Testing | QA & Verification | [`tasks/task-22-test-platform-modernization-xunit-v3-cscheck.md`](task-22-test-platform-modernization-xunit-v3-cscheck.md) | Test suites; SemanticQueryCompiler + value-object properties | Task 13 (coord. 04, 15, 21) | Medium | Specified |
 | **Task 23** | Design System & Motion Foundation | Frontend Design System | [`tasks/task-23-design-system-and-motion-foundation.md`](task-23-design-system-and-motion-foundation.md) | No schema change; OKLCH tokens, typography-for-data, motion vocabulary | Task 18, Task 19 (rel. 05, 06) | High | Specified |
 | **Task 24** | Agent UI Guardrails & Visual QA | Agent Governance / Frontend | [`tasks/task-24-agent-ui-guardrails-and-visual-qa.md`](task-24-agent-ui-guardrails-and-visual-qa.md) | No schema change; token-lock lint, component registry + MCP, `DESIGN.md`, visual-regression + a11y gates | Task 08, Task 18, Task 19, Task 23 (rel. 09) | High | Specified |
+| **Task 25** | AI-Native Capability Plane + MCP + In-App Agent Slice | AI Platform Foundation | [`tasks/task-25-ai-native-capability-plane-and-mcp.md`](task-25-ai-native-capability-plane-and-mcp.md) | All entities consumed through shared capability-plane contracts (`Analytics`, `DashboardSpecification`, mutation-capable tools) | Task 12, Task 16, Task 17, Task 20, Task 24 | Very High | Specified |
 
 ---
 
@@ -311,8 +312,11 @@ k6 run tests/performance/load-baseline.js --out json=tests/performance/baseline-
 | **22** | xUnit v3 on Microsoft.Testing.Platform; CsCheck property-based tests (semantic compiler + value objects) | xUnit v2 |
 | **23** | OKLCH design-token system (Tailwind v4 `@theme`), typography-for-data (`tabular-nums`), six-state components, motion vocabulary (Motion via `LazyMotion`, NumberFlow, View Transitions, `tw-animate-css`) | undefined "bootstrap" styling; ad-hoc visual decisions |
 | **24** | Token-lock lint, curated shadcn component registry + MCP, `DESIGN.md`, Storybook + Argos visual-regression + `axe` CI gates, design-review agent | ungoverned agent-authored UI drift |
+| **25** | AI-native capability plane shared by REST/MCP/in-app agents (analytics + approvals + subject-claim security + Streamable `/mcp`) | endpoint-loopback patterns and non-shared agent tool routing |
 
 ### 7.2 Sequencing
+
+Task 25 is the first AI-native milestone. It depends on Tasks 12, 16, and 17 as the minimum substrate (JWT actor binding, TypeSpec contract authority, and durable message plumbing). The task adds a shared capability plane for analytics and approvals, plus Streamable `/mcp` and in-app-host groundwork, and remains behind explicit feature flags until all security/coverage gates are green.
 
 **Task 13 is foundational and unblocks Tasks 14–24** (it establishes the `net10.0` target and a populated `Directory.Packages.props`). After it, three tracks proceed in parallel: the **backend** track (14 → 15 → 16 and 17), the **frontend** track (18 → 19 → 23 → 24), and the **data/DX** track (20, 21, 22). Cross-task coordination: Task 16 (contract) and Task 15 (value-object → primitive mapping) align on wire shapes; Task 17 messages carry Task 15 value objects; Task 21 orchestrates the Task 17 workers and the Vite frontend; Task 22 property-tests the Task 04 semantic compiler and Task 15 value objects; Task 23 builds the design system on the Task 18/19 platform; and Task 24's visual-regression gate rides on the Task 09 Playwright harness. These tasks do not change `architecture/entity-model.md` (v2.0) — the domain model remains the source of truth.
 

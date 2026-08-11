@@ -37,7 +37,7 @@ public sealed class ActorIdTests
         ((ClaimsIdentity)p.Identity!).AddClaims([
             new("email", Guid.NewGuid().ToString()),
             new("preferred_username", Guid.NewGuid().ToString()),
-            new("sub", Guid.NewGuid().ToString()),
+            new("sub", "opaque-pairwise-subject"),
         ]);
         Assert.Equal(actor, ActorId.From(p));
     }

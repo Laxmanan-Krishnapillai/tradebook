@@ -13,19 +13,19 @@ using Tradebook.IntegrationTests.Fixtures;
 
 namespace Tradebook.IntegrationTests;
 
-public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture postgres)
+public sealed class JwtObjectIdAuthenticationIntegrationTests(PostgresTestFixture postgres)
     : PostgresDatabaseTestBase(postgres)
 {
     [Theory]
     [InlineData(null)]
     [InlineData("not-a-guid")]
-    public async Task RestApiRejectsTokensWithoutAValidUuidSubject(string? subject)
+    public async Task RestApiRejectsTokensWithoutAValidUuidObjectId(string? objectId)
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer",
-            CreateToken(subject, includeReadRole: true)
+            CreateToken(objectId, includeReadRole: true)
         );
 
         using var response = await client.GetAsync("/api/v1/events?afterSequence=0&limit=1");
@@ -34,14 +34,35 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
     }
 
     [Theory]
+    [Trait("Category", "ObjectIdClaimSecurity")]
     [InlineData(null)]
     [InlineData("not-a-guid")]
-    public async Task DashboardHubRejectsTokensWithoutAValidUuidSubject(string? subject)
+    public async Task McpRejectsTokensWithoutAValidUuidObjectId(string? objectId)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(objectId, includeReadRole: true)
+        );
+
+        using var response = await client.PostAsync(
+            "/mcp",
+            new StringContent(InitializeRequest, Encoding.UTF8, "application/json")
+        );
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-a-guid")]
+    public async Task DashboardHubRejectsTokensWithoutAValidUuidObjectId(string? objectId)
     {
         await using var factory = CreateFactory();
         await using var hub = BuildHubConnection(
             factory,
-            CreateToken(subject, includeReadRole: true)
+            CreateToken(objectId, includeReadRole: true)
         );
 
         await Assert.ThrowsAsync<HttpRequestException>(() => hub.StartAsync());
@@ -93,12 +114,12 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
             )
             .Build();
 
-    private static string CreateToken(string? subject, bool includeReadRole)
+    private static string CreateToken(string? objectId, bool includeReadRole)
     {
-        var claims = new List<Claim>();
-        if (subject is not null)
+        var claims = new List<Claim> { new("sub", "opaque-pairwise-subject") };
+        if (objectId is not null)
         {
-            claims.Add(new Claim("sub", subject));
+            claims.Add(new Claim("oid", objectId));
         }
 
         if (includeReadRole)
@@ -120,4 +141,8 @@ public sealed class JwtSubjectAuthenticationIntegrationTests(PostgresTestFixture
         var handler = new JwtSecurityTokenHandler();
         return handler.WriteToken(handler.CreateToken(descriptor));
     }
+
+    private const string InitializeRequest = """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"tradebook-tests","version":"1.0"}}}
+        """;
 }

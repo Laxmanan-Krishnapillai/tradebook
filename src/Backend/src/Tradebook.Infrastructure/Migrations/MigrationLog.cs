@@ -12,6 +12,12 @@ internal static partial class MigrationLog
 
     [LoggerMessage(
         Level = LogLevel.Critical,
+        Message = "Database migration failed permanently; stopping the application."
+    )]
+    public static partial void MigrationFatal(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Critical,
         Message = "Semantic schema validation failed after migrations; stopping the application."
     )]
     public static partial void SchemaDriftFatal(ILogger logger, Exception exception);

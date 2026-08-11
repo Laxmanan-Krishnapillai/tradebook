@@ -6,7 +6,7 @@
   `@tradebook` registry components; do not hand-roll an existing primitive.
 - Read `docs/architecture/decision-log.md` before task work; it overrides all other documents.
 - The authoritative domain model is `docs/architecture/entity-model.md`. Do not invent schema or enum values.
-- Every endpoint requires JWT authentication except `/health/live`, `/health/ready`, and `POST /api/v1/auth/login` (the sole anonymous API route). Derive the actor from the JWT `sub` claim only.
+- Every endpoint requires JWT authentication except `/health/live`, `/health/ready`, and `POST /api/v1/auth/login` (the sole anonymous API route). Derive the actor from the Entra JWT `oid` claim only after validating `tid`.
 - Bind SQL values as parameters and whitelist every dynamic identifier.
 - Do not edit `src/Frontend/src/api/generated/` by hand. Change TypeSpec and regenerate contracts.
 - Integration tests use PostgreSQL 17 through Testcontainers; do not depend on a host database.

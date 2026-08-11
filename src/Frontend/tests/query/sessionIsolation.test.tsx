@@ -52,5 +52,22 @@ describe('authenticated Query session boundary', () => {
     expect(useUiStore.getState().activeModal).toBeNull();
   });
 
+  it('invalidates the old identity before awaiting cache cancellation', async () => {
+    await beginSession(session('actor-a'));
+    let releaseCancellation!: () => void;
+    const cancellation = new Promise<void>((resolve) => {
+      releaseCancellation = resolve;
+    });
+    const cancelQueries = vi.spyOn(queryClient, 'cancelQueries').mockReturnValue(cancellation);
+
+    const transition = beginSession(session('actor-b'));
+
+    await vi.waitFor(() => expect(getAuthSession()).toBeUndefined());
+    releaseCancellation();
+    await transition;
+
+    expect(getAuthSession()).toEqual(session('actor-b'));
+    cancelQueries.mockRestore();
+  });
 
 });

@@ -1,0 +1,46 @@
+@media (prefers-reduced-motion: no-preference) {
+  .workspace {
+    view-transition-name: tradebook-workspace;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+
+  ::view-transition-old(tradebook-workspace) {
+    animation: tradebook-workspace-exit var(--duration-fast) var(--ease-accelerate) both;
+  }
+
+  ::view-transition-new(tradebook-workspace) {
+    animation: tradebook-workspace-enter var(--duration-base) var(--ease-decelerate) both;
+  }
+}
+
+@keyframes tradebook-workspace-exit {
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes tradebook-workspace-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms !important;
+  }
+}
+
+:root.reduce-motion::view-transition-old(root),
+:root.reduce-motion::view-transition-new(root),
+:root.reduce-motion::view-transition-old(tradebook-workspace),
+:root.reduce-motion::view-transition-new(tradebook-workspace) {
+  animation-duration: 1ms !important;
+}

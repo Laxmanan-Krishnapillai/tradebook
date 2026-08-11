@@ -3,6 +3,7 @@ import { type QueryClient, type QueryKey, useQueryClient } from '@tanstack/react
 import type { GetDeliveryHistoryResponse, PhysicalDeliveryDetailsDto } from '../api/generated/types.gen';
 import { zEntityChangedEventDto } from '../api/generated/zod.gen';
 import { ApiError, apiFetch } from '../lib/api/client';
+import { mutationScopeKey, withMutationScope } from '../lib/mutations/mutationCoordinator';
 import { queryKeys } from '../lib/query/queryKeys';
 import {
   DashboardStreamClient,
@@ -11,11 +12,13 @@ import {
   type KnownAggregateType,
 } from '../lib/realtime/signalRClient';
 import { EntityEventBatcher } from '../lib/streaming/eventBatcher';
+import { getAuthSessionIdentity } from '../lib/state/useAuthStore';
 
 type DeliveryListCache = GetDeliveryHistoryResponse | PhysicalDeliveryDetailsDto[];
 type DeliveryLoader = (deliveryId: string, signal?: AbortSignal) => Promise<PhysicalDeliveryDetailsDto>;
 
 interface ReconciliationOptions {
+  isCurrent?: () => boolean;
   signal?: AbortSignal;
 }
 
@@ -60,7 +63,10 @@ function installDelivery(
   event: EntityChangedEvent,
   delivery: PhysicalDeliveryDetailsDto,
 ): void {
-  queryClient.setQueryData(queryKeys.deliveries.detail(delivery.deliveryId), delivery);
+  queryClient.setQueryData<PhysicalDeliveryDetailsDto>(
+    queryKeys.deliveries.detail(delivery.deliveryId),
+    (current) => !current || current.version <= delivery.version ? delivery : current,
+  );
   for (const [queryKey, cache] of queryClient.getQueriesData<DeliveryListCache>({ queryKey: queryKeys.deliveries.lists() })) {
     if (!cache) continue;
     const current = rows(cache);
@@ -97,6 +103,7 @@ async function reconcileDelivery(
   event: EntityChangedEvent,
   roots: Map<string, QueryKey>,
   loadDelivery: DeliveryLoader,
+  isCurrent?: () => boolean,
   signal?: AbortSignal,
 ): Promise<void> {
   const version = eventVersion(event);
@@ -115,10 +122,10 @@ async function reconcileDelivery(
   }
   try {
     const delivery = await loadDelivery(event.aggregateId, signal);
-    if (signal?.aborted) return;
+    if (signal?.aborted || isCurrent?.() === false) return;
     installDelivery(queryClient, event, delivery);
   } catch (error) {
-    if (signal?.aborted) return;
+    if (signal?.aborted || isCurrent?.() === false) return;
     if (error instanceof ApiError && error.status === 404) removeDelivery(queryClient, event.aggregateId);
     addRoot(roots, queryKeys.deliveries.all);
   }
@@ -136,17 +143,28 @@ export async function reconcileRealtimeBatch(
   options: ReconciliationOptions = {},
 ): Promise<void> {
   const roots = new Map<string, QueryKey>();
+  const sessionIdentity = getAuthSessionIdentity();
   for (const rawEvent of events) {
     const event = zEntityChangedEventDto.parse(rawEvent);
-    if (options.signal?.aborted) return;
+    if (options.signal?.aborted || options.isCurrent?.() === false) return;
     if (!isKnownAggregateType(event.aggregateType)) continue;
     if (event.aggregateType === 'PhysicalDelivery') {
-      await reconcileDelivery(queryClient, event, roots, loadDelivery, options.signal);
+      await withMutationScope(
+        mutationScopeKey(queryKeys.deliveries.all, sessionIdentity, event.aggregateId),
+        () => reconcileDelivery(
+          queryClient,
+          event,
+          roots,
+          loadDelivery,
+          options.isCurrent,
+          options.signal,
+        ),
+      );
       continue;
     }
     for (const queryKey of affectedQueryRoots[event.aggregateType]) addRoot(roots, queryKey);
   }
-  if (options.signal?.aborted) return;
+  if (options.signal?.aborted || options.isCurrent?.() === false) return;
   await Promise.all([...roots.values()].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
@@ -183,13 +201,23 @@ export function useRealtimeQuerySync(enabled = true, sessionKey = ''): EntityCha
     let active = true;
     const controller = new AbortController();
     const batcher = new EntityEventBatcher();
+    const identity = getAuthSessionIdentity();
+    const isCurrent = () => active && identity === getAuthSessionIdentity();
+    let reconciliation = Promise.resolve();
     batcher.start((events) => {
       if (active) setLastEvent(events.at(-1));
-      void reconcileRealtimeBatch(queryClient, events, undefined, { signal: controller.signal });
+      reconciliation = reconciliation
+        .then(() => reconcileRealtimeBatch(queryClient, events, undefined, {
+          isCurrent,
+          signal: controller.signal,
+        }))
+        .catch(() => {
+          if (isCurrent()) return queryClient.invalidateQueries();
+        });
     });
     const stream = new DashboardStreamClient(
       (event) => batcher.pushEvent(event),
-      { onError: () => { if (active) void queryClient.invalidateQueries(); } },
+      { onError: () => { if (isCurrent()) void queryClient.invalidateQueries(); } },
     );
     void stream.start();
     return () => {
@@ -197,6 +225,7 @@ export function useRealtimeQuerySync(enabled = true, sessionKey = ''): EntityCha
       controller.abort();
       batcher.stop();
       void stream.stop();
+      void reconciliation;
     };
   }, [enabled, queryClient, sessionKey]);
 

@@ -55,6 +55,34 @@ export function toSeriesData(result: AnalyticsResult, encodings: VisualEncodingS
 }
 
 const chartKind: Record<string, string> = { AREA: 'line', SPARK_LINE: 'line', STACKED_BAR: 'bar' };
+const compactNumber = new Intl.NumberFormat('en', { maximumFractionDigits: 1, notation: 'compact' });
+const monthLabel = new Intl.DateTimeFormat('en', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+
+function formatCompact(value: unknown): string {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? compactNumber.format(numericValue) : String(value ?? '');
+}
+
+function isTemporalCategory(value: string | number): boolean {
+  return typeof value === 'string' && /^\d{4}-\d{2}(?:-\d{2})?/.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function formatCategory(value: string | number): string {
+  return isTemporalCategory(value) ? monthLabel.format(new Date(value)) : String(value);
+}
+
+function readableSeriesName(name: string): string {
+  const withoutUnit = name.replace(/_(eur|mwh|count)$/i, '');
+  return withoutUnit.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+const motion = {
+  animation: true,
+  animationDuration: 420,
+  animationDurationUpdate: 260,
+  animationEasing: 'cubicOut' as const,
+  animationEasingUpdate: 'cubicOut' as const,
+};
 
 function axisLine(tokens: ThemeTokens | null) {
   return { lineStyle: { color: tokens?.axisLine } };
@@ -92,6 +120,8 @@ function heatmapOption(spec: ChartSpec, data: SeriesData, tokens: ThemeTokens | 
     maximum = 0;
   }
   return {
+    ...motion,
+    aria: { enabled: true, decal: { show: false } },
     backgroundColor: tokens?.background,
     textStyle: { color: tokens?.textPrimary, fontFamily: tokens?.fontFamily },
     tooltip: { trigger: 'item' },
@@ -132,21 +162,77 @@ export function toEChartsOption(spec: ChartSpec, data: SeriesData, tokens: Theme
   const type = chartKind[spec.chartType] ?? spec.chartType.toLowerCase();
   const first = data.series[0];
   const opacity = spec.style?.opacity;
+  const temporalCategory = first?.x.length ? first.x.every(isTemporalCategory) : false;
+  const compactHorizontalBar = spec.chartType === 'BAR'
+    && (first?.x.length ?? 0) <= 20
+    && first?.x.every((value) => typeof value === 'string') === true;
+  const rankedHorizontalBar = compactHorizontalBar && !temporalCategory;
+  if (rankedHorizontalBar) {
+    return {
+      ...motion,
+      aria: { enabled: true, decal: { show: false } },
+      backgroundColor: tokens?.background,
+      textStyle: { color: tokens?.textPrimary, fontFamily: tokens?.fontFamily },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: formatCompact },
+      legend: { show: spec.style?.showLegend ?? false },
+      grid: { containLabel: true, left: 8, right: 48, top: 8, bottom: 8 },
+      xAxis: { type: 'value', show: false },
+      yAxis: {
+        type: 'category',
+        data: first?.x,
+        inverse: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: tokens?.textSecondary, fontSize: 11, overflow: 'truncate', width: 104 }
+      },
+      series: data.series.map((series, index) => ({
+        id: series.name,
+        name: readableSeriesName(series.name),
+        type: 'bar',
+        data: Array.from(series.y),
+        barMaxWidth: 7,
+        showBackground: true,
+        backgroundStyle: { color: tokens?.gridLine, borderRadius: 4 },
+        itemStyle: { color: tokens?.seriesPalette[index], borderRadius: 4 },
+        label: { show: true, position: 'right', color: tokens?.textPrimary, fontFamily: 'IBM Plex Mono', fontSize: 10, formatter: ({ value }) => formatCompact(value) },
+        universalTransition: true,
+      })) as EChartsOption['series']
+    };
+  }
+  const quietVerticalBar = spec.chartType === 'BAR' && data.series.length === 1;
+  const trendChart = spec.chartType === 'AREA' || spec.chartType === 'LINE' || spec.chartType === 'SPARK_LINE';
+  const xValues = temporalCategory ? first?.x.map(formatCategory) : first?.x;
   return {
+    ...motion,
+    aria: { enabled: true, decal: { show: false } },
     backgroundColor: tokens?.background,
     textStyle: { color: tokens?.textPrimary, fontFamily: tokens?.fontFamily },
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'axis', axisPointer: { type: trendChart ? 'line' : 'shadow' }, valueFormatter: formatCompact },
     legend: { show: spec.style?.showLegend ?? true },
-    xAxis: { type: 'category', data: first?.x, axisLine: axisLine(tokens) },
-    yAxis: { type: 'value', splitLine: splitLine(spec, tokens) },
+    grid: quietVerticalBar || trendChart ? { containLabel: true, left: 2, right: 10, top: 16, bottom: 4 } : undefined,
+    xAxis: quietVerticalBar
+      ? { type: 'category', data: xValues, axisLine: axisLine(tokens), axisTick: { show: false }, axisLabel: { color: tokens?.textSecondary, fontSize: 10, hideOverlap: true } }
+      : { type: 'category', data: xValues, boundaryGap: !trendChart, axisLine: axisLine(tokens), axisTick: { show: false }, axisLabel: { alignMaxLabel: 'right', alignMinLabel: 'left', color: tokens?.textSecondary, fontSize: 10, hideOverlap: true } },
+    yAxis: quietVerticalBar
+      ? { type: 'value', show: false, splitLine: splitLine(spec, tokens) }
+      : { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: tokens?.textSecondary, fontSize: 10, formatter: formatCompact }, splitLine: splitLine(spec, tokens), splitNumber: 4 },
     series: data.series.map((series, index) => ({
-      name: series.name,
+      id: series.name,
+      name: readableSeriesName(series.name),
       type,
-      data: Array.from(series.y),
-      areaStyle: spec.chartType === 'AREA' ? { opacity } : undefined,
+      data: quietVerticalBar
+        ? Array.from(series.y, (value, valueIndex) => ({
+            value,
+            itemStyle: { color: tokens?.seriesPalette[0], opacity: valueIndex === series.y.length - 1 ? 1 : 0.32 }
+          }))
+        : Array.from(series.y),
+      areaStyle: spec.chartType === 'AREA' ? { opacity: opacity ?? 0.14 } : undefined,
       stack: spec.chartType === 'STACKED_BAR' ? 'total' : undefined,
-      lineStyle: { width: spec.style?.strokeWidth, opacity },
-      itemStyle: { color: tokens?.seriesPalette[index], opacity, borderWidth: spec.style?.strokeWidth }
+      lineStyle: { width: spec.style?.strokeWidth ?? (trendChart ? 2 : undefined), opacity: spec.chartType === 'AREA' ? 1 : opacity ?? 1 },
+      itemStyle: { color: tokens?.seriesPalette[index], opacity, borderWidth: spec.style?.strokeWidth },
+      showSymbol: trendChart ? false : undefined,
+      smooth: trendChart ? 0.28 : undefined,
+      universalTransition: true,
     })) as EChartsOption['series']
   };
 }
