@@ -87,6 +87,17 @@ variable "entra_tenant_id" {
   }
 }
 
+variable "existing_entra_client_id" {
+  type        = string
+  description = "Optional existing single-tenant Tradebook application client ID for environments where tenant app administration is centralized."
+  default     = null
+  nullable    = true
+  validation {
+    condition     = var.existing_entra_client_id == null || can(regex("^[0-9a-fA-F-]{36}$", var.existing_entra_client_id))
+    error_message = "existing_entra_client_id must be a UUID when provided."
+  }
+}
+
 variable "entra_redirect_uris" {
   type        = list(string)
   description = "Exact local, staging, and production SPA redirect URIs."

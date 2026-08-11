@@ -11,15 +11,16 @@ const spaClientId = required('VITE_ENTRA_SPA_CLIENT_ID');
 const apiClientId = required('VITE_ENTRA_API_CLIENT_ID');
 const redirectOrigin = required('VITE_ENTRA_REDIRECT_ORIGIN');
 const redirect = new URL(redirectOrigin);
-if (redirect.origin !== redirectOrigin || redirect.pathname !== '/') throw new Error('VITE_ENTRA_REDIRECT_ORIGIN must be an origin without a path.');
+if (redirect.pathname !== '/' || redirect.search || redirect.hash) throw new Error('VITE_ENTRA_REDIRECT_ORIGIN must be an origin without a path.');
+const normalizedRedirectOrigin = redirect.origin;
 
 export const apiScopes = [`api://${apiClientId}/access_as_user`] as const;
 export const msalConfig: Configuration = {
   auth: {
     clientId: spaClientId,
     authority: `https://login.microsoftonline.com/${tenantId}`,
-    redirectUri: redirectOrigin,
-    postLogoutRedirectUri: redirectOrigin,
+    redirectUri: normalizedRedirectOrigin,
+    postLogoutRedirectUri: normalizedRedirectOrigin,
   },
   // msal-browser v5 refuses the redirect flow whenever cacheLocation is MemoryStorage
   // (in_mem_redirect_unavailable) and removed the storeAuthStateInCookie escape hatch,

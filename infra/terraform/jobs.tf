@@ -15,6 +15,7 @@ resource "azurerm_container_app_job" "migration" {
   container_app_environment_id = azurerm_container_app_environment.this.id
   replica_timeout_in_seconds   = 1800
   replica_retry_limit          = 0
+  workload_profile_name        = "Consumption"
   tags                         = var.tags
 
   identity {
@@ -79,6 +80,7 @@ resource "azurerm_container_app_job" "backup" {
   container_app_environment_id = azurerm_container_app_environment.this.id
   replica_timeout_in_seconds   = 3600
   replica_retry_limit          = 2
+  workload_profile_name        = "Consumption"
   tags                         = var.tags
 
   identity {
@@ -157,6 +159,7 @@ resource "azurerm_container_app_job" "restore" {
   container_app_environment_id = azurerm_container_app_environment.this.id
   replica_timeout_in_seconds   = 3600
   replica_retry_limit          = 0
+  workload_profile_name        = "Consumption"
   tags                         = var.tags
 
   identity {
