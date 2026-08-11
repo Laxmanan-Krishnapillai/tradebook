@@ -454,11 +454,13 @@ public sealed class ToolingConfigurationTests
         );
 
         var databaseOperationsStage = dockerfile[
-            dockerfile.IndexOf("FROM postgres:17-bookworm AS database-ops", StringComparison.Ordinal)
-                ..dockerfile.IndexOf(
-                    "FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime",
-                    StringComparison.Ordinal
-                )
+            dockerfile.IndexOf(
+                "FROM postgres:17-bookworm AS database-ops",
+                StringComparison.Ordinal
+            )..dockerfile.IndexOf(
+                "FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS runtime",
+                StringComparison.Ordinal
+            )
         ];
         Assert.Contains(
             "COPY --from=backend /app/migrator/",
