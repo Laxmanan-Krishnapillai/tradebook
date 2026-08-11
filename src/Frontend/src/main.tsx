@@ -6,6 +6,7 @@ import { App } from './App';
 import { MotionProvider } from './components/providers/motion-provider';
 import { queryClient } from './lib/query/queryClient';
 import './styles.css';
+import './styles/route-transitions.css';
 import { initializeMsal, msalInstance } from './lib/auth/msalInstance';
 
 async function render(): Promise<void> {

@@ -59,4 +59,30 @@ describe('visual encoding mapper', () => {
     expect(option.series[0].lineStyle).toMatchObject({ width: 3, opacity: 0.25 });
     expect(option.series[0].itemStyle).toMatchObject({ opacity: 0.25 });
   });
+
+  it('renders dense categorical rankings as readable horizontal bars', () => {
+    const categories = Array.from({ length: 12 }, (_, index) => `CTR-${index + 1}`);
+    const option = toEChartsOption(
+      { chartType: 'BAR', encodings: { xAxis: 'contract', yAxis: ['volume_mwh'] } },
+      { series: [{ name: 'volume_mwh', x: categories, y: categories.map((_, index) => 1200 - index * 50) }] },
+      null
+    ) as { aria: { enabled: boolean }; xAxis: { type: string; show: boolean }; yAxis: { type: string; inverse: boolean }; series: Array<{ name: string; universalTransition: boolean }> };
+
+    expect(option.xAxis).toMatchObject({ type: 'value', show: false });
+    expect(option.yAxis).toMatchObject({ type: 'category', inverse: true });
+    expect(option.series[0]).toMatchObject({ name: 'Volume', universalTransition: true });
+    expect(option.aria.enabled).toBe(true);
+  });
+
+  it('formats temporal trend charts with compact axes and smooth update motion', () => {
+    const option = toEChartsOption(
+      { chartType: 'AREA', encodings: { xAxis: 'month', yAxis: ['revenue_eur'] }, style: { opacity: 0.14 } },
+      { series: [{ name: 'revenue_eur', x: ['2026-07-01', '2026-08-01'], y: [2_600_000, 2_800_000] }] },
+      null
+    ) as { animationDurationUpdate: number; xAxis: { data: string[]; boundaryGap: boolean }; series: Array<{ name: string; smooth: number; showSymbol: boolean; universalTransition: boolean }> };
+
+    expect(option.xAxis).toMatchObject({ data: ['Jul 26', 'Aug 26'], boundaryGap: false });
+    expect(option.series[0]).toMatchObject({ name: 'Revenue', smooth: 0.28, showSymbol: false, universalTransition: true });
+    expect(option.animationDurationUpdate).toBe(260);
+  });
 });

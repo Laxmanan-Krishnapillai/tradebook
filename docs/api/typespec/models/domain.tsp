@@ -2,6 +2,18 @@ import "./common.tsp";
 
 namespace Tradebook;
 
+model ActivityEntryDto {
+  auditId: string;
+  operation: string;
+  actorId: string | null;
+  occurredAt: utcDateTime;
+  changes: unknown;
+}
+
+model GetActivityResponse {
+  items: ActivityEntryDto[];
+}
+
 model BioticketDetailsDto {
   bioticketId: string;
   contractId: string;
@@ -709,4 +721,3 @@ model UpsertMarketPriceRequest {
   eurDkk?: Money | null;
   version: int32;
 }
-

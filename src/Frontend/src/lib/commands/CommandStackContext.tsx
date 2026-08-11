@@ -1,5 +1,5 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { isEditableTarget } from '../dom/keyboard';
+import { useHotkeys } from '@tanstack/react-hotkeys';
+import { createContext, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
 import { type Command, UndoRedoStack } from './UndoRedoStack';
 
 interface CommandStackSession {
@@ -20,15 +20,14 @@ export function CommandStackProvider({ children }: { children: ReactNode }) {
   const undo = useCallback(async () => { const applied = await stack.current.undo(); changed(); return applied; }, [changed]);
   const redo = useCallback(async () => { const applied = await stack.current.redo(); changed(); return applied; }, [changed]);
 
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 'z' || isEditableTarget(event.target)) return;
-      event.preventDefault();
-      void (event.shiftKey ? redo() : undo()).catch(() => undefined);
-    };
-    document.addEventListener('keydown', listener);
-    return () => document.removeEventListener('keydown', listener);
-  }, [redo, undo]);
+  useHotkeys([
+    { hotkey: 'Mod+Z', callback: () => void undo().catch(() => undefined) },
+    { hotkey: 'Mod+Shift+Z', callback: () => void redo().catch(() => undefined) },
+    { hotkey: 'Mod+Y', callback: () => void redo().catch(() => undefined) },
+  ], {
+    ignoreInputs: true,
+    preventDefault: true,
+  });
 
   const value: CommandStackSession = {
     execute,

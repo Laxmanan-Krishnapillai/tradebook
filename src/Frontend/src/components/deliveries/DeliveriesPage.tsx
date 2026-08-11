@@ -13,6 +13,8 @@ import type { PhysicalDeliveryDetailsDto } from "../../api/generated/types.gen";
 import { apiFetch } from "../../lib/api/client";
 import { useCommandStack } from "../../lib/commands/CommandStackContext";
 import type { Command } from "../../lib/commands/UndoRedoStack";
+import { changedFields, draftValuesEquivalent, shouldAdoptRefreshedDraft } from "../../lib/editor/detailDraftPolicy";
+import { clearMutationConflictForEntity } from "../../lib/mutations/mutationCoordinator";
 import {
   useCreateDelivery,
   useDeleteDelivery,
@@ -21,10 +23,21 @@ import {
   type UpdateDeliveryVariables,
 } from "../../lib/mutations/entityMutations";
 import { queryKeys } from '../../lib/query/queryKeys';
+import { useContractOptions } from '../../lib/query/useContractOptions';
 import { useUiStore } from '../../lib/state/useUiStore';
 import { isMoneyString, moneyInputField, normalizeMoneyInput } from '../../lib/validation/money-input';
 import { VirtualizedDataTable } from "../grid/VirtualizedDataTable";
 import { ConflictDialog } from "../ui/ConflictDialog";
+import { Button } from "../ui/button";
+import { Combobox } from '../ui/combobox';
+import { EntityCreateDrawer } from '../ui/entity-create-drawer';
+import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '../ui/frame';
+import { Input } from '../ui/input';
+import { NumberInput } from '../ui/number-input';
+import { RecordDetailPanel } from '../ui/record-detail-panel';
+import { RecordActivity } from '../ui/record-activity';
+import { TableEditableCell } from '../ui/table-editable-cell';
+import { Select } from '../ui/select';
 import { ValidatedForm } from '../ui/validated-form';
 
 const statuses = [
@@ -39,71 +52,6 @@ interface ConflictState {
   id: string;
   serverState?: PhysicalDeliveryDetailsDto;
   attempted: object;
-}
-
-function DeliveryEditor({
-  delivery,
-  onSave,
-  onCancel,
-}: {
-  delivery: PhysicalDeliveryDetailsDto;
-  onSave: (
-    delivery: PhysicalDeliveryDetailsDto,
-    changes: UpdateDeliveryVariables["changes"],
-  ) => void;
-  onCancel: (delivery: PhysicalDeliveryDetailsDto) => void;
-}) {
-  const [volume, setVolume] = useState(
-    delivery.volumeRealisedMwh?.toString() ?? "",
-  );
-  const [status, setStatus] = useState(delivery.status);
-  useEffect(() => {
-    setVolume(delivery.volumeRealisedMwh?.toString() ?? "");
-    setStatus(delivery.status);
-  }, [delivery.status, delivery.volumeRealisedMwh]);
-  return (
-    <div className="grid grid-cols-4 items-center gap-2 max-[800px]:grid-cols-2">
-      <input
-        data-testid={`delivery-volume-${delivery.deliveryId}`}
-        aria-label={`Realised volume for ${delivery.contractInstanceId}`}
-        type="number"
-        min="0"
-        step="any"
-        value={volume}
-        onChange={(event) => setVolume(event.target.value)}
-      />
-      <select
-        aria-label={`Status for ${delivery.contractInstanceId}`}
-        value={status}
-        onChange={(event) => setStatus(event.target.value)}
-      >
-        {statuses.map((value) => (
-          <option key={value}>{value}</option>
-        ))}
-      </select>
-      <button
-        data-testid={`btn-save-${delivery.deliveryId}`}
-        type="button"
-        onClick={() =>
-          onSave(delivery, {
-            volumeRealisedMwh: volume === "" ? undefined : volume,
-            status,
-          })
-        }
-      >
-        Save
-      </button>
-      <button
-        data-testid={`btn-cancel-${delivery.deliveryId}`}
-        type="button"
-        className="bg-red-700"
-        disabled={delivery.status === "Cancelled"}
-        onClick={() => onCancel(delivery)}
-      >
-        Cancel
-      </button>
-    </div>
-  );
 }
 
 const initialCreate: CreateDeliveryVariables = {
@@ -126,6 +74,20 @@ const createDeliverySchema: z.ZodType<CreateDeliveryVariables> = z.object({
   endDay: z.string().nullish(),
 });
 
+function matchesSearch(delivery: PhysicalDeliveryDetailsDto, term: string): boolean {
+  if (term === '') return true;
+  const lowered = term.toLowerCase();
+  const candidates: Array<unknown> = [
+    delivery.deliveryId,
+    delivery.contractId,
+    delivery.contractInstanceId,
+    delivery.bookType,
+    delivery.supplyMonth,
+    delivery.status,
+  ];
+  return candidates.some((value) => String(value ?? '').toLowerCase().includes(lowered));
+}
+
 export function DeliveriesPage() {
   const [page, setPage] = useState(1);
   const showCreate = useUiStore((state) => state.activeModal === 'create-delivery');
@@ -135,9 +97,14 @@ export function DeliveriesPage() {
     useState<CreateDeliveryVariables>(initialCreate);
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState<ConflictState>();
+  const [search, setSearch] = useState("");
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [activeDelivery, setActiveDelivery] = useState<PhysicalDeliveryDetailsDto>();
+  const contractOptions = useContractOptions();
+  const [panelDeliveryVolume, setPanelDeliveryVolume] = useState("");
+  const [panelDeliveryStatus, setPanelDeliveryStatus] = useState<(typeof statuses)[number]>(statuses[0]);
   const attempted = useRef<object>({});
   const commandStack = useCommandStack();
-  const [, setHistoryRevision] = useState(0);
   const onConflict = useCallback(
     (id: string, serverState?: PhysicalDeliveryDetailsDto) =>
       setConflict({ id, serverState, attempted: attempted.current }),
@@ -163,23 +130,32 @@ export function DeliveriesPage() {
     ),
   });
 
-  const refreshHistory = useCallback(
-    () => setHistoryRevision((value) => value + 1),
-    [],
-  );
+  const deliveries = useMemo(() => history.data?.items ?? [], [history.data?.items]);
+  const searchableDeliveries = useMemo(() => {
+    const term = search.trim();
+    return deliveries.filter((delivery) => matchesSearch(delivery, term.toLowerCase()));
+  }, [deliveries, search]);
+  const selectedCount = selectedRowIds.size;
+  const totalCount = history.data?.totalCount ?? 0;
+  const setSelection = useCallback((nextSelectedRowIds: Set<string>) => {
+    setSelectedRowIds(nextSelectedRowIds);
+  }, []);
+  const openDeliveryPanel = useCallback((delivery: PhysicalDeliveryDetailsDto) => {
+    setActiveDelivery(delivery);
+    setPanelDeliveryVolume(delivery.volumeRealisedMwh?.toString() ?? '');
+    setPanelDeliveryStatus(delivery.status as (typeof statuses)[number]);
+  }, []);
   const undo = useCallback(async () => {
     if (!(await commandStack.undo()))
       setError("Nothing could be undone. The server may have a newer version.");
-    refreshHistory();
-  }, [commandStack, refreshHistory]);
+  }, [commandStack]);
   const redo = useCallback(async () => {
     try {
       if (!(await commandStack.redo())) setError("Nothing to redo.");
     } catch (failure) {
       onMutationError(failure);
     }
-    refreshHistory();
-  }, [commandStack, onMutationError, refreshHistory]);
+  }, [commandStack, onMutationError]);
 
   const saveDelivery = useCallback(
     async (
@@ -196,12 +172,12 @@ export function DeliveriesPage() {
         return;
       }
       const changes = { ...requested, volumeRealisedMwh };
-      attempted.current = changes;
       let version = delivery.version;
       const before = {
         volumeRealisedMwh: delivery.volumeRealisedMwh,
         status: delivery.status,
       } as UpdateDeliveryVariables["changes"];
+      const intent = changedFields(before, changes);
       const command: Command = {
         id: crypto.randomUUID(),
         description: `Update ${delivery.contractInstanceId}`,
@@ -212,6 +188,7 @@ export function DeliveriesPage() {
             id: delivery.deliveryId,
             version,
             changes,
+            intent,
           });
           version = updated.version;
         },
@@ -221,18 +198,18 @@ export function DeliveriesPage() {
             id: delivery.deliveryId,
             version,
             changes: before,
+            intent,
           });
           version = updated.version;
         },
       };
       try {
         await commandStack.execute(command);
-        refreshHistory();
       } catch {
         /* mutation callbacks surface the error */
       }
     },
-    [commandStack, refreshHistory, updateMutation],
+    [commandStack, updateMutation],
   );
 
   const cancelDelivery = useCallback(
@@ -266,48 +243,55 @@ export function DeliveriesPage() {
             id: delivery.deliveryId,
             version,
             changes,
+            intent: ['status'],
           });
           version = restored.version;
         },
       };
       try {
         await commandStack.execute(command);
-        refreshHistory();
       } catch {
         /* mutation callbacks surface the error */
       }
     },
-    [commandStack, deleteMutation, refreshHistory, updateMutation],
+    [commandStack, deleteMutation, updateMutation],
   );
 
   const columns = useMemo<ColumnDef<PhysicalDeliveryDetailsDto>[]>(
     () => [
-      { accessorKey: "contractInstanceId", header: "Contract instance" },
-      { accessorKey: "bookType", header: "Book" },
-      { accessorKey: "supplyMonth", header: "Supply month" },
       {
-        accessorKey: "volumeMwh",
-        header: "Volume MWh",
-        cell: ({ getValue }) => String(getValue() ?? "—"),
+        accessorKey: "contractInstanceId",
+        header: "Contract instance",
+        cell: ({ row }) => (
+          <Button
+            intent="ghost"
+            type="button"
+            onClick={() => openDeliveryPanel(row.original)}
+            aria-label={`Open delivery ${row.original.contractInstanceId}`}
+          >
+            {row.original.contractInstanceId}
+          </Button>
+        ),
+      },
+      { accessorKey: "bookType", header: "Book", cell: ({ row }) => <TableEditableCell label="Book" readOnly value={row.original.bookType} /> },
+      { accessorKey: "supplyMonth", header: "Supply month", cell: ({ row }) => <TableEditableCell label="Supply month" readOnly value={row.original.supplyMonth} /> },
+      {
+        accessorKey: "volumeRealisedMwh",
+        header: "Realised MWh",
+        cell: ({ row }) => <TableEditableCell kind="number" label="Realised volume MWh" value={String(row.original.volumeRealisedMwh ?? '')} onCommit={(value) => saveDelivery(row.original, { volumeRealisedMwh: value, status: row.original.status })} />,
       },
       {
         accessorKey: "invoiceAmountEur",
         header: "Invoice EUR",
-        cell: ({ getValue }) => String(getValue() ?? "—"),
+        cell: ({ getValue }) => <TableEditableCell label="Invoice EUR" readOnly value={String(getValue() ?? "—")} />,
       },
       {
-        id: "edit",
-        header: "Edit",
-        cell: ({ row }) => (
-          <DeliveryEditor
-            delivery={row.original}
-            onSave={(delivery, changes) => void saveDelivery(delivery, changes)}
-            onCancel={(delivery) => void cancelDelivery(delivery)}
-          />
-        ),
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => <TableEditableCell label="Status" options={statuses} value={row.original.status} onCommit={(value) => saveDelivery(row.original, { volumeRealisedMwh: row.original.volumeRealisedMwh, status: value })} />,
       },
     ],
-    [cancelDelivery, saveDelivery],
+    [openDeliveryPanel, saveDelivery],
   );
 
   const submitCreate = async (validatedRequest: CreateDeliveryVariables) => {
@@ -357,19 +341,56 @@ export function DeliveriesPage() {
       await commandStack.execute(command);
       closeCreate();
       setCreateRequest(initialCreate);
-      refreshHistory();
     } catch {
       /* mutation callbacks surface the error */
     }
   };
 
-  const deliveries = history.data?.items ?? [];
+  useEffect(() => {
+    if (!activeDelivery) return;
+    const refreshed = deliveries.find((delivery) => delivery.deliveryId === activeDelivery.deliveryId);
+    if (!refreshed) return;
+    const dirty = !draftValuesEquivalent(panelDeliveryVolume, activeDelivery.volumeRealisedMwh?.toString() ?? '')
+      || panelDeliveryStatus !== activeDelivery.status;
+    const refreshedMatchesDraft = draftValuesEquivalent(panelDeliveryVolume, refreshed.volumeRealisedMwh?.toString() ?? '')
+      && panelDeliveryStatus === refreshed.status;
+    if (!shouldAdoptRefreshedDraft({
+      activeVersion: activeDelivery.version,
+      refreshedVersion: refreshed.version,
+      dirty,
+      refreshedMatchesDraft,
+    })) return;
+    setActiveDelivery(refreshed);
+    setPanelDeliveryVolume(refreshed.volumeRealisedMwh?.toString() ?? "");
+    setPanelDeliveryStatus(refreshed.status as (typeof statuses)[number]);
+  }, [activeDelivery, deliveries, panelDeliveryStatus, panelDeliveryVolume]);
+
+  const submitPanelSave = useCallback(async () => {
+    if (!activeDelivery) return;
+    const normalized = panelDeliveryVolume === "" ? undefined : normalizeMoneyInput(panelDeliveryVolume);
+    if (typeof normalized === 'string' && !isMoneyString(normalized)) {
+      setError("Realised volume MWh must be a decimal number (for example 12.5).");
+      return;
+    }
+    await saveDelivery(activeDelivery, { status: panelDeliveryStatus, volumeRealisedMwh: normalized });
+  }, [activeDelivery, panelDeliveryStatus, panelDeliveryVolume, saveDelivery]);
+
+  const submitPanelCancel = useCallback(async () => {
+    if (!activeDelivery) return;
+    await cancelDelivery(activeDelivery);
+  }, [activeDelivery, cancelDelivery]);
+
+  const panelDirty = Boolean(activeDelivery) && (
+    !draftValuesEquivalent(panelDeliveryVolume, activeDelivery?.volumeRealisedMwh?.toString() ?? '')
+    || panelDeliveryStatus !== activeDelivery?.status
+  );
+
   return (
     <section>
       <header className="mb-6 flex items-start justify-between gap-4 max-[800px]:flex-col max-[800px]:items-stretch">
         <div>
-          <p className="mb-1 text-xs font-extrabold uppercase tracking-widest text-gray-600">Operations</p>
-          <h2>Physical deliveries</h2>
+          <p className="eyebrow">Operations</p>
+          <h2>Deliveries</h2>
           <p>
             {history.data
               ? `${history.data.totalCount} records`
@@ -377,31 +398,49 @@ export function DeliveriesPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => void undo()}
             disabled={!commandStack.canUndo}
           >
             Undo
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => void redo()}
             disabled={!commandStack.canRedo}
           >
             Redo
-          </button>
-          <button
+          </Button>
+          <Button
             data-testid="btn-create-delivery"
             type="button"
             onClick={() => openCreate('create-delivery')}
           >
-            Create delivery
-          </button>
+            New delivery
+          </Button>
         </div>
       </header>
+      <section className="toolbar" aria-label="Delivery list toolbar">
+        <label>
+          Search deliveries
+          <Input
+            aria-label="Search deliveries"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            type="search"
+            placeholder="Search delivery, contract, status..."
+          />
+        </label>
+        <div aria-label="Selection">
+          {selectedCount} selected
+        </div>
+        <div aria-label="Record count">
+          {searchableDeliveries.length} of {totalCount} deliveries
+        </div>
+      </section>
       {error && (
-        <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">
+        <p role="alert" className="error-banner">
           {error}
         </p>
       )}
@@ -409,9 +448,13 @@ export function DeliveriesPage() {
       {!history.isError && (
         <VirtualizedDataTable
           testId="virtual-deliveries-grid"
-          data={deliveries}
+          data={searchableDeliveries}
           columns={columns}
+          ariaLabel="Deliveries"
           getRowId={(row) => row.deliveryId}
+          onRowOpen={openDeliveryPanel}
+          selectedRowIds={selectedRowIds}
+          onSelectedRowIdsChange={setSelection}
         />
       )}
       {history.data && (
@@ -421,31 +464,29 @@ export function DeliveriesPage() {
           <button type="button" disabled={!history.data.hasNextPage || history.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
         </nav>
       )}
-      {showCreate && (
-        <section
-          className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Create physical delivery"
-        >
+      <EntityCreateDrawer
+        description="Add a delivery and connect it to an existing contract."
+        onOpenChange={(open) => { if (!open) closeCreate(); }}
+        open={showCreate}
+        title="Create physical delivery"
+      >
           <ValidatedForm schema={createDeliverySchema} values={createRequest} onValid={submitCreate}>
-            <h3>Create physical delivery</h3>
-            <label>
-              Contract ID
-              <input
-                required
-                value={createRequest.contractId}
-                onChange={(event) =>
-                  setCreateRequest((value) => ({
-                    ...value,
-                    contractId: event.target.value,
-                  }))
-                }
-              />
-            </label>
+            <Combobox
+              disabled={contractOptions.isLoading}
+              label="Contract"
+              options={contractOptions.options}
+              placeholder={contractOptions.isLoading ? 'Loading contracts…' : 'Search contracts…'}
+              value={createRequest.contractId}
+              onChange={(contractId) =>
+                setCreateRequest((value) => ({ ...value, contractId }))
+              }
+            />
+            {contractOptions.isError && (
+              <p role="alert">Contracts could not be loaded. Close this form and try again.</p>
+            )}
             <label>
               Contract instance (optional)
-              <input
+              <Input
                 value={createRequest.contractInstanceId ?? ""}
                 onChange={(event) =>
                   setCreateRequest((value) => ({
@@ -455,25 +496,18 @@ export function DeliveriesPage() {
                 }
               />
             </label>
-            <label>
-              Book type
-              <select
+            <div data-slot="entity-create-field">
+              <span>Book type</span>
+              <Select
+                label="Book type"
+                options={['Sourcing', 'Sales', 'Intercompany']}
                 value={createRequest.bookType}
-                onChange={(event) =>
-                  setCreateRequest((value) => ({
-                    ...value,
-                    bookType: event.target.value,
-                  }))
-                }
-              >
-                <option>Sourcing</option>
-                <option>Sales</option>
-                <option>Intercompany</option>
-              </select>
-            </label>
+                onValueChange={(bookType) => setCreateRequest((value) => ({ ...value, bookType }))}
+              />
+            </div>
             <label>
               Supply month
-              <input
+              <Input
                 required
                 type="date"
                 value={createRequest.supplyMonth}
@@ -487,24 +521,23 @@ export function DeliveriesPage() {
             </label>
             <label>
               Realised volume MWh
-              <input
-                type="number"
-                min="0"
-                step="any"
+              <NumberInput
+                aria-label="Realised volume MWh"
+                min={0}
                 value={createRequest.volumeRealisedMwh ?? ""}
-                onChange={(event) =>
-                  setCreateRequest((value) => ({
-                    ...value,
+                onValueChange={(nextValue) =>
+                  setCreateRequest((current) => ({
+                    ...current,
                     volumeRealisedMwh:
-                      event.target.value === "" ? undefined : event.target.value,
+                      nextValue === "" ? undefined : nextValue,
                   }))
                 }
               />
             </label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div data-slot="entity-create-drawer-actions" className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="bg-gray-200 text-gray-800"
+                className="secondary"
                 onClick={closeCreate}
               >
                 Close
@@ -514,17 +547,96 @@ export function DeliveriesPage() {
               </button>
             </div>
           </ValidatedForm>
-        </section>
-      )}
+      </EntityCreateDrawer>
       {conflict && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
+        <div className="modal">
           <ConflictDialog
             entityId={conflict.id}
             serverState={conflict.serverState}
             attemptedChanges={conflict.attempted}
-            onClose={() => setConflict(undefined)}
+            onClose={() => {
+              clearMutationConflictForEntity(conflict.id);
+              setConflict(undefined);
+            }}
           />
         </div>
+      )}
+      {activeDelivery && (
+        <RecordDetailPanel
+          open
+          onOpenChange={(open) => {
+            if (!open) setActiveDelivery(undefined);
+          }}
+          eyebrow="Delivery"
+          title={activeDelivery.contractInstanceId || activeDelivery.contractId}
+          description={`${activeDelivery.bookType} delivery for ${activeDelivery.supplyMonth}`}
+          recordId={activeDelivery.deliveryId}
+          version={activeDelivery.version}
+          dirty={panelDirty}
+          properties={(
+            <div data-slot="record-field-grid">
+              <div data-slot="record-field">
+                <span>Status</span>
+                <Select
+                  label="Delivery status"
+                  options={[...statuses]}
+                  value={panelDeliveryStatus}
+                  onValueChange={(value) => setPanelDeliveryStatus(value as (typeof statuses)[number])}
+                />
+              </div>
+              <label data-slot="record-field">
+                <span>Realised volume</span>
+                <div data-slot="input-with-unit">
+                  <NumberInput
+                    aria-label="Volume realised MWh"
+                    value={panelDeliveryVolume}
+                    onValueChange={setPanelDeliveryVolume}
+                    min={0}
+                  />
+                  <span>MWh</span>
+                </div>
+              </label>
+            </div>
+          )}
+          context={(
+            <>
+              <Frame>
+                <FrameHeader>
+                  <FrameTitle>Contract</FrameTitle>
+                  <FrameDescription>Relationship attached to this delivery.</FrameDescription>
+                </FrameHeader>
+                <FramePanel>
+                  <dl data-slot="record-facts">
+                    <div><dt>Instance</dt><dd>{activeDelivery.contractInstanceId || '—'}</dd></div>
+                    <div><dt>Contract</dt><dd>{activeDelivery.contractId}</dd></div>
+                    <div><dt>Book</dt><dd>{activeDelivery.bookType}</dd></div>
+                  </dl>
+                </FramePanel>
+              </Frame>
+              <Frame>
+                <FrameHeader>
+                  <FrameTitle>Commercial summary</FrameTitle>
+                  <FrameDescription>Read-only values calculated by Tradebook.</FrameDescription>
+                </FrameHeader>
+                <FramePanel>
+                  <dl data-slot="record-facts">
+                    <div><dt>Nominated</dt><dd>{activeDelivery.volumeNominatedMwh ?? '—'} MWh</dd></div>
+                    <div><dt>Capacity</dt><dd>{activeDelivery.capacityMw ?? '—'} MW</dd></div>
+                    <div><dt>Invoice</dt><dd>{activeDelivery.invoiceAmountEur ?? '—'} EUR</dd></div>
+                  </dl>
+                </FramePanel>
+              </Frame>
+            </>
+          )}
+          activity={<RecordActivity entityId={activeDelivery.deliveryId} entityName="physical_deliveries" />}
+          actions={(
+            <>
+              <Button aria-label="Close panel" intent="secondary" type="button" onClick={() => setActiveDelivery(undefined)}>Close</Button>
+              <Button aria-label="Cancel" intent="danger" type="button" onClick={() => void submitPanelCancel()} disabled={activeDelivery.status === 'Cancelled'}>Cancel delivery</Button>
+              <Button aria-label="Save" type="button" onClick={() => void submitPanelSave()} disabled={updateMutation.isPending}>Save changes</Button>
+            </>
+          )}
+        />
       )}
     </section>
   );

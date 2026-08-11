@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Tradebook.Api.AgentTools;
 using Tradebook.Infrastructure.Options;
 
 namespace Tradebook.UnitTests;
@@ -38,6 +39,11 @@ public sealed class OptionsValidatorTests
             backendSource,
             StringComparison.Ordinal
         );
+        Assert.Contains(
+            "AddSingleton<IValidateOptions<InAppAgentOptions>, InAppAgentOptionsValidator>()",
+            backendSource,
+            StringComparison.Ordinal
+        );
         var optionTypes = Regex
             .Matches(
                 backendSource,
@@ -49,7 +55,10 @@ public sealed class OptionsValidatorTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(["DatabaseOptions", "EntraOptions"], optionTypes);
+        Assert.Equal(
+            ["DatabaseOptions", "EntraOptions", "InAppAgentOptions", "NetworkingOptions"],
+            optionTypes
+        );
         AssertValidatorShapes(optionTypes, backendSource);
     }
 
@@ -97,12 +106,16 @@ public sealed class OptionsValidatorTests
     {
         foreach (var optionType in optionTypes)
         {
-            // EntraOptions uses a hand-written sealed IValidateOptions with custom
-            // tenant/placeholder rules - compiled validation, no reflection (Task 12).
-            if (string.Equals(optionType, "EntraOptions", StringComparison.Ordinal))
+            // Entra and the feature-gated agent use hand-written sealed validators
+            // for rules that go beyond attribute validation.
+            if (
+                string.Equals(optionType, "EntraOptions", StringComparison.Ordinal)
+                || string.Equals(optionType, "InAppAgentOptions", StringComparison.Ordinal)
+                || string.Equals(optionType, "NetworkingOptions", StringComparison.Ordinal)
+            )
             {
                 Assert.Matches(
-                    @"internal\s+sealed\s+class\s+EntraOptionsValidator\s*:\s*IValidateOptions<EntraOptions>",
+                    $@"internal\s+sealed\s+class\s+{optionType}Validator(?:\s*\([^)]*\))?\s*:\s*IValidateOptions<{optionType}>",
                     backendSource
                 );
                 continue;

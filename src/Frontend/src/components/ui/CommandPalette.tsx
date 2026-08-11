@@ -1,11 +1,11 @@
 import { useNavigate } from '@tanstack/react-router';
+import { useHotkey, useHotkeySequences, type HotkeySequence } from '@tanstack/react-hotkeys';
 import { Command } from "cmdk";
 import { useEffect, useState } from "react";
-import { isEditableTarget } from "../../lib/dom/keyboard";
 import type { AuthenticatedRoutePath } from '../../lib/session/sessionController';
 import { useUiStore } from '../../lib/state/useUiStore';
 
-const shortcutRoutes: Readonly<Partial<Record<string, AuthenticatedRoutePath>>> = {
+const shortcutRoutes = {
   d: '/deliveries',
   c: '/contracts',
   m: '/market-prices',
@@ -13,53 +13,33 @@ const shortcutRoutes: Readonly<Partial<Record<string, AuthenticatedRoutePath>>> 
   t: '/transfers',
   h: '/hedges',
   w: '/workflow',
-};
+} as const satisfies Readonly<Record<string, AuthenticatedRoutePath>>;
 
 export function CommandPalette() {
   const navigate = useNavigate();
   const openModal = useUiStore((state) => state.openModal);
   const [open, setOpen] = useState(false);
-  const [prefix, setPrefix] = useState(false);
   useEffect(() => {
-    if (!prefix) return;
-    const timeout = window.setTimeout(() => setPrefix(false), 750);
-    return () => window.clearTimeout(timeout);
-  }, [prefix]);
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOpen((value) => !value);
-        return;
-      }
-      if (isEditableTarget(event.target)) {
-        setPrefix(false);
-        return;
-      }
-      if (event.key === "Escape") {
-        setPrefix(false);
-        return;
-      }
-      if (prefix) {
-        const path = shortcutRoutes[event.key.toLowerCase()];
-        setPrefix(false);
-        if (path) {
-          event.preventDefault();
-          void navigate({ to: path });
-        }
-        return;
-      }
-      if (
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey &&
-        event.key.toLowerCase() === "g"
-      )
-        setPrefix(true);
-    };
-    document.addEventListener("keydown", listener);
-    return () => document.removeEventListener("keydown", listener);
-  }, [navigate, prefix]);
+    const openPalette = () => setOpen(true);
+    window.addEventListener('tradebook:open-command-palette', openPalette);
+    return () => window.removeEventListener('tradebook:open-command-palette', openPalette);
+  }, []);
+  useHotkey('Mod+K', () => setOpen((value) => !value), {
+    ignoreInputs: false,
+    preventDefault: true,
+  });
+  useHotkey('Escape', () => setOpen(false), { enabled: open });
+  useHotkeySequences(
+    Object.entries(shortcutRoutes).map(([key, path]) => ({
+      sequence: ['G', key.toUpperCase()] as HotkeySequence,
+      callback: () => void navigate({ to: path }),
+    })),
+    {
+      ignoreInputs: true,
+      preventDefault: true,
+      timeout: 750,
+    },
+  );
   const select = (path: AuthenticatedRoutePath) => {
     void navigate({ to: path });
     setOpen(false);

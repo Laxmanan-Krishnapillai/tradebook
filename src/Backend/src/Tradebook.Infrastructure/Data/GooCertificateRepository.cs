@@ -63,9 +63,9 @@ public sealed class GooCertificateRepository(
             request.ToDate,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM goo_certificate_transactions WHERE (@ContractId IS NULL OR producer_contract_id = @ContractId OR customer_contract_id = @ContractId) AND (@Status IS NULL OR status::text = @Status) AND (@FromDate IS NULL OR transaction_start_date >= @FromDate) AND (@ToDate IS NULL OR transaction_start_date <= @ToDate) ORDER BY transaction_start_date DESC NULLS LAST, id LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM goo_certificate_transactions WHERE (@ContractId::uuid IS NULL OR producer_contract_id = @ContractId OR customer_contract_id = @ContractId) AND (@Status::text IS NULL OR status::text = @Status) AND (@FromDate::date IS NULL OR transaction_start_date >= @FromDate) AND (@ToDate::date IS NULL OR transaction_start_date <= @ToDate) ORDER BY transaction_start_date DESC NULLS LAST, id LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM goo_certificate_transactions WHERE (@ContractId IS NULL OR producer_contract_id = @ContractId OR customer_contract_id = @ContractId) AND (@Status IS NULL OR status::text = @Status) AND (@FromDate IS NULL OR transaction_start_date >= @FromDate) AND (@ToDate IS NULL OR transaction_start_date <= @ToDate)";
+            "SELECT COUNT(*) FROM goo_certificate_transactions WHERE (@ContractId::uuid IS NULL OR producer_contract_id = @ContractId OR customer_contract_id = @ContractId) AND (@Status::text IS NULL OR status::text = @Status) AND (@FromDate::date IS NULL OR transaction_start_date >= @FromDate) AND (@ToDate::date IS NULL OR transaction_start_date <= @ToDate)";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {

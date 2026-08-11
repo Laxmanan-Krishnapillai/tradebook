@@ -44,7 +44,7 @@ public sealed class ResilientStartupHostedService(
         {
             // Shutdown of a service whose dependency is unreachable must not turn a
             // graceful stop into a crash; the envelope store is durable regardless.
-            ResilientStartupLog.StopFaulted(logger, _inner.GetType().Name, exception);
+            LogStopFaultedSafely(_inner.GetType().Name, exception);
         }
     }
 
@@ -65,7 +65,7 @@ public sealed class ResilientStartupHostedService(
         }
         catch (Exception exception)
         {
-            ResilientStartupLog.StopFaulted(logger, _inner?.GetType().Name ?? "inner", exception);
+            LogStopFaultedSafely(_inner?.GetType().Name ?? "inner", exception);
         }
     }
 
@@ -79,6 +79,28 @@ public sealed class ResilientStartupHostedService(
         {
             // Host dispose can precede or repeat stop; a disposed source already
             // means "stop everything", which is the state we wanted.
+        }
+    }
+
+    private void LogStopFaultedSafely(string serviceName, Exception exception)
+    {
+        try
+        {
+            ResilientStartupLog.StopFaulted(logger, serviceName, exception);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The host can dispose test or Windows Event Log providers before a
+            // late inner-service shutdown fault is reported. Logging must not
+            // turn an otherwise graceful shutdown into a second failure.
+        }
+        catch (AggregateException aggregate)
+            when (aggregate
+                    .Flatten()
+                    .InnerExceptions.All(static inner => inner is ObjectDisposedException)
+            )
+        {
+            // Microsoft.Extensions.Logging aggregates provider failures.
         }
     }
 

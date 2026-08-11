@@ -1,13 +1,18 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using JasperFx;
+using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Tradebook_Core;
 using Tradebook.Api;
+using Tradebook.Api.AgentTools;
 using Tradebook.Api.ErrorHandling;
+using Tradebook.Api.Features.Analytics;
 using Tradebook.Api.Features.Health;
 using Tradebook.Api.Messaging;
+using Tradebook.Api.Options;
 using Tradebook.Api.RealTime;
 using Tradebook.Api.Security;
 using Tradebook.Api.Serialization;
@@ -39,6 +44,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 );
 builder.Services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("Database").ValidateOnStart();
+builder.Services.AddTradebookNetworking();
 builder.Services.AddTradebookPersistence();
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton<ICacheService, HybridCacheService>();
@@ -49,6 +55,20 @@ builder.Services.AddTradebookAuthentication(builder.Configuration, builder.Envir
 builder.Services.AddTradebookHealthChecks();
 builder.Services.AddFastEndpoints();
 builder.Services.AddOpenApi();
+builder.Services.AddScoped<AnalyticsQueryRunner>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IValidateOptions<InAppAgentOptions>, InAppAgentOptionsValidator>();
+builder
+    .Services.AddOptions<InAppAgentOptions>()
+    .BindConfiguration(InAppAgentOptions.SectionName)
+    .ValidateOnStart();
+builder.Services.AddAGUIServer();
+builder.Services.AddSingleton<AnalyticsAgentTool>();
+builder.Services.AddSingleton<AIAgent>(TradebookInAppAgent.Create);
+builder
+    .Services.AddMcpServer()
+    .WithHttpTransport(options => options.Stateless = true)
+    .WithTools<AnalyticsMcpTools>();
 builder.Services.AddDashboardPush();
 builder.Services.AddExceptionHandler<PostgresExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -94,6 +114,7 @@ var app = builder.Build();
 // Schema validation runs inside MigrationHostedService after the background migration
 // pass; semantic-model drift stops the application there instead of racing startup.
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 
 // Static assets must run before the authorization fallback policy so the SPA shell can
@@ -109,6 +130,12 @@ app.UseFastEndpoints(config =>
 app.MapOpenApi().RequireAuthorization();
 app.MapTradebookHealthEndpoints();
 app.MapDashboardPushHub();
+app.MapMcp("/mcp").RequireAuthorization("ReadPolicy");
+if (app.Services.GetRequiredService<IOptions<InAppAgentOptions>>().Value.Enabled)
+{
+    app.MapAGUIServer("/api/v1/agent/run", app.Services.GetRequiredService<AIAgent>())
+        .RequireAuthorization("ReadPolicy");
+}
 
 // SPA hosting (Task 02 §3.7): serve the built frontend; unmatched /api/* and /hubs/*
 // return 404 instead of index.html.

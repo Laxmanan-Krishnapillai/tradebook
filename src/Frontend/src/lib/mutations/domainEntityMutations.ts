@@ -25,15 +25,46 @@ import type { UpdateTransferRequest } from '../../api/generated/types.gen';
 import type { UpsertMarketPriceRequest } from '../../api/generated/types.gen';
 import { ApiError, apiFetch } from '../api/client';
 import { isFirstListPage, isUnfilteredList, queryKeys } from '../query/queryKeys';
-import { getAuthSession } from '../state/useAuthStore';
+import { getAuthSessionIdentity } from '../state/useAuthStore';
+import {
+  acquireMutationScope,
+  markMutationConflict,
+  mutationScopeKey,
+  recordMutationVersion,
+  resolveMutationVersion,
+  waitForMutationConflictResolution,
+} from './mutationCoordinator';
+import {
+  type EntitySnapshot,
+  isPagedEntityCache,
+  type PagedEntityCache,
+  rollbackEntityDelete,
+  rollbackEntityUpdate,
+  rollbackOptimisticCreate,
+} from './optimisticCache';
 
 interface VersionedEntity { version: number; }
-export interface PagedEntityCache<T> { items: T[]; totalCount: number; page: number; pageSize: number; hasNextPage: boolean; }
-export interface EntityUpdateVariables<TChanges> { id: string; version: number; changes: TChanges; }
+export type { PagedEntityCache } from './optimisticCache';
+export interface EntityUpdateVariables<TChanges> {
+  id: string;
+  version: number;
+  changes: TChanges;
+  intent?: readonly (keyof TChanges)[];
+}
 export interface EntityDeleteVariables { id: string; version: number; reason: string; }
+export type MarketPriceMutationVariables = UpsertMarketPriceRequest & {
+  intent?: readonly (keyof UpsertMarketPriceRequest)[];
+};
 export type EntityConflictHandler<T> = (id: string, serverState?: T) => void;
 type ErrorHandler = (error: unknown) => void;
-type EntitySnapshots<T> = Array<[QueryKey, PagedEntityCache<T> | T | undefined]>;
+type EntitySnapshots<T> = EntitySnapshot<T>[];
+
+interface EntityMutationContext<T> {
+  release?: () => void;
+  scopeKey?: string;
+  sessionIdentity: string;
+  snapshots: EntitySnapshots<T>;
+}
 
 interface EntityDescriptor<T extends VersionedEntity> {
   basePath: string;
@@ -45,36 +76,89 @@ interface EntityDescriptor<T extends VersionedEntity> {
   optimisticDeletePatch?: Partial<T>;
 }
 
-function currentSessionIdentity(): string | undefined {
-  const session = getAuthSession();
-  return session ? `${session.actorId}\u0000${session.accountKey}` : undefined;
-}
+const currentSessionIdentity = getAuthSessionIdentity;
 function isCurrentSession<T extends { sessionIdentity?: string }>(context: T | undefined): context is T {
   return context !== undefined && context.sessionIdentity === currentSessionIdentity();
 }
 function isPagedCache<T>(value: unknown): value is PagedEntityCache<T> {
-  return typeof value === 'object' && value !== null && Array.isArray((value as { items?: unknown }).items);
+  return isPagedEntityCache<T>(value);
 }
 function takeSnapshots<T>(queryClient: QueryClient, queryKey: readonly string[]): EntitySnapshots<T> {
   return queryClient.getQueriesData<PagedEntityCache<T> | T>({ queryKey });
 }
-function restore<T>(queryClient: QueryClient, snapshots: EntitySnapshots<T>, seededKeys: QueryKey[] = []): void {
-  for (const seededKey of seededKeys) queryClient.removeQueries({ queryKey: seededKey, exact: true });
-  for (const [cachedKey, snapshot] of snapshots) {
-    if (snapshot === undefined) queryClient.removeQueries({ queryKey: cachedKey, exact: true });
-    else queryClient.setQueryData(cachedKey, snapshot);
-  }
-}
-
 function installEntity<T extends VersionedEntity>(queryClient: QueryClient, descriptor: EntityDescriptor<T>, entity: T): void {
-  queryClient.setQueryData(descriptor.detailKey(descriptor.idOf(entity)), entity);
+  queryClient.setQueryData<T>(
+    descriptor.detailKey(descriptor.idOf(entity)),
+    (current) => !current || current.version <= entity.version ? entity : current,
+  );
   for (const [key, value] of queryClient.getQueriesData({ queryKey: descriptor.queryKey })) {
     if (!isPagedCache<T>(value)) continue;
     queryClient.setQueryData<PagedEntityCache<T>>(key, {
       ...value,
-      items: value.items.map((item) => descriptor.idOf(item) === descriptor.idOf(entity) ? entity : item),
+      items: value.items.map((item) => descriptor.idOf(item) === descriptor.idOf(entity) && item.version <= entity.version
+        ? entity
+        : item),
     });
   }
+}
+
+async function prepareEntityMutation<T extends VersionedEntity>(
+  queryClient: QueryClient,
+  descriptor: EntityDescriptor<T>,
+  id?: string,
+): Promise<EntityMutationContext<T>> {
+  const sessionIdentity = currentSessionIdentity();
+  const scopeKey = id === undefined
+    ? undefined
+    : mutationScopeKey(descriptor.queryKey, sessionIdentity, id);
+  const release = scopeKey ? await acquireMutationScope(scopeKey) : undefined;
+  try {
+    if (scopeKey) await waitForMutationConflictResolution(scopeKey);
+    await queryClient.cancelQueries({ queryKey: descriptor.queryKey });
+    if (sessionIdentity !== currentSessionIdentity()) throw new Error('The authenticated session changed before the mutation started.');
+    return {
+      release,
+      scopeKey,
+      sessionIdentity,
+      snapshots: takeSnapshots<T>(queryClient, descriptor.queryKey),
+    };
+  } catch (error) {
+    release?.();
+    throw error;
+  }
+}
+
+function latestSnapshotEntity<T extends VersionedEntity>(
+  snapshots: EntitySnapshots<T>,
+  id: string,
+  idOf: (entity: T) => string,
+): T | undefined {
+  let latest: T | undefined;
+  for (const [, snapshot] of snapshots) {
+    const candidates = isPagedCache<T>(snapshot) ? snapshot.items : snapshot ? [snapshot] : [];
+    for (const candidate of candidates) {
+      if (idOf(candidate) !== id || (latest && latest.version >= candidate.version)) continue;
+      latest = candidate;
+    }
+  }
+  return latest;
+}
+
+function rebaseChanges<T extends VersionedEntity, TChanges extends object>(
+  latest: T,
+  changes: TChanges,
+  intent: readonly (keyof TChanges)[],
+): TChanges {
+  const intended = new Set<PropertyKey>(intent);
+  const latestRecord = latest as unknown as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(changes).map(([key, value]) => [
+    key,
+    intended.has(key) || !(key in latestRecord) ? value : latestRecord[key],
+  ])) as TChanges;
+}
+
+function settleEntityMutation(context: { release?: () => void } | undefined): void {
+  context?.release?.();
 }
 
 function seedFirstPageCaches<T extends VersionedEntity>(
@@ -110,19 +194,21 @@ function useEntityCreate<T extends VersionedEntity, TRequest extends object>(des
     mutationFn: (request: TRequest) => apiFetch<T>(descriptor.basePath, { method: 'POST', body: JSON.stringify(request) }),
     retry: false,
     onMutate: async (request) => {
-      const sessionIdentity = currentSessionIdentity();
-      await queryClient.cancelQueries({ queryKey: descriptor.queryKey });
-      if (sessionIdentity !== currentSessionIdentity()) throw new Error('The authenticated session changed before the mutation started.');
-      const snapshots = takeSnapshots<T>(queryClient, descriptor.queryKey);
+      const context = await prepareEntityMutation(queryClient, descriptor);
+      const { snapshots } = context;
       const listSnapshots = snapshots.filter((entry): entry is [QueryKey, PagedEntityCache<T>] => (
         isPagedCache<T>(entry[1]) && isUnfilteredList(entry[0], descriptor.queryKey)
       ));
+      const previousTotals = new Map<string, number | undefined>(
+        listSnapshots.map(([key, cache]) => [JSON.stringify(key), cache.totalCount]),
+      );
       const optimisticId = `optimistic-${crypto.randomUUID()}`;
       const now = new Date().toISOString();
       const optimistic = { ...request, [descriptor.idField]: optimisticId, version: 0, createdAt: now, updatedAt: now } as unknown as T;
       let seededKeys: QueryKey[] = [];
       if (listSnapshots.length === 0) {
         seededKeys = seedFirstPageCaches(queryClient, descriptor, snapshots, optimistic);
+        for (const key of seededKeys) previousTotals.set(JSON.stringify(key), undefined);
       } else {
         for (const [cachedKey, cache] of listSnapshots) {
           const items = isFirstListPage(cachedKey, descriptor.queryKey)
@@ -131,7 +217,13 @@ function useEntityCreate<T extends VersionedEntity, TRequest extends object>(des
           queryClient.setQueryData(cachedKey, withTotalDelta(cache, 1, items));
         }
       }
-      return { snapshots, seededKeys, optimisticId, sessionIdentity };
+      return {
+        ...context,
+        seededKeys,
+        optimisticId,
+        optimisticKeys: listSnapshots.length === 0 ? seededKeys : listSnapshots.map(([key]) => key),
+        previousTotals,
+      };
     },
     onSuccess: (created, _request, context) => {
       if (!isCurrentSession(context)) return;
@@ -143,14 +235,23 @@ function useEntityCreate<T extends VersionedEntity, TRequest extends object>(des
     },
     onError: (error, _request, context) => {
       if (!isCurrentSession(context)) return;
-      restore(queryClient, context.snapshots, context.seededKeys);
+      rollbackOptimisticCreate(
+        queryClient,
+        context.optimisticKeys,
+        context.optimisticId,
+        descriptor.idOf,
+        context.seededKeys,
+        context.previousTotals,
+      );
       if (error instanceof ApiError && error.status === 409) {
+        if (context.scopeKey) markMutationConflict(context.scopeKey);
         const current = error.problem as T | undefined;
         if (current) installEntity(queryClient, descriptor, current);
         onConflict(context.optimisticId, current);
       } else onError(error);
     },
     onSettled: (_data, _error, _request, context) => {
+      settleEntityMutation(context);
       if (isCurrentSession(context)) return queryClient.invalidateQueries({ queryKey: descriptor.queryKey });
     }
   });
@@ -159,31 +260,48 @@ function useEntityCreate<T extends VersionedEntity, TRequest extends object>(des
 function useEntityUpdate<T extends VersionedEntity, TChanges extends object>(descriptor: EntityDescriptor<T>, onConflict: EntityConflictHandler<T>, onError: ErrorHandler) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, version, changes }: EntityUpdateVariables<TChanges>) => apiFetch<T>(`${descriptor.basePath}/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ ...changes, [descriptor.idField]: id, version }) }),
+    mutationFn: ({ id, version, changes }: EntityUpdateVariables<TChanges>) => {
+      return apiFetch<T>(`${descriptor.basePath}/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...changes,
+          [descriptor.idField]: id,
+          version,
+        }),
+      });
+    },
     retry: false,
-    onMutate: async ({ id, changes }) => {
-      const sessionIdentity = currentSessionIdentity();
-      await queryClient.cancelQueries({ queryKey: descriptor.queryKey });
-      if (sessionIdentity !== currentSessionIdentity()) throw new Error('The authenticated session changed before the mutation started.');
-      const snapshots = takeSnapshots<T>(queryClient, descriptor.queryKey);
-      for (const [key, value] of snapshots) {
+    onMutate: async (variables: EntityUpdateVariables<TChanges>) => {
+      const context = await prepareEntityMutation(queryClient, descriptor, variables.id);
+      const latest = latestSnapshotEntity(context.snapshots, variables.id, descriptor.idOf);
+      if (variables.intent && latest && latest.version > variables.version) {
+        variables.changes = rebaseChanges(latest, variables.changes, variables.intent);
+        variables.version = latest.version;
+      }
+      const { changes, id } = variables;
+      for (const [key, value] of context.snapshots) {
         if (isPagedCache<T>(value)) queryClient.setQueryData(key, { ...value, items: value.items.map((item) => descriptor.idOf(item) === id ? { ...item, ...changes } : item) });
       }
       queryClient.setQueryData<T>(descriptor.detailKey(id), (entity) => entity ? { ...entity, ...changes } : entity);
-      return { snapshots, sessionIdentity };
+      return context;
     },
-    onSuccess: (updated, _variables, context) => { if (isCurrentSession(context)) installEntity(queryClient, descriptor, updated); },
-    onError: (error, { id }, context) => {
+    onSuccess: (updated, _variables, context) => {
       if (!isCurrentSession(context)) return;
-      restore(queryClient, context.snapshots);
+      if (context.scopeKey) recordMutationVersion(context.scopeKey, updated.version);
+      installEntity(queryClient, descriptor, updated);
+    },
+    onError: (error, { id, changes }, context) => {
+      if (!isCurrentSession(context)) return;
+      rollbackEntityUpdate(queryClient, context.snapshots, id, descriptor.idOf, changes);
       if (error instanceof ApiError && error.status === 409) {
+        if (context.scopeKey) markMutationConflict(context.scopeKey);
         const current = error.problem as T | undefined;
         if (current) installEntity(queryClient, descriptor, current);
         onConflict(id, current);
       } else onError(error);
     },
     onSettled: (_data, _error, _variables, context) => {
-      if (isCurrentSession(context)) return queryClient.invalidateQueries({ queryKey: descriptor.queryKey });
+      settleEntityMutation(context);
     }
   });
 }
@@ -191,14 +309,21 @@ function useEntityUpdate<T extends VersionedEntity, TChanges extends object>(des
 function useEntityDelete<T extends VersionedEntity>(descriptor: EntityDescriptor<T>, onConflict: EntityConflictHandler<T>, onError: ErrorHandler) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, version, reason }: EntityDeleteVariables) => apiFetch<void>(`${descriptor.basePath}/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ [descriptor.idField]: id, version, reason }) }),
+    mutationFn: ({ id, version, reason }: EntityDeleteVariables) => {
+      const scopeKey = mutationScopeKey(descriptor.queryKey, currentSessionIdentity(), id);
+      return apiFetch<void>(`${descriptor.basePath}/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({
+          [descriptor.idField]: id,
+          version: resolveMutationVersion(scopeKey, version),
+          reason,
+        }),
+      });
+    },
     retry: false,
     onMutate: async ({ id }) => {
-      const sessionIdentity = currentSessionIdentity();
-      await queryClient.cancelQueries({ queryKey: descriptor.queryKey });
-      if (sessionIdentity !== currentSessionIdentity()) throw new Error('The authenticated session changed before the mutation started.');
-      const snapshots = takeSnapshots<T>(queryClient, descriptor.queryKey);
-      for (const [key, value] of snapshots) {
+      const context = await prepareEntityMutation(queryClient, descriptor, id);
+      for (const [key, value] of context.snapshots) {
         if (!isPagedCache<T>(value)) continue;
         if (descriptor.optimisticDeletePatch) {
           queryClient.setQueryData(key, {
@@ -216,18 +341,26 @@ function useEntityDelete<T extends VersionedEntity>(descriptor: EntityDescriptor
       }
       if (descriptor.optimisticDeletePatch) queryClient.setQueryData<T>(descriptor.detailKey(id), (entity) => entity ? { ...entity, ...descriptor.optimisticDeletePatch } : entity);
       else queryClient.removeQueries({ queryKey: descriptor.detailKey(id), exact: true });
-      return { snapshots, sessionIdentity };
+      return context;
     },
     onError: (error, { id }, context) => {
       if (!isCurrentSession(context)) return;
-      restore(queryClient, context.snapshots);
+      rollbackEntityDelete(
+        queryClient,
+        context.snapshots,
+        id,
+        descriptor.idOf,
+        descriptor.optimisticDeletePatch,
+      );
       if (error instanceof ApiError && error.status === 409) {
+        if (context.scopeKey) markMutationConflict(context.scopeKey);
         const current = error.problem as T | undefined;
         if (current) installEntity(queryClient, descriptor, current);
         onConflict(id, current);
       } else onError(error);
     },
     onSettled: (_data, _error, _variables, context) => {
+      settleEntityMutation(context);
       if (isCurrentSession(context)) return queryClient.invalidateQueries({ queryKey: descriptor.queryKey });
     }
   });
@@ -263,17 +396,31 @@ export const useDeleteGooCertificate = (onConflict: EntityConflictHandler<GooCer
 export function useRequestGooBatchExport(onConflict: EntityConflictHandler<GooCertificateTransactionDetailsDto> = noConflict, onError: ErrorHandler = noError) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (request: RequestGooBatchExportRequest) => apiFetch<GooCertificateTransactionDetailsDto>(
-      `/api/v1/goo-certificates/${encodeURIComponent(request.gooCertificateTransactionId)}/request-batch-export`,
-      { method: 'POST', body: JSON.stringify(request) }
-    ),
+    mutationFn: (request: RequestGooBatchExportRequest) => {
+      const scopeKey = mutationScopeKey(
+        certificates.queryKey,
+        currentSessionIdentity(),
+        request.gooCertificateTransactionId,
+      );
+      return apiFetch<GooCertificateTransactionDetailsDto>(
+        `/api/v1/goo-certificates/${encodeURIComponent(request.gooCertificateTransactionId)}/request-batch-export`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            ...request,
+            version: resolveMutationVersion(scopeKey, request.version),
+          }),
+        },
+      );
+    },
     retry: false,
     onMutate: async (request) => {
-      const sessionIdentity = currentSessionIdentity();
-      await queryClient.cancelQueries({ queryKey: certificates.queryKey });
-      if (sessionIdentity !== currentSessionIdentity()) throw new Error('The authenticated session changed before the mutation started.');
-      const snapshots = takeSnapshots<GooCertificateTransactionDetailsDto>(queryClient, certificates.queryKey);
-      for (const [key, value] of snapshots) {
+      const context = await prepareEntityMutation(
+        queryClient,
+        certificates,
+        request.gooCertificateTransactionId,
+      );
+      for (const [key, value] of context.snapshots) {
         if (!isPagedCache<GooCertificateTransactionDetailsDto>(value)) continue;
         queryClient.setQueryData(key, {
           ...value,
@@ -283,13 +430,24 @@ export function useRequestGooBatchExport(onConflict: EntityConflictHandler<GooCe
         });
       }
       queryClient.setQueryData<GooCertificateTransactionDetailsDto>(certificates.detailKey(request.gooCertificateTransactionId), (entity) => entity ? { ...entity, status: 'Batch export requested' } : entity);
-      return { snapshots, sessionIdentity };
+      return context;
     },
-    onSuccess: (saved, _request, context) => { if (isCurrentSession(context)) installEntity(queryClient, certificates, saved); },
+    onSuccess: (saved, _request, context) => {
+      if (!isCurrentSession(context)) return;
+      if (context.scopeKey) recordMutationVersion(context.scopeKey, saved.version);
+      installEntity(queryClient, certificates, saved);
+    },
     onError: (error, request, context) => {
       if (!isCurrentSession(context)) return;
-      restore(queryClient, context.snapshots);
+      rollbackEntityUpdate(
+        queryClient,
+        context.snapshots,
+        request.gooCertificateTransactionId,
+        certificates.idOf,
+        { status: 'Batch export requested' },
+      );
       if (error instanceof ApiError && error.status === 409) {
+        if (context.scopeKey) markMutationConflict(context.scopeKey);
         const current = error.problem as GooCertificateTransactionDetailsDto | undefined;
         if (current) installEntity(queryClient, certificates, current);
         onConflict(request.gooCertificateTransactionId, current);
@@ -297,6 +455,7 @@ export function useRequestGooBatchExport(onConflict: EntityConflictHandler<GooCe
       else onError(error);
     },
     onSettled: (_data, _error, _request, context) => {
+      settleEntityMutation(context);
       if (isCurrentSession(context)) return queryClient.invalidateQueries({ queryKey: certificates.queryKey });
     }
   });
@@ -313,43 +472,90 @@ export function useUpsertMarketPrice(onConflict: EntityConflictHandler<MarketPri
   const queryKey = domainQueryKeys.marketPrices;
   const descriptor = { basePath: '/api/v1/market-prices', idField: 'priceDate', queryKey, listKey: queryKeys.marketPrices.list(), detailKey: queryKeys.marketPrices.detail, idOf: (value: MarketPriceDetailsDto) => value.priceDate } satisfies EntityDescriptor<MarketPriceDetailsDto>;
   return useMutation({
-    mutationFn: (request: UpsertMarketPriceRequest) => apiFetch<MarketPriceDetailsDto>(`/api/v1/market-prices/${encodeURIComponent(request.priceDate)}`, { method: 'PUT', body: JSON.stringify(request) }),
+    mutationFn: ({ intent: _intent, ...request }: MarketPriceMutationVariables) => {
+      return apiFetch<MarketPriceDetailsDto>(
+        `/api/v1/market-prices/${encodeURIComponent(request.priceDate)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(request),
+        },
+      );
+    },
     retry: false,
-    onMutate: async (request) => {
-      const sessionIdentity = currentSessionIdentity();
-      await queryClient.cancelQueries({ queryKey });
-      if (sessionIdentity !== currentSessionIdentity()) throw new Error('The authenticated session changed before the mutation started.');
-      const snapshots = takeSnapshots<MarketPriceDetailsDto>(queryClient, queryKey);
+    onMutate: async (request: MarketPriceMutationVariables) => {
+      const context = await prepareEntityMutation(queryClient, descriptor, request.priceDate);
+      const { snapshots } = context;
+      const latest = latestSnapshotEntity(snapshots, request.priceDate, descriptor.idOf);
+      if (request.intent && latest && latest.version > request.version) {
+        Object.assign(request, rebaseChanges(latest, request, request.intent), {
+          version: latest.version,
+        });
+      }
+      const { intent: _intent, ...wireRequest } = request;
       const listSnapshots = snapshots.filter((entry): entry is [QueryKey, PagedEntityCache<MarketPriceDetailsDto>] => (
         isPagedCache<MarketPriceDetailsDto>(entry[1]) && isUnfilteredList(entry[0], queryKey)
       ));
+      const previousTotals = new Map<string, number | undefined>(
+        listSnapshots.map(([key, cache]) => [JSON.stringify(key), cache.totalCount]),
+      );
       const exists = listSnapshots.some(([, cache]) => cache.items.some((item) => item.priceDate === request.priceDate));
-      const optimistic = { ...request } as MarketPriceDetailsDto;
+      const optimistic = { ...wireRequest } as MarketPriceDetailsDto;
       let seededKeys: QueryKey[] = [];
       if (listSnapshots.length === 0) {
         seededKeys = seedFirstPageCaches(queryClient, descriptor, snapshots, optimistic);
+        for (const key of seededKeys) previousTotals.set(JSON.stringify(key), undefined);
       } else {
         for (const [cachedKey, cache] of listSnapshots) {
           const items = exists
-            ? cache.items.map((item) => item.priceDate === request.priceDate ? { ...item, ...request } : item)
+            ? cache.items.map((item) => item.priceDate === request.priceDate ? { ...item, ...wireRequest } : item)
             : isFirstListPage(cachedKey, queryKey) ? [optimistic, ...cache.items].slice(0, cache.pageSize) : cache.items;
           queryClient.setQueryData(cachedKey, exists ? { ...cache, items } : withTotalDelta(cache, 1, items));
         }
       }
-      return { snapshots, seededKeys, sessionIdentity };
+      return {
+        ...context,
+        exists,
+        optimisticKeys: listSnapshots.length === 0 ? seededKeys : listSnapshots.map(([key]) => key),
+        previousTotals,
+        seededKeys,
+      };
     },
-    onSuccess: (saved, _request, context) => { if (isCurrentSession(context)) installEntity(queryClient, descriptor, saved); },
+    onSuccess: (saved, _request, context) => {
+      if (!isCurrentSession(context)) return;
+      if (context.scopeKey) recordMutationVersion(context.scopeKey, saved.version);
+      installEntity(queryClient, descriptor, saved);
+    },
     onError: (error, request, context) => {
       if (!isCurrentSession(context)) return;
-      restore(queryClient, context.snapshots, context.seededKeys);
+      const { intent: _intent, ...wireRequest } = request;
+      if (context.exists) {
+        rollbackEntityUpdate(
+          queryClient,
+          context.snapshots,
+          request.priceDate,
+          descriptor.idOf,
+          wireRequest,
+        );
+      } else {
+        rollbackOptimisticCreate(
+          queryClient,
+          context.optimisticKeys,
+          request.priceDate,
+          descriptor.idOf,
+          context.seededKeys,
+          context.previousTotals,
+        );
+      }
       if (error instanceof ApiError && error.status === 409) {
+        if (context.scopeKey) markMutationConflict(context.scopeKey);
         const current = error.problem as MarketPriceDetailsDto | undefined;
         if (current) installEntity(queryClient, descriptor, current);
         onConflict(request.priceDate, current);
       } else onError(error);
     },
     onSettled: (_data, _error, _request, context) => {
-      if (isCurrentSession(context)) return queryClient.invalidateQueries({ queryKey });
+      settleEntityMutation(context);
+      if (isCurrentSession(context) && !context.exists) return queryClient.invalidateQueries({ queryKey });
     }
   });
 }

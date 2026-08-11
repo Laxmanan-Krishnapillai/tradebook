@@ -53,9 +53,9 @@ public sealed class TaxTariffRepository(
             request.EffectiveOn,
         };
         const string rowsSql =
-            $"SELECT {Projection} FROM tax_tariffs WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@EffectiveOn IS NULL OR (period_start <= @EffectiveOn AND period_end >= @EffectiveOn)) ORDER BY period_start DESC, id LIMIT @Limit OFFSET @Offset";
+            $"SELECT {Projection} FROM tax_tariffs WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@EffectiveOn::date IS NULL OR (period_start <= @EffectiveOn AND period_end >= @EffectiveOn)) ORDER BY period_start DESC, id LIMIT @Limit OFFSET @Offset";
         const string countSql =
-            "SELECT COUNT(*) FROM tax_tariffs WHERE (@ContractId IS NULL OR contract_id = @ContractId) AND (@EffectiveOn IS NULL OR (period_start <= @EffectiveOn AND period_end >= @EffectiveOn))";
+            "SELECT COUNT(*) FROM tax_tariffs WHERE (@ContractId::uuid IS NULL OR contract_id = @ContractId) AND (@EffectiveOn::date IS NULL OR (period_start <= @EffectiveOn AND period_end >= @EffectiveOn))";
         var connection = await connections.OpenConnectionAsync(ct).ConfigureAwait(false);
         await using (connection.ConfigureAwait(false))
         {

@@ -4,6 +4,14 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type ActivityEntryDto = {
+    auditId: string;
+    operation: string;
+    actorId: string | null;
+    occurredAt: string;
+    changes: unknown;
+};
+
 export type AnalyticsQueryResponse = {
     columns: Array<string>;
     rows: Array<Array<unknown>>;
@@ -301,9 +309,13 @@ export type EntityChangedEventDto = {
 };
 
 export type FilterQuery = {
-    member: string;
+    member: QueryIdentifier;
     operator: string;
-    values: Array<unknown>;
+    values: QueryFilterValueList;
+};
+
+export type GetActivityResponse = {
+    items: Array<ActivityEntryDto>;
 };
 
 export type GetBioticketHistoryRequest = {
@@ -497,14 +509,21 @@ export type HedgeDetailsDto = {
     updatedAt: string;
 };
 
+export type InAppAgentStatusResponse = {
+    enabled: boolean;
+    readOnly: boolean;
+    transport: string;
+    runPath: string;
+};
+
 export type JsonQueryAst = {
-    modelName: string;
-    measures?: Array<string> | null;
-    metrics?: Array<string> | null;
-    dimensions?: Array<string> | null;
-    timeDimensions?: Array<TimeDimensionQuery> | null;
-    filters?: Array<FilterQuery> | null;
-    sorts?: Array<SortQuery> | null;
+    modelName: QueryIdentifier;
+    measures?: QuerySelectedMemberList | null;
+    metrics?: QuerySelectedMemberList | null;
+    dimensions?: QuerySelectedMemberList | null;
+    timeDimensions?: QueryTimeDimensionList | null;
+    filters?: QueryFilterList | null;
+    sorts?: QuerySortList | null;
     limit?: number | null;
     offset?: number | null;
 };
@@ -585,6 +604,22 @@ export type ProblemDetailsResponse = {
     detail: string | null;
 };
 
+export type QueryFilterList = Array<FilterQuery>;
+
+export type QueryFilterValue = QueryStringFilterValue | number | boolean;
+
+export type QueryFilterValueList = Array<QueryFilterValue>;
+
+export type QueryIdentifier = string;
+
+export type QuerySelectedMemberList = Array<QueryIdentifier>;
+
+export type QuerySortList = Array<SortQuery>;
+
+export type QueryStringFilterValue = string;
+
+export type QueryTimeDimensionList = Array<TimeDimensionQuery>;
+
 export type RequestGooBatchExportRequest = {
     gooCertificateTransactionId: string;
     version: number;
@@ -603,8 +638,8 @@ export type SaveDashboardResponse = {
 };
 
 export type SortQuery = {
-    member: string;
-    direction: string;
+    member: QueryIdentifier;
+    direction: QueryIdentifier;
 };
 
 export type TaxTariffDetailsDto = {
@@ -626,9 +661,9 @@ export type TaxTariffDetailsDto = {
 };
 
 export type TimeDimensionQuery = {
-    dimension: string;
-    granularity: string;
-    dateRange?: Array<string> | null;
+    dimension: QueryIdentifier;
+    granularity: QueryIdentifier;
+    dateRange?: Array<QueryStringFilterValue> | null;
 };
 
 export type TradeAction = 'Buy' | 'Sell' | 'Intercompany' | 'Swap';
@@ -780,7 +815,68 @@ export type UpsertMarketPriceRequest = {
     version: number;
 };
 
+export type GetActivityRequestEntityId = string;
+
+export type GetActivityRequestEntityName = string;
+
+export type GetActivityRequestPageSize = number;
+
 export type GetEventsSinceRequest = number;
+
+export type ActivityListData = {
+    body?: never;
+    path: {
+        entityName: string;
+        entityId: string;
+    };
+    query?: {
+        pageSize?: number;
+    };
+    url: '/api/v1/activity/{entityName}/{entityId}';
+};
+
+export type ActivityListErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ProblemDetails;
+};
+
+export type ActivityListError = ActivityListErrors[keyof ActivityListErrors];
+
+export type ActivityListResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: GetActivityResponse;
+};
+
+export type ActivityListResponse = ActivityListResponses[keyof ActivityListResponses];
+
+export type AgentStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/agent/status';
+};
+
+export type AgentStatusErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: ProblemDetails;
+};
+
+export type AgentStatusError = AgentStatusErrors[keyof AgentStatusErrors];
+
+export type AgentStatusResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: InAppAgentStatusResponse;
+};
+
+export type AgentStatusResponse = AgentStatusResponses[keyof AgentStatusResponses];
 
 export type AnalyticsQueryData = {
     body: JsonQueryAst;
