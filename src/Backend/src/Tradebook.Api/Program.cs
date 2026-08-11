@@ -95,6 +95,12 @@ var app = builder.Build();
 // pass; semantic-model drift stops the application there instead of racing startup.
 
 app.UseExceptionHandler();
+
+// Static assets must run before the authorization fallback policy so the SPA shell can
+// load MSAL and acquire a token. API and real-time endpoints remain policy guarded.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseFastEndpoints(config =>
@@ -106,9 +112,6 @@ app.MapDashboardPushHub();
 
 // SPA hosting (Task 02 §3.7): serve the built frontend; unmatched /api/* and /hubs/*
 // return 404 instead of index.html.
-app.UseDefaultFiles();
-app.UseStaticFiles();
-
 // AllowAnonymous: the SPA shell must load on deep-link refresh (F5 on /dashboards/x)
 // so MSAL can run; without it the authorization FallbackPolicy returns 401 for the
 // HTML document itself. Data still comes from the policy-guarded /api endpoints.

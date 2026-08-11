@@ -5,3 +5,6 @@
 src/Frontend/dist
 TestResults
 StrykerOutput
+infra/terraform/*.tfplan
+infra/terraform/backend.*.hcl
+infra/terraform/*.tfvars

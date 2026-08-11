@@ -6,6 +6,13 @@ resource "azurerm_container_app_environment" "this" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
   infrastructure_subnet_id   = azurerm_subnet.container_apps.id
   tags                       = var.tags
+
+  workload_profile {
+    name                  = "Consumption"
+    workload_profile_type = "Consumption"
+    minimum_count         = 0
+    maximum_count         = 0
+  }
 }
 
 resource "azurerm_container_app" "api" {
@@ -13,6 +20,7 @@ resource "azurerm_container_app" "api" {
   container_app_environment_id = azurerm_container_app_environment.this.id
   resource_group_name          = azurerm_resource_group.this.name
   revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
   tags                         = var.tags
 
   identity {
@@ -55,7 +63,7 @@ resource "azurerm_container_app" "api" {
       }
       env {
         name  = "Entra__ClientId"
-        value = azuread_application.api.client_id
+        value = local.entra_api_client_id
       }
 
       startup_probe {

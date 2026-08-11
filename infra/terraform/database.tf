@@ -21,6 +21,10 @@ resource "azurerm_postgresql_flexible_server" "this" {
   tags                              = var.tags
 
   depends_on = [azurerm_private_dns_zone_virtual_network_link.postgres]
+
+  lifecycle {
+    ignore_changes = [zone]
+  }
 }
 
 resource "azurerm_postgresql_flexible_server_database" "tradebook" {
@@ -34,4 +38,10 @@ resource "azurerm_postgresql_flexible_server_configuration" "pg_stat_statements"
   name      = "shared_preload_libraries"
   server_id = azurerm_postgresql_flexible_server.this.id
   value     = "pg_stat_statements"
+}
+
+resource "azurerm_postgresql_flexible_server_configuration" "azure_extensions" {
+  name      = "azure.extensions"
+  server_id = azurerm_postgresql_flexible_server.this.id
+  value     = "btree_gist"
 }
