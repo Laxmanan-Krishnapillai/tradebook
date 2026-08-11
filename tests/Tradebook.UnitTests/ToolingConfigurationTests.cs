@@ -395,6 +395,24 @@ public sealed class ToolingConfigurationTests
     }
 
     [Fact]
+    public void ProductionDeploymentRunsOnlyFromTheOrganizationFork()
+    {
+        var workflow = File.ReadAllText(
+            Path.Combine(FindRepositoryRoot(), ".github", "workflows", "deploy.yml")
+        );
+
+        Assert.Equal(
+            2,
+            Regex.Count(
+                workflow,
+                @"(?m)^\s+github\.repository == 'Fremsyn/tradebook' &&\s*$",
+                RegexOptions.None,
+                RegexTimeout
+            )
+        );
+    }
+
+    [Fact]
     public void SAFE09GlobalAnalyzersAreExactPrivateAndRepoWide()
     {
         var repositoryRoot = FindRepositoryRoot();

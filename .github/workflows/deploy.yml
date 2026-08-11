@@ -17,6 +17,7 @@ concurrency:
 jobs:
   deploy:
     if: >-
+      github.repository == 'Fremsyn/tradebook' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
@@ -134,6 +135,7 @@ jobs:
   release:
     needs: deploy
     if: >-
+      github.repository == 'Fremsyn/tradebook' &&
       needs.deploy.result == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
